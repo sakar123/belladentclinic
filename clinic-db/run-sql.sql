@@ -1,0 +1,8 @@
+--SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com'))
+--CREATE USER clinic_backend_user WITH PASSWORD 'pD7pr';
+-- GRANT ALL PRIVILEGES ON DATABASE clinic_db TO clinic_backend_user;
+-- GRANT ALL ON SCHEMA public TO clinic_backend_user;
+-- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO clinic_backend_user;
+-- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO clinic_backend_user;
+-- 	ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO clinic_backend_user;
+-- 	ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO clinic_backend_user;

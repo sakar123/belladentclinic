@@ -1,0 +1,1291 @@
+----Entities
+//Appointment.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using ClinicApi.Models.Entities;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Appointment 
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        public Guid patient_id { get; set; }
+        
+        [Required]
+        public Guid staff_id { get; set; }
+        
+        [Required]
+        public Guid status_id { get; set; }
+        
+        [Required]
+        public DateTime appointment_start_time { get; set; }
+        
+        [Required]
+        [Range(1, 480)]
+        public int duration_minutes { get; set; }
+        
+        [StringLength(1000)]
+        public string? reason_for_visit { get; set; }
+        
+        [StringLength(2000)]
+        public string? notes { get; set; }
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+        
+        [ForeignKey("patient_id")]
+        public virtual required Patient patient { get; set; }
+        
+        [ForeignKey("staff_id")]
+        public virtual required Staff staff { get; set; }
+        
+        [ForeignKey("status_id")]
+        public virtual required AppointmentStatus status { get; set; }
+        
+        [InverseProperty("Appointment")]
+        public virtual required ICollection<Treatment> treatments { get; set; }
+    }
+}
+//AppointmentStatus.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+using ClinicApi.Models.Entities;
+
+namespace ClinicApi.Models.Entities
+{
+    public class AppointmentStatus
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public required string name { get; set; }
+        
+        [InverseProperty("status")]
+        public virtual required ICollection<Appointment> appointments { get; set; }
+    }
+}
+//BaseAuditableEntity.cs
+using System;
+
+namespace ClinicApi.Models.Entities
+{
+    public abstract class BaseAuditableEntity : BaseEntity
+    {
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+    }
+}
+//BaseEntity.cs
+using System;
+
+namespace ClinicApi.Models.Entities
+{
+    public abstract class BaseEntity
+    {
+        public Guid id { get; set; }
+    }
+}
+//Billing.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using ClinicApi.Models.Enumerations;
+using System.Collections.Generic;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Billing
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        public Guid patient_id { get; set; }
+        
+        [Required]
+        public DateTime issue_date { get; set; } = DateTime.UtcNow;
+        
+        [Required]
+        public DateTime due_date { get; set; }
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal total_amount { get; set; } = 0.00m;
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal amount_paid { get; set; } = 0.00m;
+        
+        [Required]
+        public BillStatusEnum status { get; set; } = BillStatusEnum.Draft;
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+        
+        [ForeignKey("patient_id")]
+        public virtual required Patient patient { get; set; }
+        
+        [InverseProperty("billing")]
+        public virtual required ICollection<BillingLineItem> billing_line_Item { get; set; }
+        
+        [InverseProperty("billing")]
+        public virtual required ICollection<Payment> payment { get; set; }
+    }
+}
+//BillingLineItem.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace ClinicApi.Models.Entities
+{
+    public class BillingLineItem
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        public Guid billing_id { get; set; }
+        
+        public Guid? treatment_id { get; set; }
+        
+        [Required]
+        [StringLength(1000)]
+        public required string description { get; set; }
+        
+        [Required]
+        [Range(1, int.MaxValue)]
+        public int quantity { get; set; } = 1;
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal unit_price { get; set; }
+        
+        [Range(0, 100)]
+        public decimal discount_percentage { get; set; } = 0.00m;
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+        
+        [ForeignKey("billing_id")]
+        public virtual required Billing billing { get; set; }
+        
+        [ForeignKey("treatment_id")]
+        public virtual required Treatment treatment { get; set; }
+    }
+}
+//DiscountType.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+
+namespace ClinicApi.Models.Entities
+{
+    public class DiscountType
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public required string discount_name { get; set; }
+        
+        [Required]
+        [Range(0, 100)]
+        public decimal discount_percentage { get; set; }
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+        
+        [InverseProperty("discount_type")]
+        public virtual ICollection<SaleItem> sale_item { get; set; }
+    }
+}
+//Document.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Document
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        public Guid? tooth_id { get; set; }
+        
+        public Guid? treatment_id { get; set; }
+        
+        [Required]
+        public Guid patient_id { get; set; }
+        
+        [Required]
+        public Guid document_type_id { get; set; }
+        
+        [Required]
+        public DateTime upload_date { get; set; } = DateTime.UtcNow;
+        
+        [Required]
+        [StringLength(500)]
+        public string description { get; set; }
+        
+        public bool is_sensitive { get; set; } = false;
+        
+        [Required]
+        [StringLength(500)]
+        public string document_path { get; set; }
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        
+        [ForeignKey("tooth_id")]
+        public virtual Tooth tooth { get; set; }
+        
+        [ForeignKey("treatment_id")]
+        public virtual Treatment treatment { get; set; }
+        
+        [ForeignKey("patient_id")]
+        public virtual Patient patient { get; set; }
+        
+        [ForeignKey("document_type_id")]
+        public virtual DocumentType document_type { get; set; }
+    }
+}
+//Patient.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+using ClinicApi.Models.Entities;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Patient
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        public Guid person_id { get; set; }
+        
+        [StringLength(100)]
+        public string? emergency_contact_name { get; set; }
+        
+        [StringLength(20)]
+        public string? emergency_contact_phone { get; set; }
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+        
+        [ForeignKey("person_id")]
+        public virtual required Person Person { get; set; }
+        
+        [InverseProperty("patient")]
+        public virtual required ICollection<Appointment> appointments { get; set; }
+        
+        [InverseProperty("patient")]
+        public virtual required ICollection<Treatment> treatments { get; set; }
+        
+        [InverseProperty("patient")]
+        public virtual required ICollection<Billing> billings { get; set; }
+        
+        [InverseProperty("patient")]
+        public virtual required ICollection<Tooth> teeth { get; set; }
+        
+        [InverseProperty("patient")]
+        public virtual required ICollection<Document> documents { get; set; }
+        
+        [InverseProperty("patient")]
+        public virtual required ICollection<SaleItem> sale_items { get; set; }
+    }
+}
+
+//Payment.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using ClinicApi.Models.Enumerations;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Payment
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        public Guid billing_id { get; set; }
+        
+        [Required]
+        [Range(0.01, 999999.99)]
+        public decimal amount { get; set; }
+        
+        [Required]
+        public DateTime payment_date { get; set; } = DateTime.UtcNow;
+        
+        [Required]
+        public PaymentMethodEnum method { get; set; }
+        
+        [StringLength(255)]
+        public required string transaction_ref { get; set; }
+        
+        [Required]
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public required string created_by { get; set; }
+        
+        [ForeignKey("billing_id")]
+        public virtual required Billing billing { get; set; }
+    }
+}
+
+//Person.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using ClinicApi.Models.Enumerations;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Person
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public required string first_name { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public required string last_name { get; set; }
+        
+        public DateTime? date_of_birth { get; set; }
+        
+        public GenderEnum? gender { get; set; }
+        
+        [StringLength(100)]
+        [EmailAddress]
+        public required string email { get; set; }
+        
+        [StringLength(20)]
+        public required string phone_number { get; set; }
+        
+        [StringLength(500)]
+        public required string address { get; set; }
+        
+        public required string a_identifier { get; set; }
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+    }
+}
+
+//Prescription.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Prescription
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        public Guid treatment_id { get; set; }
+        
+        [Required]
+        [StringLength(100)]
+        public required string drug_name { get; set; }
+        
+        [StringLength(100)]
+        public required string dosage { get; set; }
+        
+        [StringLength(2000)]
+        public string? instructions { get; set; }
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+        
+        [ForeignKey("treatment_id")]
+        public virtual required Treatment treatment { get; set; }
+    }
+}
+
+//Role.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Role
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public required string name { get; set; }
+        
+        [StringLength(1000)]
+        public string? description { get; set; }
+        
+        [InverseProperty("Role")]
+        public virtual required ICollection<Staff> staff { get; set; }
+    }
+}
+
+//SaleItem.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace ClinicApi.Models.Entities
+{
+    public class SaleItem
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        [Range(1, int.MaxValue)]
+        public int quantity { get; set; }
+        
+        public Guid? discount_id { get; set; }
+        
+        public Guid? patient_id { get; set; }
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal cost { get; set; }
+        
+        public DateTime created_t { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+        
+        [ForeignKey("discount_id")]
+        public virtual required DiscountType discount_type { get; set; }
+        
+        [ForeignKey("patient_id")]
+        public virtual required Patient patient { get; set; }
+    }
+}
+
+//Service.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Service
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        public Guid? specialty_id { get; set; }
+        
+        [Required]
+        [StringLength(100)]
+        public required string name { get; set; }
+        
+        [StringLength(1000)]
+        public string? description { get; set; }
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal cost { get; set; }
+        
+        [ForeignKey("specialty_id")]
+        public virtual required Specialty specialty { get; set; }
+        
+        [InverseProperty("service")]
+        public virtual required ICollection<Treatment> treatments { get; set; }
+    }
+}
+
+//Specialty.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Specialty
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public string name { get; set; }
+        
+        [StringLength(1000)]
+        public string description { get; set; }
+        
+        [InverseProperty("specialty")]
+        public virtual ICollection<Staff> staff { get; set; }
+        
+        [InverseProperty("specialty")]
+        public virtual ICollection<Service> services { get; set; }
+    }
+}
+
+//Staff.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+using ClinicApi.Models.Entities;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Staff
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        public Guid person_id { get; set; }
+        
+        [Required]
+        public Guid role_id { get; set; }
+        
+        public Guid? specialty_id { get; set; }
+        
+        [StringLength(50)]
+        public required string license_number { get; set; }
+        
+        public bool is_active { get; set; } = true;
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_y { get; set; }
+        
+        [ForeignKey("person_d")]
+        public virtual required Person person { get; set; }
+        
+        [ForeignKey("role_id")]
+        public virtual required Role role { get; set; }
+        
+        [ForeignKey("specialty_id")]
+        public virtual required Specialty specialty { get; set; }
+        
+        [InverseProperty("staff")]
+        public virtual required ICollection<Appointment> appointments { get; set; }
+        
+        [InverseProperty("staff")]
+        public virtual required ICollection<Treatment> treatments { get; set; }
+    }
+}
+
+//Tooth.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Tooth
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+
+        [Required]
+        public Guid patient_id { get; set; }
+
+        [Required]
+        [Range(1, 32)]
+        public int tooth_number { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public required string tooth_name { get; set; }
+
+        [Required]
+        public Guid tooth_status_id { get; set; }
+
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+
+        [ForeignKey("patient_id")]
+        public virtual required Patient patient { get; set; }
+
+        [ForeignKey("tooth_status_id")]
+        public virtual required ToothStatus tooth_status { get; set; }
+
+        [InverseProperty(nameof(Treatment.Tooth))]
+        public virtual ICollection<Treatment> treatments { get; set; } = new List<Treatment>();
+
+        [InverseProperty("tooth")]
+        public virtual ICollection<Document> documents { get; set; }
+        
+    }
+}
+
+//ToothStatus.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+
+namespace ClinicApi.Models.Entities
+{
+    public class ToothStatus
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+        
+        [Required]
+        [StringLength(25)]
+        public string? code { get; set; }
+        
+        [StringLength(200)]
+        public string? description { get; set; }
+        
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        
+        [InverseProperty("tooth_status")]
+        public virtual required ICollection<Tooth> teeth { get; set; }
+    }
+}
+
+//Treatment.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
+using ClinicApi.Models.Entities;
+
+namespace ClinicApi.Models.Entities
+{
+    public class Treatment
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public Guid id { get; set; }
+
+        [Required]
+        public Guid appointment_id { get; set; }
+
+        [Required]
+        public Guid patient_id { get; set; }
+
+        [Required]
+        public Guid staff_id { get; set; }
+
+        [Required]
+        public Guid service_id { get; set; }
+
+        [Required]
+        public Guid tooth_id { get; set; }
+
+        [StringLength(2000)]
+        public string? notes { get; set; }
+
+        public DateTime created_at { get; set; } = DateTime.UtcNow;
+        public DateTime updated_at { get; set; } = DateTime.UtcNow;
+        public string? created_by { get; set; }
+        public string? updated_by { get; set; }
+
+        [ForeignKey("appointment_id")]
+        public virtual required Appointment appointment { get; set; }
+
+        [ForeignKey("patient_id")]
+        public virtual required Patient patient { get; set; }
+
+        [ForeignKey("staff_id")]
+        public virtual required Staff staff { get; set; }
+
+        [ForeignKey("service_id")]
+        public virtual required Service service { get; set; }
+
+        [InverseProperty("treatment")]
+        public virtual required ICollection<Prescription> prescriptions { get; set; }
+
+        [InverseProperty("treatment")]
+        public virtual required ICollection<BillingLineItem> billing_line_item { get; set; }
+
+        [InverseProperty("treatment")]
+        public virtual required ICollection<Document> documents { get; set; }
+        
+        [ForeignKey(nameof(tooth_id))]
+        [InverseProperty(nameof(Tooth.treatments))]
+        public virtual Tooth Tooth { get; set; } 
+    }
+}
+
+----Enumerations
+//BillStatusEnum.cs
+namespace ClinicApi.Models.Enumerations
+{
+    public enum BillStatusEnum
+    {
+        Draft,
+        Open,
+        Paid,
+        Partial,
+        Void
+    }
+}
+//GenderEnum.cs
+namespace ClinicApi.Models.Enumerations
+{
+    public enum GenderEnum
+    {
+        Male,
+        Female,
+        Other,
+        PreferNotToSay
+    }
+}
+
+//PaymentMethodEnum.cs
+namespace ClinicApi.Models.Enumerations
+{
+    public enum PaymentMethodEnum
+    {
+        Cash,
+        CreditCard,
+        Insurance,
+        BankTransfer,
+        MobilePay
+    }
+}
+----DTO
+//AppointmentDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class AppointmentDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        public Guid patient_id { get; set; }
+        
+        [Required]
+        public Guid staff_id { get; set; }
+        
+        [Required]
+        public Guid status_id { get; set; }
+        
+        [Required]
+        public DateTime appointment_start_time { get; set; }
+        
+        [Required]
+        [Range(1, 480)]
+        public int duration_minutes { get; set; }
+        
+        [StringLength(1000)]
+        public required string reason_for_visit { get; set; }
+        
+        [StringLength(2000)]
+        public string? notes { get; set; }
+    }
+}
+
+
+
+//AppointmentStatusDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class AppointmentStatusDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public required string name { get; set; }
+    }
+}
+
+//BillingDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using ClinicApi.Models.Enumerations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class BillingDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        public Guid patient_id { get; set; }
+        
+        [Required]
+        public DateTime issue_date { get; set; }
+        
+        [Required]
+        public DateTime due_date { get; set; }
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal total_amount { get; set; }
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal amount_paid { get; set; }
+        
+        [Required]
+        public BillStatusEnum status { get; set; }
+    }
+}
+
+//BillingLineItemDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class BillingLineItemDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        public Guid billing_id { get; set; }
+        
+        public Guid? treatment_id { get; set; }
+        
+        [Required]
+        [StringLength(1000)]
+        public required string description { get; set; }
+        
+        [Required]
+        [Range(1, int.MaxValue)]
+        public int quantity { get; set; }
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal unit_price { get; set; }
+        
+        [Range(0, 100)]
+        public decimal discount_percentage { get; set; }
+    }
+}
+
+//DiscountTypeDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class DiscountTypeDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public string? discount_name { get; set; }
+        
+        [Required]
+        [Range(0, 100)]
+        public decimal discount_percentage { get; set; }
+    }
+}
+
+//DocumentDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class DocumentDTO
+    {
+        public Guid? id { get; set; }
+        
+        public Guid? tooth_id { get; set; }
+        
+        public Guid? treatment_id { get; set; }
+        
+        [Required]
+        public Guid patient_id { get; set; }
+        
+        [Required]
+        public Guid document_type_id { get; set; }
+        
+        [Required]
+        public DateTime upload_date { get; set; }
+        
+        [Required]
+        [StringLength(500)]
+        public required string description { get; set; }
+        
+        public bool is_sensitive { get; set; } = false;
+        
+        [Required]
+        [StringLength(500)]
+        public required string document_path { get; set; }
+    }
+}
+
+//DocumentTypeDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class DocumentTypeDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        [StringLength(25)]
+        public required string document_type { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public required string name { get; set; }
+        
+        [StringLength(200)]
+        public string? description { get; set; }
+    }
+}
+
+
+//PatientDTO.cs
+	using System;
+	using System.ComponentModel.DataAnnotations;
+using ClinicApi.Models.Enumerations;
+namespace ClinicApi.Models.DTOs
+	{
+	    public class PatientDTO
+	    {
+	        public Guid? id { get; set; } // Optional for create operations
+	        // Person properties
+	        public Guid? person_id { get; set; }
+
+	        [StringLength(100)]
+	        public string? emergency_contact_name { get; set; }
+	        [StringLength(20)]
+	        public string? emergency_contact_phone { get; set; }
+	    }
+	}
+//PaymentDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+using ClinicApi.Models.Enumerations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class PaymentDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        public Guid billing_id { get; set; }
+        
+        [Required]
+        [Range(0.01, 999999.99)]
+        public decimal amount { get; set; }
+        
+        public DateTime payment_date { get; set; } = DateTime.UtcNow;
+        
+        [Required]
+        public PaymentMethodEnum  method { get; set; }
+        
+        [StringLength(255)]
+        public string? transaction_ref { get; set; }
+        
+        [Required]
+        public string? created_by { get; set; }
+    }
+}
+
+//PersonDTO.cs
+using System;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class PersonDTO
+    {
+        public Guid id { get; set; }
+        
+        public string first_name { get; set; } = null!;
+        
+        public string last_name { get; set; } = null!;
+        
+        public DateTime? date_of_birth { get; set; }
+        
+        public string? gender { get; set; }  // you can use enum if you have GenderEnum
+        
+        public string? email { get; set; }
+        
+        public string? phone_number { get; set; }
+        
+        public string? address { get; set; }
+        
+        public string? a_identifier { get; set; }  // maps to a_identifier
+        
+        public DateTime created_at { get; set; }
+        
+        public DateTime updated_at { get; set; }
+        
+        public string? created_by { get; set; }
+        
+        public string? updated_by { get; set; }
+    }
+}
+
+
+//PrescriptionDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class PrescriptionDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        public Guid treatment_id { get; set; }
+        
+        [Required]
+        [StringLength(100)]
+        public required string drug_name { get; set; }
+        
+        [StringLength(100)]
+        public string? dosage { get; set; }
+        
+        [StringLength(2000)]
+        public string? instructions { get; set; }
+    }
+}
+
+//RoleDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class RoleDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public string name { get; set; }
+        
+        [StringLength(1000)]
+        public string description { get; set; }
+    }
+}
+
+//SaleItemDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class SaleItemDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        [Range(1, int.MaxValue)]
+        public int quantity { get; set; }
+        
+        public Guid? discount_id { get; set; }
+        
+        public Guid? patient_id { get; set; }
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal cost { get; set; }
+    }
+}
+
+//ServiceDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class ServiceDTO
+    {
+        public Guid? id { get; set; }
+        
+        public Guid? specialty_id { get; set; }
+        
+        [Required]
+        [StringLength(100)]
+        public string name { get; set; }
+        
+        [StringLength(1000)]
+        public string description { get; set; }
+        
+        [Required]
+        [Range(0, 999999.99)]
+        public decimal cost { get; set; }
+    }
+}
+
+//SpecialtyDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class SpecialtyDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public string name { get; set; }
+        
+        [StringLength(1000)]
+        public string description { get; set; }
+    }
+}
+
+//StaffDTO.cs
+	using System;
+	using System.ComponentModel.DataAnnotations;
+using ClinicApi.Models.Enumerations;
+namespace ClinicApi.Models.DTOs
+	{
+	    public class StaffDTO
+	    {
+	        public Guid? id { get; set; } // Optional for create operations
+	        // Person properties
+	        public Guid? person_id { get; set; }
+	        // Staff-specific properties
+	        [Required]
+	        public Guid role_id { get; set; }
+	        public Guid? specialty_id { get; set; }
+	        [StringLength(50)]
+	        public required string license_number { get; set; }
+	        public bool is_active { get; set; } = true;
+	    }
+	}
+//ToothDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class ToothDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        public Guid patient_id { get; set; }
+        
+        [Required]
+        [Range(1, 32)]
+        public int tooth_number { get; set; }
+        
+        [Required]
+        [StringLength(50)]
+        public string tooth_name { get; set; }
+        
+        [Required]
+        public Guid tooth_status_id { get; set; }
+    }
+}
+//ToothStatusDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class ToothStatusDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        [StringLength(25)]
+        public string code { get; set; }
+        
+        [StringLength(200)]
+        public string description { get; set; }
+    }
+}
+
+//TreatmentDTO.cs
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicApi.Models.DTOs
+{
+    public class TreatmentDTO
+    {
+        public Guid? id { get; set; }
+        
+        [Required]
+        public Guid appointment_id { get; set; }
+        
+        [Required]
+        public Guid patient_id { get; set; }
+        
+        [Required]
+        public Guid staff_id { get; set; }
+        
+        [Required]
+        public Guid service_id { get; set; }
+        
+        public int? tooth_number { get; set; }
+        
+        [StringLength(2000)]
+        public string notes { get; set; }
+    }
+}

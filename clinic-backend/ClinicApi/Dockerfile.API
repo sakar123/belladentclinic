@@ -1,0 +1,36 @@
+# Stage 1: Build the application
+# Use the .NET 9 SDK image to build the project.
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+
+# Set the working directory
+WORKDIR /src
+
+# Copy the solution file and project files first to leverage Docker's layer caching.
+# This way, dependencies are only re-downloaded if the project files change.
+COPY clinic-backend/Clinic-Api.sln .
+COPY clinic-backend/ClinicApi/ClinicApi.csproj ./ClinicApi/
+COPY clinic-backend/ClinicApi.Tests/ClinicApi.Tests.csproj ./ClinicApi.Tests/
+
+# Restore NuGet packages for all projects in the solution
+RUN dotnet restore "Clinic-Api.sln"
+
+# Copy the rest of the source code
+COPY clinic-backend/ .
+
+# Publish the API project in Release configuration
+WORKDIR "/src/ClinicApi"
+RUN dotnet publish "ClinicApi.csproj" -c Release -o /app/publish --no-restore
+
+# Stage 2: Create the final, smaller runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+
+WORKDIR /app
+# Copy the published output from the build stage
+COPY --from=build /app/publish .
+
+# Expose the port the app will run on
+EXPOSE 8080
+
+# Define the entry point for the container
+ENTRYPOINT ["dotnet", "ClinicApi.dll"]
+

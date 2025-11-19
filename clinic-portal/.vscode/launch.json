@@ -1,0 +1,48 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+      {
+        "name": "Next.js: Dev (server)",
+        "type": "pwa-node",
+        "request": "launch",
+        "runtimeExecutable": "npm",
+        "runtimeArgs": ["run", "dev"],
+        "cwd": "${workspaceFolder}",
+        "envFile": "${workspaceFolder}/.env.local",
+        "env": {
+          "NODE_OPTIONS": "--inspect"
+        },
+        "console": "integratedTerminal",
+        "autoAttachChildProcesses": true,
+        "skipFiles": ["<node_internals>/**"],
+        "serverReadyAction": {
+          "pattern": "started server on .* http://localhost:(\\d+)",
+          "uriFormat": "http://localhost:%s",
+          "action": "openExternally"
+        }
+      },
+      {
+        "name": "Chrome: Client (localhost:3000)",
+        "type": "pwa-chrome",
+        "request": "launch",
+        "url": "http://localhost:3000",
+        "webRoot": "${workspaceFolder}",
+        "skipFiles": ["<node_internals>/**"]
+      },
+      {
+        "name": "Attach to Node (9229)",
+        "type": "pwa-node",
+        "request": "attach",
+        "port": 9229,
+        "restart": true,
+        "skipFiles": ["<node_internals>/**"],
+        "timeout": 20000
+      }
+  ],
+  "compounds": [
+      {
+        "name": "Next.js: Full (server+browser)",
+        "configurations": ["Next.js: Dev (server)", "Chrome: Client(localhost:3000)"]
+      }
+  ]
+  }

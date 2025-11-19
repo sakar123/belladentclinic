@@ -1,0 +1,55 @@
+# General
+.DS_Store
+*.log
+*.tmp
+*~
+
+# Visual Studio / .NET
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.pdb
+*.opendb
+*.bak
+*/publish/ # Ignore publish folders for .NET
+
+# Node.js
+node_modules/
+# Next.js specific build/cache directories
+.next/
+out/
+/build # Common for some JS builds, also in Next.js ignores
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches # Typically these are committed for Yarn PnP
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local # Catch all local envs
+
+# IDE specific
+.idea/
+.vscode/*.code-workspace
+.vscode/*.log
+
+# Testing/Coverage
+coverage/
+*.trx # .NET test results
+
+# Docker specific (already in some subfolders, but good to have in root for consistency)
+# If there are any locally built images or volumes that shouldn't be committed
+# .dockerignore # This file should be committed, not ignored
+.volume/ # Example: if Docker volumes are mounted here

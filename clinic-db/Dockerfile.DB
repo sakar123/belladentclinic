@@ -1,0 +1,32 @@
+## Custom Postgres image with schema + seed
+# Builds on the official Postgres image, sets a non-default port, and
+# loads schema/seed on first boot via /docker-entrypoint-initdb.d
+
+FROM postgres:16-alpine
+
+# ===== Configuration =====
+# These ENV values are used by the official entrypoint to create the
+# initial database/user on first run when the data directory is empty.
+# Adjust as needed, or override at `docker run`/compose time.
+ENV POSTGRES_DB=clinic_db \
+    POSTGRES_USER=clinic_backend_user \
+    POSTGRES_PASSWORD=pD7pr
+
+# Listen on a non-default port. To change, edit here.
+# Note: host port mapping is still configured at runtime (docker run/compose).
+ENV PG_LISTEN_PORT=5433
+
+# Copy initialization SQL. These run once on first container start
+# against an empty data dir, in lexicographic order.
+COPY database-schema.sql /docker-entrypoint-initdb.d/01_schema.sql
+COPY insert-statement.sql /docker-entrypoint-initdb.d/02_seed.sql
+# Optional maintenance scripts copied into the image for convenience
+COPY delete-records.sql /sql/delete-records.sql
+COPY delete-tables.sql /sql/delete-tables.sql
+
+# Expose the chosen port (for documentation; mapping is done at runtime)
+EXPOSE 5433
+
+# Pass desired port to the server process. The official image has
+# docker-entrypoint.sh as ENTRYPOINT; this CMD becomes its args.
+CMD ["postgres", "-p", "5433"]

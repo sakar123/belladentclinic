@@ -1,0 +1,33 @@
+import { cn } from "../../lib/utils";
+
+export default function Button({ as: Comp = "button", className, variant = "default", size = "md", ...props }) {
+  const variants = {
+    /* primary now white with subtle border */
+    default: "bg-primary text-primary-foreground border border-app-border hover:bg-app-bg",
+    /* blue secondary */
+    secondary: "bg-secondary text-white hover:opacity-90",
+    /* pink accent/tertiary */
+    accent: "bg-tertiary text-white hover:opacity-90",
+    outline: "border border-app-border bg-transparent hover:bg-app-bg",
+    ghost: "bg-transparent hover:bg-app-bg",
+    subtle: "bg-app-bg hover:bg-app-border/40",
+  };
+  const sizes = {
+    sm: "h-8 px-3 text-sm",
+    md: "h-10 px-4",
+    lg: "h-11 px-5 text-base",
+    icon: "h-10 w-10 p-0 inline-flex items-center justify-center",
+  };
+  return (
+    <Comp
+      className={cn(
+        "inline-flex items-center gap-2 rounded-md font-medium ring-focus",
+        "disabled:opacity-50 disabled:pointer-events-none",
+        variants[variant] || variants.default,
+        sizes[size] || sizes.md,
+        className
+      )}
+      {...props}
+    />
+  );
+}

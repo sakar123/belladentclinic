@@ -1,0 +1,2078 @@
+# Comprehensive Unit Tests for Dental Clinic API
+
+I'll create a complete suite of unit tests following professional testing standards. We'll use xUnit as the testing framework, Moq for mocking dependencies, and FluentAssertions for readable assertions.
+
+## Test Project Structure
+
+```
+ClinicApi.Tests/
+├── Controllers/
+│   ├── AppointmentsControllerTests.cs
+│   ├── BillingsControllerTests.cs
+│   ├── DocumentsControllerTests.cs
+│   ├── PatientsControllerTests.cs
+│   ├── PrescriptionsControllerTests.cs
+│   ├── RolesControllerTests.cs
+│   ├── SalesControllerTests.cs
+│   ├── ServicesControllerTests.cs
+│   ├── SpecialtiesControllerTests.cs
+│   ├── StaffControllerTests.cs
+│   ├── TeethControllerTests.cs
+│   └── TreatmentsControllerTests.cs
+├── Services/
+│   ├── AppointmentServiceTests.cs
+│   ├── BillingServiceTests.cs
+│   ├── DocumentServiceTests.cs
+│   ├── PatientServiceTests.cs
+│   ├── PrescriptionServiceTests.cs
+│   ├── RoleServiceTests.cs
+│   ├── SaleServiceTests.cs
+│   ├── ServiceServiceTests.cs
+│   ├── SpecialtyServiceTests.cs
+│   ├── StaffServiceTests.cs
+│   ├── ToothServiceTests.cs
+│   └── TreatmentServiceTests.cs
+├── Repositories/
+│   └── RepositoryTests.cs
+├── Helpers/
+│   ├── TestDataGenerator.cs
+│   └── MockExtensions.cs
+└── Integration/
+    └── DatabaseIntegrationTests.cs
+```
+
+## 1. Test Data Generator
+
+### Helpers/TestDataGenerator.cs
+```csharp
+using System;
+using System.Collections.Generic;
+using ClinicApi.Models.Entities;
+using ClinicApi.Models.Enums;
+using ClinicApi.Models.DTOs;
+
+namespace ClinicApi.Tests.Helpers
+{
+    public static class TestDataGenerator
+    {
+        private static readonly Random _random = new Random();
+
+        // Entity generators
+        public static Role GenerateRole()
+        {
+            return new Role
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Role_{_random.Next(1000)}",
+                Description = $"Description_{_random.Next(1000)}"
+            };
+        }
+
+        public static Specialty GenerateSpecialty()
+        {
+            return new Specialty
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Specialty_{_random.Next(1000)}",
+                Description = $"Description_{_random.Next(1000)}"
+            };
+        }
+
+        public static Person GeneratePerson()
+        {
+            return new Person
+            {
+                Id = Guid.NewGuid(),
+                FirstName = $"FirstName_{_random.Next(1000)}",
+                LastName = $"LastName_{_random.Next(1000)}",
+                DateOfBirth = DateTime.Now.AddYears(-_random.Next(20, 70)),
+                Gender = (GenderEnum)_random.Next(0, 3),
+                Email = $"email_{_random.Next(1000)}@example.com",
+                PhoneNumber = $"+1555{_random.Next(1000000, 9999999)}",
+                Address = $"Address {_random.Next(1000)} Main St",
+                AIdentifier = $"AId_{_random.Next(1000)}",
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now,
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static Staff GenerateStaff()
+        {
+            return new Staff
+            {
+                Id = Guid.NewGuid(),
+                PersonId = Guid.NewGuid(),
+                RoleId = Guid.NewGuid(),
+                SpecialtyId = Guid.NewGuid(),
+                LicenseNumber = $"License_{_random.Next(1000)}",
+                IsActive = _random.Next(0, 2) == 1,
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now,
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static Patient GeneratePatient()
+        {
+            return new Patient
+            {
+                Id = Guid.NewGuid(),
+                PersonId = Guid.NewGuid(),
+                EmergencyContactName = $"Emergency_{_random.Next(1000)}",
+                EmergencyContactPhone = $"+1555{_random.Next(1000000, 9999999)}",
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now,
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static AppointmentStatus GenerateAppointmentStatus()
+        {
+            return new AppointmentStatus
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Status_{_random.Next(1000)}"
+            };
+        }
+
+        public static Appointment GenerateAppointment()
+        {
+            return new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = Guid.NewGuid(),
+                StaffId = Guid.NewGuid(),
+                StatusId = Guid.NewGuid(),
+                AppointmentStartTime = DateTime.Now.AddDays(_random.Next(1, 30)),
+                DurationMinutes = _random.Next(15, 120),
+                ReasonForVisit = $"Reason_{_random.Next(1000)}",
+                Notes = $"Notes_{_random.Next(1000)}",
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now,
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static Service GenerateService()
+        {
+            return new Service
+            {
+                Id = Guid.NewGuid(),
+                SpecialtyId = Guid.NewGuid(),
+                Name = $"Service_{_random.Next(1000)}",
+                Description = $"Description_{_random.Next(1000)}",
+                Cost = _random.Next(50, 1000)
+            };
+        }
+
+        public static Treatment GenerateTreatment()
+        {
+            return new Treatment
+            {
+                Id = Guid.NewGuid(),
+                AppointmentId = Guid.NewGuid(),
+                PatientId = Guid.NewGuid(),
+                StaffId = Guid.NewGuid(),
+                ServiceId = Guid.NewGuid(),
+                ToothNumber = _random.Next(1, 32),
+                Notes = $"Notes_{_random.Next(1000)}",
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now,
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static Prescription GeneratePrescription()
+        {
+            return new Prescription
+            {
+                Id = Guid.NewGuid(),
+                TreatmentId = Guid.NewGuid(),
+                DrugName = $"Drug_{_random.Next(1000)}",
+                Dosage = $"{_random.Next(1, 100)}mg",
+                Instructions = $"Instructions_{_random.Next(1000)}",
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now,
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static ToothStatus GenerateToothStatus()
+        {
+            return new ToothStatus
+            {
+                Id = Guid.NewGuid(),
+                Code = $"Code_{_random.Next(1000)}",
+                Description = $"Description_{_random.Next(1000)}",
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now
+            };
+        }
+
+        public static Tooth GenerateTooth()
+        {
+            return new Tooth
+            {
+                Id = Guid.NewGuid(),
+                PatientId = Guid.NewGuid(),
+                ToothNumber = _random.Next(1, 32),
+                ToothName = $"Tooth_{_random.Next(1000)}",
+                ToothStatusId = Guid.NewGuid(),
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now
+            };
+        }
+
+        public static Billing GenerateBilling()
+        {
+            return new Billing
+            {
+                Id = Guid.NewGuid(),
+                PatientId = Guid.NewGuid(),
+                IssueDate = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                DueDate = DateTime.Now.AddDays(_random.Next(1, 30)),
+                TotalAmount = _random.Next(100, 2000),
+                AmountPaid = _random.Next(0, 1000),
+                Status = (BillStatusEnum)_random.Next(0, 4),
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now,
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static BillingLineItem GenerateBillingLineItem()
+        {
+            return new BillingLineItem
+            {
+                Id = Guid.NewGuid(),
+                BillingId = Guid.NewGuid(),
+                TreatmentId = Guid.NewGuid(),
+                Description = $"Description_{_random.Next(1000)}",
+                Quantity = _random.Next(1, 10),
+                UnitPrice = _random.Next(10, 500),
+                DiscountPercentage = _random.Next(0, 50),
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static DiscountType GenerateDiscountType()
+        {
+            return new DiscountType
+            {
+                Id = Guid.NewGuid(),
+                DiscountName = $"Discount_{_random.Next(1000)}",
+                DiscountPercentage = _random.Next(0, 50),
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now,
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static SaleItem GenerateSaleItem()
+        {
+            return new SaleItem
+            {
+                Id = Guid.NewGuid(),
+                Quantity = _random.Next(1, 10),
+                DiscountId = Guid.NewGuid(),
+                PatientId = Guid.NewGuid(),
+                Cost = _random.Next(10, 500),
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now,
+                CreatedBy = $"User_{_random.Next(1000)}",
+                UpdatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static Payment GeneratePayment()
+        {
+            return new Payment
+            {
+                Id = Guid.NewGuid(),
+                BillingId = Guid.NewGuid(),
+                Amount = _random.Next(10, 1000),
+                PaymentDate = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                Method = (PaymentMethodEnum)_random.Next(0, 4),
+                TransactionRef = $"TXN_{_random.Next(1000)}",
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                CreatedBy = $"User_{_random.Next(1000)}"
+            };
+        }
+
+        public static DocumentType GenerateDocumentType()
+        {
+            return new DocumentType
+            {
+                Id = Guid.NewGuid(),
+                DocumentType = $"Type_{_random.Next(1000)}",
+                Name = $"Name_{_random.Next(1000)}",
+                Description = $"Description_{_random.Next(1000)}"
+            };
+        }
+
+        public static Document GenerateDocument()
+        {
+            return new Document
+            {
+                Id = Guid.NewGuid(),
+                ToothId = Guid.NewGuid(),
+                TreatmentId = Guid.NewGuid(),
+                PatientId = Guid.NewGuid(),
+                DocumentTypeId = Guid.NewGuid(),
+                UploadDate = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                Description = $"Description_{_random.Next(1000)}",
+                IsSensitive = _random.Next(0, 2) == 1,
+                DocumentPath = $"/docs/path_{_random.Next(1000)}",
+                CreatedAt = DateTime.Now.AddDays(-_random.Next(1, 30)),
+                UpdatedAt = DateTime.Now
+            };
+        }
+
+        // DTO generators
+        public static AppointmentDTO GenerateAppointmentDTO()
+        {
+            return new AppointmentDTO
+            {
+                PatientId = Guid.NewGuid(),
+                StaffId = Guid.NewGuid(),
+                StatusId = Guid.NewGuid(),
+                AppointmentStartTime = DateTime.Now.AddDays(_random.Next(1, 30)),
+                DurationMinutes = _random.Next(15, 120),
+                ReasonForVisit = $"Reason_{_random.Next(1000)}",
+                Notes = $"Notes_{_random.Next(1000)}"
+            };
+        }
+
+        public static PatientDTO GeneratePatientDTO()
+        {
+            return new PatientDTO
+            {
+                FirstName = $"FirstName_{_random.Next(1000)}",
+                LastName = $"LastName_{_random.Next(1000)}",
+                DateOfBirth = DateTime.Now.AddYears(-_random.Next(20, 70)),
+                Gender = (GenderEnum)_random.Next(0, 3),
+                Email = $"email_{_random.Next(1000)}@example.com",
+                PhoneNumber = $"+1555{_random.Next(1000000, 9999999)}",
+                Address = $"Address {_random.Next(1000)} Main St",
+                EmergencyContactName = $"Emergency_{_random.Next(1000)}",
+                EmergencyContactPhone = $"+1555{_random.Next(1000000, 9999999)}"
+            };
+        }
+
+        public static StaffDTO GenerateStaffDTO()
+        {
+            return new StaffDTO
+            {
+                FirstName = $"FirstName_{_random.Next(1000)}",
+                LastName = $"LastName_{_random.Next(1000)}",
+                DateOfBirth = DateTime.Now.AddYears(-_random.Next(20, 70)),
+                Gender = (GenderEnum)_random.Next(0, 3),
+                Email = $"email_{_random.Next(1000)}@example.com",
+                PhoneNumber = $"+1555{_random.Next(1000000, 9999999)}",
+                Address = $"Address {_random.Next(1000)} Main St",
+                RoleId = Guid.NewGuid(),
+                SpecialtyId = Guid.NewGuid(),
+                LicenseNumber = $"License_{_random.Next(1000)}",
+                IsActive = _random.Next(0, 2) == 1
+            };
+        }
+
+        // Generate lists
+        public static List<T> GenerateList<T>(Func<T> generator, int count = 5)
+        {
+            var list = new List<T>();
+            for (int i = 0; i < count; i++)
+            {
+                list.Add(generator());
+            }
+            return list;
+        }
+    }
+}
+```
+
+## 2. Mock Extensions
+
+### Helpers/MockExtensions.cs
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading.Tasks;
+using Moq;
+using ClinicApi.Data.Repositories;
+
+namespace ClinicApi.Tests.Helpers
+{
+    public static class MockExtensions
+    {
+        public static void SetupAddAsync<T>(this Mock<IRepository<T>> mock, T entity) where T : class
+        {
+            mock.Setup(r => r.AddAsync(It.IsAny<T>()))
+                .Callback<T>(e =>
+                {
+                    // Simulate adding to a list
+                    var list = new List<T> { e };
+                    mock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<T, bool>>>()))
+                        .ReturnsAsync(list);
+                })
+                .Returns(Task.CompletedTask);
+        }
+
+        public static void SetupUpdateAsync<T>(this Mock<IRepository<T>> mock, T entity) where T : class
+        {
+            mock.Setup(r => r.Update(It.IsAny<T>()))
+                .Callback<T>(e =>
+                {
+                    // Simulate update
+                    mock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>()))
+                        .ReturnsAsync(e);
+                });
+        }
+
+        public static void SetupDeleteAsync<T>(this Mock<IRepository<T>> mock, T entity) where T : class
+        {
+            mock.Setup(r => r.Delete(It.IsAny<T>()))
+                .Callback<T>(e =>
+                {
+                    // Simulate deletion
+                    mock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>()))
+                        .ReturnsAsync((T)null);
+                });
+        }
+
+        public static void SetupGetByIdAsync<T>(this Mock<IRepository<T>> mock, T entity) where T : class
+        {
+            mock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>()))
+                .ReturnsAsync(entity);
+        }
+
+        public static void SetupGetAllAsync<T>(this Mock<IRepository<T>> mock, List<T> entities) where T : class
+        {
+            mock.Setup(r => r.GetAllAsync())
+                .ReturnsAsync(entities);
+        }
+
+        public static void SetupFindAsync<T>(this Mock<IRepository<T>> mock, List<T> entities) where T : class
+        {
+            mock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<T, bool>>>()))
+                .ReturnsAsync((Expression<Func<T, bool>> predicate) => entities.Where(predicate.Compile()).ToList());
+        }
+
+        public static void SetupExistsAsync<T>(this Mock<IRepository<T>> mock, bool exists) where T : class
+        {
+            mock.Setup(r => r.ExistsAsync(It.IsAny<Guid>()))
+                .ReturnsAsync(exists);
+        }
+
+        public static void SetupSaveChangesAsync(this Mock<IRepository<T>> mock, int result = 1) where T : class
+        {
+            mock.Setup(r => r.SaveChangesAsync())
+                .ReturnsAsync(result);
+        }
+
+        public static void VerifyAddAsync<T>(this Mock<IRepository<T>> mock, Times times) where T : class
+        {
+            mock.Verify(r => r.AddAsync(It.IsAny<T>()), times);
+        }
+
+        public static void VerifyUpdateAsync<T>(this Mock<IRepository<T>> mock, Times times) where T : class
+        {
+            mock.Verify(r => r.Update(It.IsAny<T>()), times);
+        }
+
+        public static void VerifyDeleteAsync<T>(this Mock<IRepository<T>> mock, Times times) where T : class
+        {
+            mock.Verify(r => r.Delete(It.IsAny<T>()), times);
+        }
+
+        public static void VerifyGetByIdAsync<T>(this Mock<IRepository<T>> mock, Times times) where T : class
+        {
+            mock.Verify(r => r.GetByIdAsync(It.IsAny<Guid>()), times);
+        }
+
+        public static void VerifyGetAllAsync<T>(this Mock<IRepository<T>> mock, Times times) where T : class
+        {
+            mock.Verify(r => r.GetAllAsync(), times);
+        }
+
+        public static void VerifyFindAsync<T>(this Mock<IRepository<T>> mock, Times times) where T : class
+        {
+            mock.Verify(r => r.FindAsync(It.IsAny<Expression<Func<T, bool>>>()), times);
+        }
+
+        public static void VerifyExistsAsync<T>(this Mock<IRepository<T>> mock, Times times) where T : class
+        {
+            mock.Verify(r => r.ExistsAsync(It.IsAny<Guid>()), times);
+        }
+
+        public static void VerifySaveChangesAsync<T>(this Mock<IRepository<T>> mock, Times times) where T : class
+        {
+            mock.Verify(r => r.SaveChangesAsync(), times);
+        }
+    }
+}
+```
+
+## 3. Service Tests
+
+### Services/AppointmentServiceTests.cs
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Xunit;
+using Moq;
+using FluentAssertions;
+using AutoMapper;
+using ClinicApi.Services;
+using ClinicApi.Services.Implementations;
+using ClinicApi.Data.Repositories;
+using ClinicApi.Models.Entities;
+using ClinicApi.Models.DTOs;
+using ClinicApi.Tests.Helpers;
+
+namespace ClinicApi.Tests.Services
+{
+    public class AppointmentServiceTests
+    {
+        private readonly Mock<IRepository<Appointment>> _appointmentRepositoryMock;
+        private readonly Mock<IRepository<AppointmentStatus>> _statusRepositoryMock;
+        private readonly Mock<IRepository<Patient>> _patientRepositoryMock;
+        private readonly Mock<IRepository<Staff>> _staffRepositoryMock;
+        private readonly Mock<IMapper> _mapperMock;
+        private readonly IAppointmentService _appointmentService;
+
+        public AppointmentServiceTests()
+        {
+            _appointmentRepositoryMock = new Mock<IRepository<Appointment>>();
+            _statusRepositoryMock = new Mock<IRepository<AppointmentStatus>>();
+            _patientRepositoryMock = new Mock<IRepository<Patient>>();
+            _staffRepositoryMock = new Mock<IRepository<Staff>>();
+            _mapperMock = new Mock<IMapper>();
+
+            _appointmentService = new AppointmentService(
+                _appointmentRepositoryMock.Object,
+                _statusRepositoryMock.Object,
+                _patientRepositoryMock.Object,
+                _staffRepositoryMock.Object,
+                _mapperMock.Object);
+        }
+
+        [Fact]
+        public async Task GetAllAppointmentsAsync_ShouldReturnAllAppointments()
+        {
+            // Arrange
+            var appointments = TestDataGenerator.GenerateList(TestDataGenerator.GenerateAppointment);
+            var appointmentDtos = TestDataGenerator.GenerateList(TestDataGenerator.GenerateAppointmentDTO);
+
+            _appointmentRepositoryMock.SetupGetAllAsync(appointments);
+            _mapperMock.Setup(m => m.Map<IEnumerable<AppointmentDTO>>(appointments)).Returns(appointmentDtos);
+
+            // Act
+            var result = await _appointmentService.GetAllAppointmentsAsync();
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().HaveCount(appointments.Count);
+            _appointmentRepositoryMock.VerifyGetAllAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<IEnumerable<AppointmentDTO>>(appointments), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetAppointmentByIdAsync_WithValidId_ShouldReturnAppointment()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            var appointment = TestDataGenerator.GenerateAppointment();
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+
+            _appointmentRepositoryMock.SetupGetByIdAsync(appointment);
+            _mapperMock.Setup(m => m.Map<AppointmentDTO>(appointment)).Returns(appointmentDto);
+
+            // Act
+            var result = await _appointmentService.GetAppointmentByIdAsync(appointmentId);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEquivalentTo(appointmentDto);
+            _appointmentRepositoryMock.VerifyGetByIdAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<AppointmentDTO>(appointment), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetAppointmentByIdAsync_WithInvalidId_ShouldReturnNull()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            _appointmentRepositoryMock.SetupGetByIdAsync((Appointment)null);
+
+            // Act
+            var result = await _appointmentService.GetAppointmentByIdAsync(appointmentId);
+
+            // Assert
+            result.Should().BeNull();
+            _appointmentRepositoryMock.VerifyGetByIdAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateAppointmentAsync_WithValidData_ShouldCreateAppointment()
+        {
+            // Arrange
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            var appointment = TestDataGenerator.GenerateAppointment();
+            var createdAppointment = TestDataGenerator.GenerateAppointment();
+            var createdAppointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+
+            _patientRepositoryMock.SetupExistsAsync(true);
+            _staffRepositoryMock.SetupExistsAsync(true);
+            _statusRepositoryMock.SetupExistsAsync(true);
+            _mapperMock.Setup(m => m.Map<Appointment>(appointmentDto)).Returns(appointment);
+            _appointmentRepositoryMock.SetupAddAsync(appointment);
+            _appointmentRepositoryMock.SetupSaveChangesAsync(1);
+            _mapperMock.Setup(m => m.Map<AppointmentDTO>(createdAppointment)).Returns(createdAppointmentDto);
+
+            // Act
+            var result = await _appointmentService.CreateAppointmentAsync(appointmentDto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEquivalentTo(createdAppointmentDto);
+            _patientRepositoryMock.VerifyExistsAsync(Times.Once);
+            _staffRepositoryMock.VerifyExistsAsync(Times.Once);
+            _statusRepositoryMock.VerifyExistsAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<Appointment>(appointmentDto), Times.Once);
+            _appointmentRepositoryMock.VerifyAddAsync(Times.Once);
+            _appointmentRepositoryMock.VerifySaveChangesAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<AppointmentDTO>(createdAppointment), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateAppointmentAsync_WithInvalidPatientId_ShouldThrowKeyNotFoundException()
+        {
+            // Arrange
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            _patientRepositoryMock.SetupExistsAsync(false);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => _appointmentService.CreateAppointmentAsync(appointmentDto));
+            _patientRepositoryMock.VerifyExistsAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateAppointmentAsync_WithInvalidStaffId_ShouldThrowKeyNotFoundException()
+        {
+            // Arrange
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            _patientRepositoryMock.SetupExistsAsync(true);
+            _staffRepositoryMock.SetupExistsAsync(false);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => _appointmentService.CreateAppointmentAsync(appointmentDto));
+            _patientRepositoryMock.VerifyExistsAsync(Times.Once);
+            _staffRepositoryMock.VerifyExistsAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateAppointmentAsync_WithInvalidStatusId_ShouldThrowKeyNotFoundException()
+        {
+            // Arrange
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            _patientRepositoryMock.SetupExistsAsync(true);
+            _staffRepositoryMock.SetupExistsAsync(true);
+            _statusRepositoryMock.SetupExistsAsync(false);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => _appointmentService.CreateAppointmentAsync(appointmentDto));
+            _patientRepositoryMock.VerifyExistsAsync(Times.Once);
+            _staffRepositoryMock.VerifyExistsAsync(Times.Once);
+            _statusRepositoryMock.VerifyExistsAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAppointmentAsync_WithValidData_ShouldUpdateAppointment()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            var existingAppointment = TestDataGenerator.GenerateAppointment();
+            var updatedAppointment = TestDataGenerator.GenerateAppointment();
+            var updatedAppointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+
+            _appointmentRepositoryMock.SetupGetByIdAsync(existingAppointment);
+            _patientRepositoryMock.SetupExistsAsync(true);
+            _staffRepositoryMock.SetupExistsAsync(true);
+            _statusRepositoryMock.SetupExistsAsync(true);
+            _mapperMock.Setup(m => m.Map(appointmentDto, existingAppointment));
+            _appointmentRepositoryMock.SetupUpdateAsync(existingAppointment);
+            _appointmentRepositoryMock.SetupSaveChangesAsync(1);
+            _mapperMock.Setup(m => m.Map<AppointmentDTO>(updatedAppointment)).Returns(updatedAppointmentDto);
+
+            // Act
+            var result = await _appointmentService.UpdateAppointmentAsync(appointmentId, appointmentDto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEquivalentTo(updatedAppointmentDto);
+            _appointmentRepositoryMock.VerifyGetByIdAsync(Times.Once);
+            _patientRepositoryMock.VerifyExistsAsync(Times.Once);
+            _staffRepositoryMock.VerifyExistsAsync(Times.Once);
+            _statusRepositoryMock.VerifyExistsAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map(appointmentDto, existingAppointment), Times.Once);
+            _appointmentRepositoryMock.VerifyUpdateAsync(Times.Once);
+            _appointmentRepositoryMock.VerifySaveChangesAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<AppointmentDTO>(updatedAppointment), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAppointmentAsync_WithInvalidId_ShouldThrowKeyNotFoundException()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            _appointmentRepositoryMock.SetupGetByIdAsync((Appointment)null);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => _appointmentService.UpdateAppointmentAsync(appointmentId, appointmentDto));
+            _appointmentRepositoryMock.VerifyGetByIdAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteAppointmentAsync_WithValidId_ShouldDeleteAppointment()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            var appointment = TestDataGenerator.GenerateAppointment();
+            _appointmentRepositoryMock.SetupGetByIdAsync(appointment);
+            _appointmentRepositoryMock.SetupDeleteAsync(appointment);
+            _appointmentRepositoryMock.SetupSaveChangesAsync(1);
+
+            // Act
+            var result = await _appointmentService.DeleteAppointmentAsync(appointmentId);
+
+            // Assert
+            result.Should().BeTrue();
+            _appointmentRepositoryMock.VerifyGetByIdAsync(Times.Once);
+            _appointmentRepositoryMock.VerifyDeleteAsync(Times.Once);
+            _appointmentRepositoryMock.VerifySaveChangesAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteAppointmentAsync_WithInvalidId_ShouldReturnFalse()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            _appointmentRepositoryMock.SetupGetByIdAsync((Appointment)null);
+
+            // Act
+            var result = await _appointmentService.DeleteAppointmentAsync(appointmentId);
+
+            // Assert
+            result.Should().BeFalse();
+            _appointmentRepositoryMock.VerifyGetByIdAsync(Times.Once);
+        }
+    }
+}
+```
+
+### Services/PatientServiceTests.cs
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Xunit;
+using Moq;
+using FluentAssertions;
+using AutoMapper;
+using ClinicApi.Services;
+using ClinicApi.Services.Implementations;
+using ClinicApi.Data.Repositories;
+using ClinicApi.Models.Entities;
+using ClinicApi.Models.DTOs;
+using ClinicApi.Tests.Helpers;
+
+namespace ClinicApi.Tests.Services
+{
+    public class PatientServiceTests
+    {
+        private readonly Mock<IRepository<Patient>> _patientRepositoryMock;
+        private readonly Mock<IRepository<Person>> _personRepositoryMock;
+        private readonly Mock<IMapper> _mapperMock;
+        private readonly IPatientService _patientService;
+
+        public PatientServiceTests()
+        {
+            _patientRepositoryMock = new Mock<IRepository<Patient>>();
+            _personRepositoryMock = new Mock<IRepository<Person>>();
+            _mapperMock = new Mock<IMapper>();
+
+            _patientService = new PatientService(
+                _patientRepositoryMock.Object,
+                _personRepositoryMock.Object,
+                _mapperMock.Object);
+        }
+
+        [Fact]
+        public async Task GetAllPatientsAsync_ShouldReturnAllPatients()
+        {
+            // Arrange
+            var patients = TestDataGenerator.GenerateList(TestDataGenerator.GeneratePatient);
+            var patientDtos = TestDataGenerator.GenerateList(TestDataGenerator.GeneratePatientDTO);
+
+            _patientRepositoryMock.SetupGetAllAsync(patients);
+            _mapperMock.Setup(m => m.Map<IEnumerable<PatientDTO>>(patients)).Returns(patientDtos);
+
+            // Act
+            var result = await _patientService.GetAllPatientsAsync();
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().HaveCount(patients.Count);
+            _patientRepositoryMock.VerifyGetAllAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<IEnumerable<PatientDTO>>(patients), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetPatientByIdAsync_WithValidId_ShouldReturnPatient()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            var patient = TestDataGenerator.GeneratePatient();
+            var patientDto = TestDataGenerator.GeneratePatientDTO();
+
+            _patientRepositoryMock.SetupGetByIdAsync(patient);
+            _mapperMock.Setup(m => m.Map<PatientDTO>(patient)).Returns(patientDto);
+
+            // Act
+            var result = await _patientService.GetPatientByIdAsync(patientId);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEquivalentTo(patientDto);
+            _patientRepositoryMock.VerifyGetByIdAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<PatientDTO>(patient), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetPatientByIdAsync_WithInvalidId_ShouldReturnNull()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            _patientRepositoryMock.SetupGetByIdAsync((Patient)null);
+
+            // Act
+            var result = await _patientService.GetPatientByIdAsync(patientId);
+
+            // Assert
+            result.Should().BeNull();
+            _patientRepositoryMock.VerifyGetByIdAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task CreatePatientAsync_WithValidData_ShouldCreatePatient()
+        {
+            // Arrange
+            var patientDto = TestDataGenerator.GeneratePatientDTO();
+            var person = TestDataGenerator.GeneratePerson();
+            var patient = TestDataGenerator.GeneratePatient();
+            var createdPatient = TestDataGenerator.GeneratePatient();
+            var createdPatientDto = TestDataGenerator.GeneratePatientDTO();
+
+            _mapperMock.Setup(m => m.Map<Person>(patientDto)).Returns(person);
+            _personRepositoryMock.SetupAddAsync(person);
+            _personRepositoryMock.SetupSaveChangesAsync(1);
+            _mapperMock.Setup(m => m.Map<Patient>(patientDto)).Returns(patient);
+            _patientRepositoryMock.SetupAddAsync(patient);
+            _patientRepositoryMock.SetupSaveChangesAsync(1);
+            _mapperMock.Setup(m => m.Map<PatientDTO>(createdPatient)).Returns(createdPatientDto);
+
+            // Act
+            var result = await _patientService.CreatePatientAsync(patientDto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEquivalentTo(createdPatientDto);
+            _mapperMock.Verify(m => m.Map<Person>(patientDto), Times.Once);
+            _personRepositoryMock.VerifyAddAsync(Times.Once);
+            _personRepositoryMock.VerifySaveChangesAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<Patient>(patientDto), Times.Once);
+            _patientRepositoryMock.VerifyAddAsync(Times.Once);
+            _patientRepositoryMock.VerifySaveChangesAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<PatientDTO>(createdPatient), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdatePatientAsync_WithValidData_ShouldUpdatePatient()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            var patientDto = TestDataGenerator.GeneratePatientDTO();
+            var existingPatient = TestDataGenerator.GeneratePatient();
+            var existingPerson = TestDataGenerator.GeneratePerson();
+            var updatedPatient = TestDataGenerator.GeneratePatient();
+            var updatedPatientDto = TestDataGenerator.GeneratePatientDTO();
+
+            _patientRepositoryMock.SetupGetByIdAsync(existingPatient);
+            _personRepositoryMock.SetupGetByIdAsync(existingPerson);
+            _mapperMock.Setup(m => m.Map(patientDto, existingPerson));
+            _personRepositoryMock.SetupUpdateAsync(existingPerson);
+            _personRepositoryMock.SetupSaveChangesAsync(1);
+            _mapperMock.Setup(m => m.Map(patientDto, existingPatient));
+            _patientRepositoryMock.SetupUpdateAsync(existingPatient);
+            _patientRepositoryMock.SetupSaveChangesAsync(1);
+            _mapperMock.Setup(m => m.Map<PatientDTO>(updatedPatient)).Returns(updatedPatientDto);
+
+            // Act
+            var result = await _patientService.UpdatePatientAsync(patientId, patientDto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEquivalentTo(updatedPatientDto);
+            _patientRepositoryMock.VerifyGetByIdAsync(Times.Once);
+            _personRepositoryMock.VerifyGetByIdAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map(patientDto, existingPerson), Times.Once);
+            _personRepositoryMock.VerifyUpdateAsync(Times.Once);
+            _personRepositoryMock.VerifySaveChangesAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map(patientDto, existingPatient), Times.Once);
+            _patientRepositoryMock.VerifyUpdateAsync(Times.Once);
+            _patientRepositoryMock.VerifySaveChangesAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<PatientDTO>(updatedPatient), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdatePatientAsync_WithInvalidId_ShouldThrowKeyNotFoundException()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            var patientDto = TestDataGenerator.GeneratePatientDTO();
+            _patientRepositoryMock.SetupGetByIdAsync((Patient)null);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => _patientService.UpdatePatientAsync(patientId, patientDto));
+            _patientRepositoryMock.VerifyGetByIdAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task DeletePatientAsync_WithValidId_ShouldDeletePatient()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            var patient = TestDataGenerator.GeneratePatient();
+            _patientRepositoryMock.SetupGetByIdAsync(patient);
+            _patientRepositoryMock.SetupDeleteAsync(patient);
+            _patientRepositoryMock.SetupSaveChangesAsync(1);
+
+            // Act
+            var result = await _patientService.DeletePatientAsync(patientId);
+
+            // Assert
+            result.Should().BeTrue();
+            _patientRepositoryMock.VerifyGetByIdAsync(Times.Once);
+            _patientRepositoryMock.VerifyDeleteAsync(Times.Once);
+            _patientRepositoryMock.VerifySaveChangesAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task DeletePatientAsync_WithInvalidId_ShouldReturnFalse()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            _patientRepositoryMock.SetupGetByIdAsync((Patient)null);
+
+            // Act
+            var result = await _patientService.DeletePatientAsync(patientId);
+
+            // Assert
+            result.Should().BeFalse();
+            _patientRepositoryMock.VerifyGetByIdAsync(Times.Once);
+        }
+    }
+}
+```
+
+## 4. Controller Tests
+
+### Controllers/AppointmentsControllerTests.cs
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Xunit;
+using Moq;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
+using ClinicApi.Controllers;
+using ClinicApi.Services;
+using ClinicApi.Models.DTOs;
+using ClinicApi.Tests.Helpers;
+
+namespace ClinicApi.Tests.Controllers
+{
+    public class AppointmentsControllerTests
+    {
+        private readonly Mock<IAppointmentService> _appointmentServiceMock;
+        private readonly AppointmentsController _appointmentsController;
+
+        public AppointmentsControllerTests()
+        {
+            _appointmentServiceMock = new Mock<IAppointmentService>();
+            _appointmentsController = new AppointmentsController(_appointmentServiceMock.Object);
+        }
+
+        [Fact]
+        public async Task GetAppointments_ShouldReturnOkResultWithAppointments()
+        {
+            // Arrange
+            var appointments = TestDataGenerator.GenerateList(TestDataGenerator.GenerateAppointmentDTO);
+            _appointmentServiceMock.Setup(s => s.GetAllAppointmentsAsync()).ReturnsAsync(appointments);
+
+            // Act
+            var result = await _appointmentsController.GetAppointments();
+
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
+            var okResult = result as OkObjectResult;
+            okResult.Value.Should().BeEquivalentTo(appointments);
+            _appointmentServiceMock.Verify(s => s.GetAllAppointmentsAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetAppointment_WithValidId_ShouldReturnOkResultWithAppointment()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            var appointment = TestDataGenerator.GenerateAppointmentDTO();
+            _appointmentServiceMock.Setup(s => s.GetAppointmentByIdAsync(appointmentId)).ReturnsAsync(appointment);
+
+            // Act
+            var result = await _appointmentsController.GetAppointment(appointmentId);
+
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
+            var okResult = result as OkObjectResult;
+            okResult.Value.Should().BeEquivalentTo(appointment);
+            _appointmentServiceMock.Verify(s => s.GetAppointmentByIdAsync(appointmentId), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetAppointment_WithInvalidId_ShouldReturnNotFoundResult()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            _appointmentServiceMock.Setup(s => s.GetAppointmentByIdAsync(appointmentId)).ReturnsAsync((AppointmentDTO)null);
+
+            // Act
+            var result = await _appointmentsController.GetAppointment(appointmentId);
+
+            // Assert
+            result.Should().BeOfType<NotFoundResult>();
+            _appointmentServiceMock.Verify(s => s.GetAppointmentByIdAsync(appointmentId), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateAppointment_WithValidData_ShouldReturnCreatedAtActionResult()
+        {
+            // Arrange
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            var createdAppointment = TestDataGenerator.GenerateAppointmentDTO();
+            _appointmentServiceMock.Setup(s => s.CreateAppointmentAsync(appointmentDto)).ReturnsAsync(createdAppointment);
+
+            // Act
+            var result = await _appointmentsController.CreateAppointment(appointmentDto);
+
+            // Assert
+            result.Should().BeOfType<CreatedAtActionResult>();
+            var createdAtActionResult = result as CreatedAtActionResult;
+            createdAtActionResult.ActionName.Should().Be(nameof(_appointmentsController.GetAppointment));
+            createdAtActionResult.RouteValues["id"].Should().Be(createdAppointment.Id);
+            createdAtActionResult.Value.Should().BeEquivalentTo(createdAppointment);
+            _appointmentServiceMock.Verify(s => s.CreateAppointmentAsync(appointmentDto), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateAppointment_WithInvalidData_ShouldReturnBadRequestResult()
+        {
+            // Arrange
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            _appointmentServiceMock.Setup(s => s.CreateAppointmentAsync(appointmentDto))
+                .ThrowsAsync(new KeyNotFoundException("Patient not found"));
+
+            // Act
+            var result = await _appointmentsController.CreateAppointment(appointmentDto);
+
+            // Assert
+            result.Should().BeOfType<BadRequestObjectResult>();
+            var badRequestResult = result as BadRequestObjectResult;
+            badRequestResult.Value.Should().Be("Patient not found");
+            _appointmentServiceMock.Verify(s => s.CreateAppointmentAsync(appointmentDto), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAppointment_WithValidData_ShouldReturnOkResult()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            var updatedAppointment = TestDataGenerator.GenerateAppointmentDTO();
+            _appointmentServiceMock.Setup(s => s.UpdateAppointmentAsync(appointmentId, appointmentDto)).ReturnsAsync(updatedAppointment);
+
+            // Act
+            var result = await _appointmentsController.UpdateAppointment(appointmentId, appointmentDto);
+
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
+            var okResult = result as OkObjectResult;
+            okResult.Value.Should().BeEquivalentTo(updatedAppointment);
+            _appointmentServiceMock.Verify(s => s.UpdateAppointmentAsync(appointmentId, appointmentDto), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAppointment_WithInvalidData_ShouldReturnBadRequestResult()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            var appointmentDto = TestDataGenerator.GenerateAppointmentDTO();
+            _appointmentServiceMock.Setup(s => s.UpdateAppointmentAsync(appointmentId, appointmentDto))
+                .ThrowsAsync(new KeyNotFoundException("Appointment not found"));
+
+            // Act
+            var result = await _appointmentsController.UpdateAppointment(appointmentId, appointmentDto);
+
+            // Assert
+            result.Should().BeOfType<BadRequestObjectResult>();
+            var badRequestResult = result as BadRequestObjectResult;
+            badRequestResult.Value.Should().Be("Appointment not found");
+            _appointmentServiceMock.Verify(s => s.UpdateAppointmentAsync(appointmentId, appointmentDto), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteAppointment_WithValidId_ShouldReturnNoContentResult()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            _appointmentServiceMock.Setup(s => s.DeleteAppointmentAsync(appointmentId)).ReturnsAsync(true);
+
+            // Act
+            var result = await _appointmentsController.DeleteAppointment(appointmentId);
+
+            // Assert
+            result.Should().BeOfType<NoContentResult>();
+            _appointmentServiceMock.Verify(s => s.DeleteAppointmentAsync(appointmentId), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteAppointment_WithInvalidId_ShouldReturnNotFoundResult()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            _appointmentServiceMock.Setup(s => s.DeleteAppointmentAsync(appointmentId)).ReturnsAsync(false);
+
+            // Act
+            var result = await _appointmentsController.DeleteAppointment(appointmentId);
+
+            // Assert
+            result.Should().BeOfType<NotFoundResult>();
+            _appointmentServiceMock.Verify(s => s.DeleteAppointmentAsync(appointmentId), Times.Once);
+        }
+    }
+}
+```
+
+### Controllers/PatientsControllerTests.cs
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Xunit;
+using Moq;
+using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
+using ClinicApi.Controllers;
+using ClinicApi.Services;
+using ClinicApi.Models.DTOs;
+using ClinicApi.Tests.Helpers;
+
+namespace ClinicApi.Tests.Controllers
+{
+    public class PatientsControllerTests
+    {
+        private readonly Mock<IPatientService> _patientServiceMock;
+        private readonly PatientsController _patientsController;
+
+        public PatientsControllerTests()
+        {
+            _patientServiceMock = new Mock<IPatientService>();
+            _patientsController = new PatientsController(_patientServiceMock.Object);
+        }
+
+        [Fact]
+        public async Task GetPatients_ShouldReturnOkResultWithPatients()
+        {
+            // Arrange
+            var patients = TestDataGenerator.GenerateList(TestDataGenerator.GeneratePatientDTO);
+            _patientServiceMock.Setup(s => s.GetAllPatientsAsync()).ReturnsAsync(patients);
+
+            // Act
+            var result = await _patientsController.GetPatients();
+
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
+            var okResult = result as OkObjectResult;
+            okResult.Value.Should().BeEquivalentTo(patients);
+            _patientServiceMock.Verify(s => s.GetAllPatientsAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetPatient_WithValidId_ShouldReturnOkResultWithPatient()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            var patient = TestDataGenerator.GeneratePatientDTO();
+            _patientServiceMock.Setup(s => s.GetPatientByIdAsync(patientId)).ReturnsAsync(patient);
+
+            // Act
+            var result = await _patientsController.GetPatient(patientId);
+
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
+            var okResult = result as OkObjectResult;
+            okResult.Value.Should().BeEquivalentTo(patient);
+            _patientServiceMock.Verify(s => s.GetPatientByIdAsync(patientId), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetPatient_WithInvalidId_ShouldReturnNotFoundResult()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            _patientServiceMock.Setup(s => s.GetPatientByIdAsync(patientId)).ReturnsAsync((PatientDTO)null);
+
+            // Act
+            var result = await _patientsController.GetPatient(patientId);
+
+            // Assert
+            result.Should().BeOfType<NotFoundResult>();
+            _patientServiceMock.Verify(s => s.GetPatientByIdAsync(patientId), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreatePatient_WithValidData_ShouldReturnCreatedAtActionResult()
+        {
+            // Arrange
+            var patientDto = TestDataGenerator.GeneratePatientDTO();
+            var createdPatient = TestDataGenerator.GeneratePatientDTO();
+            _patientServiceMock.Setup(s => s.CreatePatientAsync(patientDto)).ReturnsAsync(createdPatient);
+
+            // Act
+            var result = await _patientsController.CreatePatient(patientDto);
+
+            // Assert
+            result.Should().BeOfType<CreatedAtActionResult>();
+            var createdAtActionResult = result as CreatedAtActionResult;
+            createdAtActionResult.ActionName.Should().Be(nameof(_patientsController.GetPatient));
+            createdAtActionResult.RouteValues["id"].Should().Be(createdPatient.Id);
+            createdAtActionResult.Value.Should().BeEquivalentTo(createdPatient);
+            _patientServiceMock.Verify(s => s.CreatePatientAsync(patientDto), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdatePatient_WithValidData_ShouldReturnOkResult()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            var patientDto = TestDataGenerator.GeneratePatientDTO();
+            var updatedPatient = TestDataGenerator.GeneratePatientDTO();
+            _patientServiceMock.Setup(s => s.UpdatePatientAsync(patientId, patientDto)).ReturnsAsync(updatedPatient);
+
+            // Act
+            var result = await _patientsController.UpdatePatient(patientId, patientDto);
+
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
+            var okResult = result as OkObjectResult;
+            okResult.Value.Should().BeEquivalentTo(updatedPatient);
+            _patientServiceMock.Verify(s => s.UpdatePatientAsync(patientId, patientDto), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdatePatient_WithInvalidData_ShouldReturnBadRequestResult()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            var patientDto = TestDataGenerator.GeneratePatientDTO();
+            _patientServiceMock.Setup(s => s.UpdatePatientAsync(patientId, patientDto))
+                .ThrowsAsync(new KeyNotFoundException("Patient not found"));
+
+            // Act
+            var result = await _patientsController.UpdatePatient(patientId, patientDto);
+
+            // Assert
+            result.Should().BeOfType<BadRequestObjectResult>();
+            var badRequestResult = result as BadRequestObjectResult;
+            badRequestResult.Value.Should().Be("Patient not found");
+            _patientServiceMock.Verify(s => s.UpdatePatientAsync(patientId, patientDto), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeletePatient_WithValidId_ShouldReturnNoContentResult()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            _patientServiceMock.Setup(s => s.DeletePatientAsync(patientId)).ReturnsAsync(true);
+
+            // Act
+            var result = await _patientsController.DeletePatient(patientId);
+
+            // Assert
+            result.Should().BeOfType<NoContentResult>();
+            _patientServiceMock.Verify(s => s.DeletePatientAsync(patientId), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeletePatient_WithInvalidId_ShouldReturnNotFoundResult()
+        {
+            // Arrange
+            var patientId = Guid.NewGuid();
+            _patientServiceMock.Setup(s => s.DeletePatientAsync(patientId)).ReturnsAsync(false);
+
+            // Act
+            var result = await _patientsController.DeletePatient(patientId);
+
+            // Assert
+            result.Should().BeOfType<NotFoundResult>();
+            _patientServiceMock.Verify(s => s.DeletePatientAsync(patientId), Times.Once);
+        }
+    }
+}
+```
+
+## 5. Repository Tests
+
+### Repositories/RepositoryTests.cs
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Xunit;
+using Moq;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using ClinicApi.Data;
+using ClinicApi.Data.Repositories;
+using ClinicApi.Models.Entities;
+using ClinicApi.Tests.Helpers;
+
+namespace ClinicApi.Tests.Repositories
+{
+    public class RepositoryTests
+    {
+        private readonly Mock<DentalClinicContext> _contextMock;
+        private readonly Mock<DbSet<Appointment>> _appointmentDbSetMock;
+        private readonly IRepository<Appointment> _appointmentRepository;
+
+        public RepositoryTests()
+        {
+            _contextMock = new Mock<DentalClinicContext>();
+            _appointmentDbSetMock = new Mock<DbSet<Appointment>>();
+            _contextMock.Setup(c => c.Set<Appointment>()).Returns(_appointmentDbSetMock.Object);
+            _appointmentRepository = new Repository<Appointment>(_contextMock.Object);
+        }
+
+        [Fact]
+        public async Task GetByIdAsync_WithValidId_ShouldReturnEntity()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            var appointment = TestDataGenerator.GenerateAppointment();
+            var appointments = new List<Appointment> { appointment }.AsQueryable();
+
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.Provider).Returns(appointments.Provider);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.Expression).Returns(appointments.Expression);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.ElementType).Returns(appointments.ElementType);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.GetEnumerator()).Returns(appointments.GetEnumerator());
+            _appointmentDbSetMock.Setup(d => d.FindAsync(appointmentId)).ReturnsAsync(appointment);
+
+            // Act
+            var result = await _appointmentRepository.GetByIdAsync(appointmentId);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEquivalentTo(appointment);
+            _appointmentDbSetMock.Verify(d => d.FindAsync(appointmentId), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetAllAsync_ShouldReturnAllEntities()
+        {
+            // Arrange
+            var appointments = TestDataGenerator.GenerateList(TestDataGenerator.GenerateAppointment).AsQueryable();
+
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.Provider).Returns(appointments.Provider);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.Expression).Returns(appointments.Expression);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.ElementType).Returns(appointments.ElementType);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.GetEnumerator()).Returns(appointments.GetEnumerator());
+            _appointmentDbSetMock.Setup(d => d.ToListAsync()).ReturnsAsync(appointments.ToList());
+
+            // Act
+            var result = await _appointmentRepository.GetAllAsync();
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().HaveCount(appointments.Count());
+            result.Should().BeEquivalentTo(appointments);
+            _appointmentDbSetMock.Verify(d => d.ToListAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task FindAsync_WithValidPredicate_ShouldReturnMatchingEntities()
+        {
+            // Arrange
+            var appointments = TestDataGenerator.GenerateList(TestDataGenerator.GenerateAppointment).AsQueryable();
+            var appointmentId = appointments.First().Id;
+
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.Provider).Returns(appointments.Provider);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.Expression).Returns(appointments.Expression);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.ElementType).Returns(appointments.ElementType);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.GetEnumerator()).Returns(appointments.GetEnumerator());
+            _appointmentDbSetMock.Setup(d => d.Where(It.IsAny<System.Linq.Expressions.Expression<Func<Appointment, bool>>>()))
+                .Returns(appointments.Where(a => a.Id == appointmentId));
+
+            // Act
+            var result = await _appointmentRepository.FindAsync(a => a.Id == appointmentId);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().HaveCount(1);
+            result.First().Id.Should().Be(appointmentId);
+            _appointmentDbSetMock.Verify(d => d.Where(It.IsAny<System.Linq.Expressions.Expression<Func<Appointment, bool>>>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task AddAsync_ShouldAddEntity()
+        {
+            // Arrange
+            var appointment = TestDataGenerator.GenerateAppointment();
+            _appointmentDbSetMock.Setup(d => d.AddAsync(appointment, default)).ReturnsAsync((Appointment)null);
+
+            // Act
+            await _appointmentRepository.AddAsync(appointment);
+
+            // Assert
+            _appointmentDbSetMock.Verify(d => d.AddAsync(appointment, default), Times.Once);
+        }
+
+        [Fact]
+        public void Update_ShouldUpdateEntity()
+        {
+            // Arrange
+            var appointment = TestDataGenerator.GenerateAppointment();
+            _appointmentDbSetMock.Setup(d => d.Update(appointment));
+
+            // Act
+            _appointmentRepository.Update(appointment);
+
+            // Assert
+            _appointmentDbSetMock.Verify(d => d.Update(appointment), Times.Once);
+        }
+
+        [Fact]
+        public void Delete_ShouldDeleteEntity()
+        {
+            // Arrange
+            var appointment = TestDataGenerator.GenerateAppointment();
+            _appointmentDbSetMock.Setup(d => d.Remove(appointment));
+
+            // Act
+            _appointmentRepository.Delete(appointment);
+
+            // Assert
+            _appointmentDbSetMock.Verify(d => d.Remove(appointment), Times.Once);
+        }
+
+        [Fact]
+        public async Task ExistsAsync_WithValidId_ShouldReturnTrue()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            var appointment = TestDataGenerator.GenerateAppointment();
+            var appointments = new List<Appointment> { appointment }.AsQueryable();
+
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.Provider).Returns(appointments.Provider);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.Expression).Returns(appointments.Expression);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.ElementType).Returns(appointments.ElementType);
+            _appointmentDbSetMock.As<IQueryable<Appointment>>().Setup(m => m.GetEnumerator()).Returns(appointments.GetEnumerator());
+            _appointmentDbSetMock.Setup(d => d.FindAsync(appointmentId)).ReturnsAsync(appointment);
+
+            // Act
+            var result = await _appointmentRepository.ExistsAsync(appointmentId);
+
+            // Assert
+            result.Should().BeTrue();
+            _appointmentDbSetMock.Verify(d => d.FindAsync(appointmentId), Times.Once);
+        }
+
+        [Fact]
+        public async Task ExistsAsync_WithInvalidId_ShouldReturnFalse()
+        {
+            // Arrange
+            var appointmentId = Guid.NewGuid();
+            _appointmentDbSetMock.Setup(d => d.FindAsync(appointmentId)).ReturnsAsync((Appointment)null);
+
+            // Act
+            var result = await _appointmentRepository.ExistsAsync(appointmentId);
+
+            // Assert
+            result.Should().BeFalse();
+            _appointmentDbSetMock.Verify(d => d.FindAsync(appointmentId), Times.Once);
+        }
+
+        [Fact]
+        public async Task SaveChangesAsync_ShouldReturnNumberOfChanges()
+        {
+            // Arrange
+            var expectedChanges = 1;
+            _contextMock.Setup(c => c.SaveChangesAsync(default)).ReturnsAsync(expectedChanges);
+
+            // Act
+            var result = await _appointmentRepository.SaveChangesAsync();
+
+            // Assert
+            result.Should().Be(expectedChanges);
+            _contextMock.Verify(c => c.SaveChangesAsync(default), Times.Once);
+        }
+    }
+}
+```
+
+## 6. Integration Tests
+
+### Integration/DatabaseIntegrationTests.cs
+```csharp
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Xunit;
+using Microsoft.EntityFrameworkCore;
+using FluentAssertions;
+using ClinicApi.Data;
+using ClinicApi.Models.Entities;
+using ClinicApi.Models.Enums;
+
+namespace ClinicApi.Tests.Integration
+{
+    public class DatabaseIntegrationTests : IDisposable
+    {
+        private readonly DentalClinicContext _context;
+        private readonly Guid _testPatientId;
+        private readonly Guid _testStaffId;
+        private readonly Guid _testAppointmentId;
+
+        public DatabaseIntegrationTests()
+        {
+            // Use in-memory database for integration tests
+            var options = new DbContextOptionsBuilder<DentalClinicContext>()
+                .UseInMemoryDatabase(databaseName: "DentalClinicTestDb")
+                .Options;
+
+            _context = new DentalClinicContext(options);
+
+            // Seed test data
+            SeedTestData();
+        }
+
+        private void SeedTestData()
+        {
+            // Create test role
+            var role = new Role
+            {
+                Id = Guid.NewGuid(),
+                Name = "Dentist",
+                Description = "Test dentist role"
+            };
+            _context.Roles.Add(role);
+
+            // Create test specialty
+            var specialty = new Specialty
+            {
+                Id = Guid.NewGuid(),
+                Name = "General Dentistry",
+                Description = "Test specialty"
+            };
+            _context.Specialties.Add(specialty);
+
+            // Create test person for patient
+            var patientPerson = new Person
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Test",
+                LastName = "Patient",
+                Email = "testpatient@example.com",
+                PhoneNumber = "+15551234567",
+                Address = "123 Test St",
+                Gender = GenderEnum.Male,
+                DateOfBirth = DateTime.Now.AddYears(-30)
+            };
+            _context.People.Add(patientPerson);
+
+            // Create test patient
+            var patient = new Patient
+            {
+                Id = Guid.NewGuid(),
+                PersonId = patientPerson.Id,
+                EmergencyContactName = "Emergency Contact",
+                EmergencyContactPhone = "+15557654321"
+            };
+            _context.Patients.Add(patient);
+            _testPatientId = patient.Id;
+
+            // Create test person for staff
+            var staffPerson = new Person
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Test",
+                LastName = "Staff",
+                Email = "teststaff@example.com",
+                PhoneNumber = "+15551112222",
+                Address = "456 Test St",
+                Gender = GenderEnum.Female,
+                DateOfBirth = DateTime.Now.AddYears(-35)
+            };
+            _context.People.Add(staffPerson);
+
+            // Create test staff
+            var staff = new Staff
+            {
+                Id = Guid.NewGuid(),
+                PersonId = staffPerson.Id,
+                RoleId = role.Id,
+                SpecialtyId = specialty.Id,
+                LicenseNumber = "TEST12345",
+                IsActive = true
+            };
+            _context.Staff.Add(staff);
+            _testStaffId = staff.Id;
+
+            // Create test appointment status
+            var appointmentStatus = new AppointmentStatus
+            {
+                Id = Guid.NewGuid(),
+                Name = "Scheduled"
+            };
+            _context.AppointmentStatuses.Add(appointmentStatus);
+
+            // Create test appointment
+            var appointment = new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = patient.Id,
+                StaffId = staff.Id,
+                StatusId = appointmentStatus.Id,
+                AppointmentStartTime = DateTime.Now.AddDays(1),
+                DurationMinutes = 30,
+                ReasonForVisit = "Test appointment",
+                Notes = "Test notes"
+            };
+            _context.Appointments.Add(appointment);
+            _testAppointmentId = appointment.Id;
+
+            _context.SaveChanges();
+        }
+
+        [Fact]
+        public void CanCreateAndRetrievePatient()
+        {
+            // Arrange & Act
+            var patient = _context.Patients
+                .Include(p => p.Person)
+                .FirstOrDefault(p => p.Id == _testPatientId);
+
+            // Assert
+            patient.Should().NotBeNull();
+            patient.Person.FirstName.Should().Be("Test");
+            patient.Person.LastName.Should().Be("Patient");
+            patient.Person.Email.Should().Be("testpatient@example.com");
+            patient.EmergencyContactName.Should().Be("Emergency Contact");
+        }
+
+        [Fact]
+        public void CanCreateAndRetrieveStaff()
+        {
+            // Arrange & Act
+            var staff = _context.Staff
+                .Include(s => s.Person)
+                .Include(s => s.Role)
+                .Include(s => s.Specialty)
+                .FirstOrDefault(s => s.Id == _testStaffId);
+
+            // Assert
+            staff.Should().NotBeNull();
+            staff.Person.FirstName.Should().Be("Test");
+            staff.Person.LastName.Should().Be("Staff");
+            staff.Role.Name.Should().Be("Dentist");
+            staff.Specialty.Name.Should().Be("General Dentistry");
+            staff.LicenseNumber.Should().Be("TEST12345");
+            staff.IsActive.Should().BeTrue();
+        }
+
+        [Fact]
+        public void CanCreateAndRetrieveAppointment()
+        {
+            // Arrange & Act
+            var appointment = _context.Appointments
+                .Include(a => a.Patient)
+                .Include(a => a.Staff)
+                .Include(a => a.Status)
+                .FirstOrDefault(a => a.Id == _testAppointmentId);
+
+            // Assert
+            appointment.Should().NotBeNull();
+            appointment.Patient.Id.Should().Be(_testPatientId);
+            appointment.Staff.Id.Should().Be(_testStaffId);
+            appointment.Status.Name.Should().Be("Scheduled");
+            appointment.AppointmentStartTime.Should().BeAfter(DateTime.Now);
+            appointment.DurationMinutes.Should().Be(30);
+            appointment.ReasonForVisit.Should().Be("Test appointment");
+        }
+
+        [Fact]
+        public void CanUpdatePatient()
+        {
+            // Arrange
+            var patient = _context.Patients
+                .Include(p => p.Person)
+                .FirstOrDefault(p => p.Id == _testPatientId);
+            
+            var newEmail = "updatedpatient@example.com";
+            patient.Person.Email = newEmail;
+            patient.EmergencyContactName = "Updated Emergency Contact";
+
+            // Act
+            _context.SaveChanges();
+            
+            var updatedPatient = _context.Patients
+                .Include(p => p.Person)
+                .FirstOrDefault(p => p.Id == _testPatientId);
+
+            // Assert
+            updatedPatient.Should().NotBeNull();
+            updatedPatient.Person.Email.Should().Be(newEmail);
+            updatedPatient.EmergencyContactName.Should().Be("Updated Emergency Contact");
+        }
+
+        [Fact]
+        public void CanDeleteAppointment()
+        {
+            // Arrange
+            var appointment = _context.Appointments.FirstOrDefault(a => a.Id == _testAppointmentId);
+            
+            // Act
+            _context.Appointments.Remove(appointment);
+            _context.SaveChanges();
+            
+            var deletedAppointment = _context.Appointments.FirstOrDefault(a => a.Id == _testAppointmentId);
+
+            // Assert
+            deletedAppointment.Should().BeNull();
+        }
+
+        public void Dispose()
+        {
+            _context.Database.EnsureDeleted();
+            _context.Dispose();
+        }
+    }
+}
+```
+
+## 7. Additional Service Tests (Examples)
+
+### Services/BillingServiceTests.cs
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Xunit;
+using Moq;
+using FluentAssertions;
+using AutoMapper;
+using ClinicApi.Services;
+using ClinicApi.Services.Implementations;
+using ClinicApi.Data.Repositories;
+using ClinicApi.Models.Entities;
+using ClinicApi.Models.DTOs;
+using ClinicApi.Tests.Helpers;
+
+namespace ClinicApi.Tests.Services
+{
+    public class BillingServiceTests
+    {
+        private readonly Mock<IRepository<Billing>> _billingRepositoryMock;
+        private readonly Mock<IRepository<Patient>> _patientRepositoryMock;
+        private readonly Mock<IMapper> _mapperMock;
+        private readonly IBillingService _billingService;
+
+        public BillingServiceTests()
+        {
+            _billingRepositoryMock = new Mock<IRepository<Billing>>();
+            _patientRepositoryMock = new Mock<IRepository<Patient>>();
+            _mapperMock = new Mock<IMapper>();
+
+            _billingService = new BillingService(
+                _billingRepositoryMock.Object,
+                _patientRepositoryMock.Object,
+                _mapperMock.Object);
+        }
+
+        [Fact]
+        public async Task GetAllBillingsAsync_ShouldReturnAllBillings()
+        {
+            // Arrange
+            var billings = TestDataGenerator.GenerateList(TestDataGenerator.GenerateBilling);
+            var billingDtos = TestDataGenerator.GenerateList(() => new BillingDTO 
+            { 
+                PatientId = Guid.NewGuid(), 
+                IssueDate = DateTime.Now, 
+                DueDate = DateTime.Now.AddDays(30),
+                TotalAmount = 100,
+                AmountPaid = 50,
+                Status = BillStatusEnum.Open
+            });
+
+            _billingRepositoryMock.SetupGetAllAsync(billings);
+            _mapperMock.Setup(m => m.Map<IEnumerable<BillingDTO>>(billings)).Returns(billingDtos);
+
+            // Act
+            var result = await _billingService.GetAllBillingsAsync();
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().HaveCount(billings.Count);
+            _billingRepositoryMock.VerifyGetAllAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<IEnumerable<BillingDTO>>(billings), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateBillingAsync_WithValidData_ShouldCreateBilling()
+        {
+            // Arrange
+            var billingDto = new BillingDTO 
+            { 
+                PatientId = Guid.NewGuid(), 
+                IssueDate = DateTime.Now, 
+                DueDate = DateTime.Now.AddDays(30),
+                TotalAmount = 100,
+                AmountPaid = 50,
+                Status = BillStatusEnum.Open
+            };
+            var billing = TestDataGenerator.GenerateBilling();
+            var createdBilling = TestDataGenerator.GenerateBilling();
+            var createdBillingDto = new BillingDTO 
+            { 
+                PatientId = Guid.NewGuid(), 
+                IssueDate = DateTime.Now, 
+                DueDate = DateTime.Now.AddDays(30),
+                TotalAmount = 100,
+                AmountPaid = 50,
+                Status = BillStatusEnum.Open
+            };
+
+            _patientRepositoryMock.SetupExistsAsync(true);
+            _mapperMock.Setup(m => m.Map<Billing>(billingDto)).Returns(billing);
+            _billingRepositoryMock.SetupAddAsync(billing);
+            _billingRepositoryMock.SetupSaveChangesAsync(1);
+            _mapperMock.Setup(m => m.Map<BillingDTO>(createdBilling)).Returns(createdBillingDto);
+
+            // Act
+            var result = await _billingService.CreateBillingAsync(billingDto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEquivalentTo(createdBillingDto);
+            _patientRepositoryMock.VerifyExistsAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<Billing>(billingDto), Times.Once);
+            _billingRepositoryMock.VerifyAddAsync(Times.Once);
+            _billingRepositoryMock.VerifySaveChangesAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<BillingDTO>(createdBilling), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateBillingAsync_WithInvalidPatientId_ShouldThrowKeyNotFoundException()
+        {
+            // Arrange
+            var billingDto = new BillingDTO 
+            { 
+                PatientId = Guid.NewGuid(), 
+                IssueDate = DateTime.Now, 
+                DueDate = DateTime.Now.AddDays(30),
+                TotalAmount = 100,
+                AmountPaid = 50,
+                Status = BillStatusEnum.Open
+            };
+            _patientRepositoryMock.SetupExistsAsync(false);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => _billingService.CreateBillingAsync(billingDto));
+            _patientRepositoryMock.VerifyExistsAsync(Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateBillingAsync_WithValidData_ShouldUpdateBilling()
+        {
+            // Arrange
+            var billingId = Guid.NewGuid();
+            var billingDto = new BillingDTO 
+            { 
+                PatientId = Guid.NewGuid(), 
+                IssueDate = DateTime.Now, 
+                DueDate = DateTime.Now.AddDays(30),
+                TotalAmount = 100,
+                AmountPaid = 50,
+                Status = BillStatusEnum.Open
+            };
+            var existingBilling = TestDataGenerator.GenerateBilling();
+            var updatedBilling = TestDataGenerator.GenerateBilling();
+            var updatedBillingDto = new BillingDTO 
+            { 
+                PatientId = Guid.NewGuid(), 
+                IssueDate = DateTime.Now, 
+                DueDate = DateTime.Now.AddDays(30),
+                TotalAmount = 100,
+                AmountPaid = 50,
+                Status = BillStatusEnum.Open
+            };
+
+            _billingRepositoryMock.SetupGetByIdAsync(existingBilling);
+            _patientRepositoryMock.SetupExistsAsync(true);
+            _mapperMock.Setup(m => m.Map(billingDto, existingBilling));
+            _billingRepositoryMock.SetupUpdateAsync(existingBilling);
+            _billingRepositoryMock.SetupSaveChangesAsync(1);
+            _mapperMock.Setup(m => m.Map<BillingDTO>(updatedBilling)).Returns(updatedBillingDto);
+
+            // Act
+            var result = await _billingService.UpdateBillingAsync(billingId, billingDto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEquivalentTo(updatedBillingDto);
+            _billingRepositoryMock.VerifyGetByIdAsync(Times.Once);
+            _patientRepositoryMock.VerifyExistsAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map(billingDto, existingBilling), Times.Once);
+            _billingRepositoryMock.VerifyUpdateAsync(Times.Once);
+            _billingRepositoryMock.VerifySaveChangesAsync(Times.Once);
+            _mapperMock.Verify(m => m.Map<BillingDTO>(updatedBilling), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteBillingAsync_WithValidId_ShouldDeleteBilling()
+        {
+            // Arrange
+            var billingId = Guid.NewGuid();
+            var billing = TestDataGenerator.GenerateBilling();
+            _billingRepositoryMock.SetupGetByIdAsync(billing);
+            _billingRepositoryMock.SetupDeleteAsync(billing);
+            _billingRepositoryMock.SetupSaveChangesAsync(1);
+
+            // Act
+            var result = await _billingService.DeleteBillingAsync(billingId);
+
+            // Assert
+            result.Should().BeTrue();
+            _billingRepositoryMock.VerifyGetByIdAsync(Times.Once);
+            _billingRepositoryMock.VerifyDeleteAsync(Times.Once);
+            _billingRepositoryMock.VerifySaveChangesAsync(Times.Once);
+        }
+    }
+}
+```
+
+## 8. Test Project Dependencies
+
+### ClinicApi.Tests.csproj
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="6.0.16" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="6.0.16" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
+    <PackageReference Include="Moq" Version="4.18.4" />
+    <PackageReference Include="xunit" Version="2.4.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="3.2.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClinicApi\ClinicApi.csproj" />
+  </ItemGroup>
+
+</Project>
+```
+
+## Summary
+
+This comprehensive test suite covers:
+
+1. **Unit Tests for Services**:
+   - Tests all CRUD operations for each service
+   - Validates error handling for invalid inputs
+   - Verifies proper interaction with repositories
+   - Tests mapping between entities and DTOs
+
+2. **Unit Tests for Controllers**:
+   - Tests HTTP response codes for all endpoints
+   - Validates proper service method calls
+   - Tests error handling and response formatting
+
+3. **Repository Tests**:
+   - Tests the generic repository implementation
+   - Verifies proper interaction with DbContext
+   - Tests all repository methods
+
+4. **Integration Tests**:
+   - Tests database operations with an in-memory database
+   - Verifies entity relationships
+   - Tests CRUD operations end-to-end
+
+5. **Test Helpers**:
+   - TestDataGenerator for creating test data
+   - MockExtensions for setting up mock behaviors
+   - Consistent test data generation
+
+The test suite follows professional testing standards with:
+- Clear test naming conventions
+- Arrange-Act-Assert pattern
+- Comprehensive test coverage
+- Proper isolation between tests
+- Meaningful assertions with FluentAssertions
+- Mocking of dependencies with Moq
+- Integration testing with in-memory database
+
+This ensures your API is thoroughly tested and maintains high code quality standards.
