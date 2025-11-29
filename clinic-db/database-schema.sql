@@ -15,7 +15,7 @@ CREATE TYPE PAYMENT_METHOD_ENUM AS ENUM ('Cash', 'Credit Card', 'Insurance', 'Ba
 -- CORE TABLES
 -- =================================================================
 
-CREATE TABLE role (
+CREATE TABLE Role (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(50) UNIQUE NOT NULL,
     description TEXT
@@ -74,7 +74,34 @@ CREATE TABLE patient (
     created_by VARCHAR(50),
     updated_by VARCHAR(50)
 );
+-- =================================================================
+-- TOOTH RELATED
+-- =================================================================
 
+CREATE TABLE tooth_status (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  code VARCHAR(25) UNIQUE NOT NULL,
+  description VARCHAR(200),
+
+  -- Auditing
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE tooth (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  patient_id UUID NOT NULL REFERENCES patient(id),
+  tooth_number INT NOT NULL,
+  tooth_name VARCHAR(50) NOT NULL,
+  tooth_status_id UUID NOT NULL REFERENCES tooth_status(id),
+
+  -- Note: 'Unique constraint on patient_id and tooth_number'
+  UNIQUE (patient_id, tooth_number),
+
+  -- Auditing
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 -- =================================================================
 -- APPOINTMENT & CLINICAL TABLES
 -- =================================================================
@@ -140,34 +167,7 @@ CREATE TABLE prescription (
     created_by VARCHAR(50),
     updated_by VARCHAR(50)
 );
--- =================================================================
--- TOOTH RELATED
--- =================================================================
 
-CREATE TABLE tooth_status (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code VARCHAR(25) UNIQUE NOT NULL,
-  description VARCHAR(200),
-
-  -- Auditing
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE tooth (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  patient_id UUID NOT NULL REFERENCES patient(id),
-  tooth_number INT NOT NULL,
-  tooth_name VARCHAR(50) NOT NULL,
-  tooth_status_id UUID NOT NULL REFERENCES tooth_status(id),
-
-  -- Note: 'Unique constraint on patient_id and tooth_number'
-  UNIQUE (patient_id, tooth_number),
-
-  -- Auditing
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
 -- =================================================================
 -- BILLING & PAYMENT TABLES (RE-ARCHITECTED)
 -- =================================================================

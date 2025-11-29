@@ -233,17 +233,6 @@ function CreateStaffDialog({ open, onClose, onCreated, initial, roles }) {
     if (!validate()) return;
     setLoading(true);
     try {
-      const genderEnum = (() => {
-        const val = (v.gender || '').trim();
-        const lower = val.toLowerCase();
-        if (["male", "m"].includes(lower)) return "Male";
-        if (["female", "f"].includes(lower)) return "Female";
-        if (["other"].includes(lower)) return "Other";
-        if (!val) return "PreferNotToSay";
-        if (["Male", "Female", "Other", "PreferNotToSay"].includes(val)) return val;
-        if (lower.replace(/\s+/g,"") === "prefernottosay") return "PreferNotToSay";
-        return "PreferNotToSay";
-      })();
       const dob = (() => {
         if (!v.dob) return undefined;
         const d = new Date(v.dob);

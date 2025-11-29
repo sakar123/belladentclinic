@@ -21,14 +21,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-    profiles: ["db"]
 
   api:
     container_name: clinic-api
     build:
-      context: .
-      dockerfile: clinic-backend/Dockerfile
-      target: api
+      context: ./clinic-backend
+      dockerfile: ClinicApi/Dockerfile.API
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -39,20 +37,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    profiles: ["api"]
 
   api-tests:
     container_name: clinic-api-tests
     build:
-      context: .
-      dockerfile: clinic-backend/Dockerfile
-      target: tests
+      context: ./clinic-backend
+      dockerfile: ClinicApi.Tests/Dockerfile
     environment:
       ConnectionStrings__clinicDbConnection: Host=db;Database=clinic_db;Username=clinic_backend_user;Password=pD7pr;
     depends_on:
       db:
         condition: service_healthy
-    profiles: ["tests"]
 
   portal:
     container_name: clinic-portal
@@ -74,7 +69,6 @@ services:
       - ./clinic-portal/.env.local
     depends_on:
       - api
-    profiles: ["portal"]
 
   landing:
     container_name: clinic-landing
@@ -84,7 +78,6 @@ services:
     restart: unless-stopped
     ports:
       - "3001:80"
-    profiles: ["landing"]
 
 volumes:
   pgdata:
