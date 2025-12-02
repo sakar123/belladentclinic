@@ -2,6 +2,8 @@ using ClinicApi.Data.Repositories;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Models.Entities;
 using ClinicApi.Mappers;
+using ClinicApi.Models.Enumerations;
+using System;
 
 namespace ClinicApi.Services.Implementations
 {
@@ -45,6 +47,54 @@ namespace ClinicApi.Services.Implementations
 
             var visited = new HashSet<object>();
             return PatientMapper.ToDto(patient, visited);
+        }
+
+        public async Task<Patient> FindOrCreatePatientFromLandingPageAsync(LandingPageAppointmentRequestDto request)
+        {
+            var person = (await _personRepository.FindAsync(p => p.email == request.Email)).FirstOrDefault();
+            if (person != null)
+            {
+                var patient = (await _patientRepository.FindAsync(p => p.person_id == person.id)).FirstOrDefault();
+                if (patient != null)
+                {
+                    return patient;
+                }
+            }
+
+            // If we reach here, either person doesn't exist or they aren't a patient yet.
+            // Create a new Person and Patient.
+            var nameParts = request.FullName.Split(new[] { ' ' }, 2);
+            var firstName = nameParts.Length > 0 ? nameParts[0] : request.FullName;
+            var lastName = nameParts.Length > 1 ? nameParts[1] : "(Not Provided)";
+            
+            GenderEnum parsedGender;
+            if (!Enum.TryParse(request.Gender, true, out parsedGender))
+            {
+                parsedGender = GenderEnum.PreferNotToSay; // Fallback
+            }
+
+            var newPerson = new Person
+            {
+                id = Guid.NewGuid(),
+                first_name = firstName,
+                last_name = lastName,
+                email = request.Email,
+                phone_number = request.Phone,
+                gender = parsedGender
+            };
+            await _personRepository.AddAsync(newPerson);
+
+            var newPatient = new Patient
+            {
+                id = Guid.NewGuid(),
+                person_id = newPerson.id,
+                Person = newPerson
+            };
+            await _patientRepository.AddAsync(newPatient);
+
+            await _personRepository.SaveChangesAsync(); // This should save both via the DbContext transaction
+
+            return newPatient;
         }
 
         public async Task<PatientDTO> CreatePatientAsync(PatientDTO patientDto)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using ClinicApi.Models.Entities;
@@ -48,6 +49,11 @@ namespace ClinicApi.Models.Entities
         public virtual required AppointmentStatus status { get; set; }
         
         [InverseProperty("Appointment")]
-        public virtual required ICollection<Treatment> treatments { get; set; }
+        public virtual ICollection<Treatment> treatments { get; set; }
+
+        public Appointment()
+        {
+            treatments = new HashSet<Treatment>();
+        }
     }
 }

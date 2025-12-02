@@ -43,7 +43,7 @@ Purpose: Keep persistent context for human contributors and AI agents so work ca
 - clinic-db
   - Schema: `clinic-db/database-schema.sql` (uses `uuid-ossp`, enums for genders/billing status/payment methods; tables: role, specialty, person, staff, patient, appointment, service, treatment, prescriptions, billing, payments, teeth, etc.)
   - Seed: `clinic-db/insert-statement.sql`
-  - Compose: `db` service (image `postgres:16-alpine`, port `5432:5432`, volume `pgdata`, mounts schema/seed to `/docker-entrypoint-initdb.d`)
+  - Compose: `db` service (image `postgres:16-alpine`, port `5433:5433`, volume `pgdata`, mounts schema/seed to `/docker-entrypoint-initdb.d`)
 
 - clinic-portal (Patient/Staff management portal)
   - Framework: Next.js (App Router)
@@ -101,7 +101,7 @@ Environment variables and endpoints:
 - Finalize Auth0 roles/claims and expand middleware protection to more routes as needed.
 - Add CI to build API, run tests, and lint portal; optionally compose-based integration job.
  - Optional: Add docker-compose.dev.yml for hot-reload (dotnet watch, next dev) to avoid rebuilds during active development.
- - Optional: Switch compose DB to custom image on 5433 or keep simple 5432 image; align API connection string accordingly.
+ - Optional: Switch compose DB to custom image on 5433 or keep simple 5433 image; align API connection string accordingly.
 
 ## Session Log
 - 2025-09-18: Established this AGENTS.md as persistent context. Current compose orchestrates db/api/portal/landing. DB schema + seeds ready. Backend has controllers/services and tests; minor mapper TODOs present. Portal integrates Auth0 and mock API routes; HTTP client uses snake/camel transforms; appointment range improvement recommended. Landing site ready with Dockerfile. Proposed Next Actions above.

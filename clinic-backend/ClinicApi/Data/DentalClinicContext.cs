@@ -46,6 +46,11 @@ namespace ClinicApi.Data
         {
             base.OnModelCreating(modelBuilder);
             
+            // Map C# enums to PostgreSQL enum types
+            modelBuilder.HasPostgresEnum<GenderEnum>();
+            modelBuilder.HasPostgresEnum<BillStatusEnum>();
+            modelBuilder.HasPostgresEnum<PaymentMethodEnum>();
+            
             // === GLOBAL CONFIGURATIONS ===
             
             // Loop through all entity types in the model
@@ -70,15 +75,15 @@ namespace ClinicApi.Data
             
             modelBuilder.Entity<Person>()
                 .Property(p => p.gender)
-                .HasConversion<string>(); // Store gender enum as string (e.g., "Male", "Female")
+                .HasColumnType("gender_enum");
             
             modelBuilder.Entity<Billing>()
                 .Property(b => b.status)
-                .HasConversion<string>(); // Store billing status as string (e.g., "Paid", "Pending")
+                .HasColumnType("bill_status_enum");
             
             modelBuilder.Entity<Payment>()
                 .Property(p => p.method)
-                .HasConversion<string>(); // Store payment method as string (e.g., "Cash", "Card")
+                .HasColumnType("payment_method_enum");
             
             // === ONE-TO-ONE RELATIONSHIPS ===
             // These configurations establish one-to-one relationships between entities

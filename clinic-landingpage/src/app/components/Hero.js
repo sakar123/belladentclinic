@@ -70,8 +70,8 @@ export default function Hero() {
           <Image
             src="/images/TempHeadShot.png" // Use a professional, warm headshot
             alt={`A portrait of ${t.HERO_DENTIST_NAME}`}
-            width={500}
-            height={500}
+            width={400}
+            height={400}
             className="rounded-full object-cover shadow-xl" // A circular image feels friendly and modern
             priority // Load the hero image first
           />

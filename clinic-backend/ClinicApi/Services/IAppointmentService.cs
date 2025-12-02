@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using ClinicApi.Models.DTOs;
 
+using ClinicApi.Models.Entities;
+
 namespace ClinicApi.Services
 {
     public interface IAppointmentService
@@ -12,5 +14,6 @@ namespace ClinicApi.Services
         Task<AppointmentDTO> CreateAppointmentAsync(AppointmentDTO appointmentDto);
         Task<AppointmentDTO> UpdateAppointmentAsync(Guid id, AppointmentDTO appointmentDto);
         Task<bool> DeleteAppointmentAsync(Guid id);
+        Task<Appointment> CreateAppointmentFromLandingPageAsync(LandingPageAppointmentRequestDto request);
     }
 }

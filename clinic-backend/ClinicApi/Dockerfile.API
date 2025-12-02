@@ -25,6 +25,9 @@ RUN dotnet publish "ClinicApi.csproj" -c Release -o /app/publish --no-restore
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 
 WORKDIR /app
+
+ENV ASPNETCORE_ENVIRONMENT=Development
+
 # Copy the published output from the build stage
 COPY --from=build /app/publish .
 
