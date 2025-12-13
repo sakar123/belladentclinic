@@ -2,7 +2,9 @@ using ClinicApi.Data.Repositories;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Models.Entities;
 using ClinicApi.Mappers;
-using ClinicApi.Models.Enumerations;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Npgsql;
 using System;
 
 namespace ClinicApi.Services.Implementations
@@ -11,13 +13,16 @@ namespace ClinicApi.Services.Implementations
     {
         private readonly IRepository<Patient> _patientRepository;
         private readonly IRepository<Person> _personRepository;
+        private readonly ILogger<PatientService> _logger;
 
         public PatientService(
             IRepository<Patient> patientRepository,
-            IRepository<Person> personRepository)
+            IRepository<Person> personRepository,
+            ILogger<PatientService> logger)
         {
             _patientRepository = patientRepository;
             _personRepository = personRepository;
+            _logger = logger;
         }
 
         public async Task<IEnumerable<PatientDTO>> GetAllPatientsAsync()
@@ -66,12 +71,8 @@ namespace ClinicApi.Services.Implementations
             var nameParts = request.FullName.Split(new[] { ' ' }, 2);
             var firstName = nameParts.Length > 0 ? nameParts[0] : request.FullName;
             var lastName = nameParts.Length > 1 ? nameParts[1] : "(Not Provided)";
-            
-            GenderEnum parsedGender;
-            if (!Enum.TryParse(request.Gender, true, out parsedGender))
-            {
-                parsedGender = GenderEnum.PreferNotToSay; // Fallback
-            }
+            var genderText = string.IsNullOrWhiteSpace(request.Gender) ? "Prefer not to say" : request.Gender.Trim();
+            _logger.LogInformation("LandingPage patient gender received. Raw='{GenderRaw}', Stored='{StoredGender}'", request.Gender, genderText);
 
             var newPerson = new Person
             {
@@ -80,7 +81,7 @@ namespace ClinicApi.Services.Implementations
                 last_name = lastName,
                 email = request.Email,
                 phone_number = request.Phone,
-                gender = parsedGender
+                gender = genderText
             };
             await _personRepository.AddAsync(newPerson);
 
@@ -92,7 +93,36 @@ namespace ClinicApi.Services.Implementations
             };
             await _patientRepository.AddAsync(newPatient);
 
-            await _personRepository.SaveChangesAsync(); // This should save both via the DbContext transaction
+            try
+            {
+                await _personRepository.SaveChangesAsync(); // This should save both via the DbContext transaction
+            }
+            catch (DbUpdateException ex)
+            {
+                var baseEx = ex.GetBaseException();
+                if (baseEx is PostgresException pg)
+                {
+                    _logger.LogError(ex,
+                        "Postgres error during SaveChanges for LandingPage patient create. SqlState={SqlState}, MessageText='{MessageText}', Hint='{Hint}', Detail='{Detail}', Schema='{Schema}', Table='{Table}', Column='{Column}', DataType='{DataType}', Constraint='{Constraint}', Position={Position}. PersonEmail='{Email}', Gender='{Gender}'",
+                        pg.SqlState,
+                        pg.MessageText,
+                        pg.Hint,
+                        pg.Detail,
+                        pg.SchemaName,
+                        pg.TableName,
+                        pg.ColumnName,
+                        pg.DataTypeName,
+                        pg.ConstraintName,
+                        pg.Position,
+                        request.Email,
+                        genderText);
+                }
+                else
+                {
+                    _logger.LogError(ex, "DbUpdateException during SaveChanges for LandingPage patient create. PersonEmail='{Email}', Gender='{Gender}'", request.Email, genderText);
+                }
+                throw;
+            }
 
             return newPatient;
         }

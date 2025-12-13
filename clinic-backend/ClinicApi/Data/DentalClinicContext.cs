@@ -1,5 +1,4 @@
 using ClinicApi.Models.Entities;
-using ClinicApi.Models.Enumerations;
 using Microsoft.EntityFrameworkCore;
 
 namespace ClinicApi.Data
@@ -46,11 +45,8 @@ namespace ClinicApi.Data
         {
             base.OnModelCreating(modelBuilder);
             
-            // Map C# enums to PostgreSQL enum types
-            modelBuilder.HasPostgresEnum<GenderEnum>();
-            modelBuilder.HasPostgresEnum<BillStatusEnum>();
-            modelBuilder.HasPostgresEnum<PaymentMethodEnum>();
-            
+            // Database stores these as TEXT columns. No enum mapping required.
+
             // === GLOBAL CONFIGURATIONS ===
             
             // Loop through all entity types in the model
@@ -68,22 +64,16 @@ namespace ClinicApi.Data
                         .HasDefaultValueSql("uuid_generate_v4()"); // PostgreSQL function to generate UUIDs
                 }
             }
-            
-            // === ENUM CONVERSIONS ===
-            // Configure how enums are stored in the database (as strings instead of integers)
-            // This makes the database more readable and prevents issues if enum values change
-            
-            modelBuilder.Entity<Person>()
-                .Property(p => p.gender)
-                .HasColumnType("gender_enum");
-            
-            modelBuilder.Entity<Billing>()
-                .Property(b => b.status)
-                .HasColumnType("bill_status_enum");
-            
-            modelBuilder.Entity<Payment>()
-                .Property(p => p.method)
-                .HasColumnType("payment_method_enum");
+
+            // Override specific table names that use snake_case in the database
+            modelBuilder.Entity<AppointmentStatus>().ToTable("appointment_status");
+            modelBuilder.Entity<ToothStatus>().ToTable("tooth_status");
+            modelBuilder.Entity<BillingLineItem>().ToTable("billing_line_item");
+            modelBuilder.Entity<DocumentType>().ToTable("document_type");
+            modelBuilder.Entity<DiscountType>().ToTable("discount_type");
+            modelBuilder.Entity<SaleItem>().ToTable("sale_item");
+
+            // No enum conversions necessary; properties are strings.
             
             // === ONE-TO-ONE RELATIONSHIPS ===
             // These configurations establish one-to-one relationships between entities
@@ -333,7 +323,7 @@ namespace ClinicApi.Data
             
             modelBuilder.Entity<Billing>()
                 .Property(b => b.status)
-                .HasDefaultValue(BillStatusEnum.Draft); // New bills start as Draft
+                .HasDefaultValue("Draft"); // New bills start as Draft
             
             modelBuilder.Entity<BillingLineItem>()
                 .Property(bli => bli.quantity)

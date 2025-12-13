@@ -130,6 +130,17 @@ Environment variables and endpoints:
       - Using an existing appointment (combobox), or creating a new appointment (staff, status, start/end) before creating the treatment; posts mapped DTOs accordingly.
   - Tests: adjusted seeds to use treatment.tooth_number instead of tooth_id and ensured DocumentType column mapping.
 
+- 2025-12-02: Fix Postgres enum binding for gender. Added model-level enum registrations in `DentalClinicContext` with `HasPostgresEnum<...>` and imported `Npgsql.EntityFrameworkCore.PostgreSQL`; keeps `gender`/`bill_status`/`payment_method` columns mapped to their Postgres enums so inserts from LandingPage no longer bind as Int32.
+  
+  - Added structured error logging for enum/DB issues:
+    - PatientService: log raw/parsed gender and detailed PostgresException fields on SaveChanges failures.
+    - AppointmentService: wrap SaveChanges with detailed PostgresException logging including FK IDs and parsed datetime.
+
+- 2025-12-12: Unified file logging with Serilog for full runtime.
+  - Added `RequestLoggingContextMiddleware` to enrich all logs with correlation ID, request ID, method, path, query, client IP, user agent, and user info.
+  - Configured Serilog sinks in `appsettings*.json` for console + rolling file `logs/clinic-api-.log` with 30-day retention; removed hard-coded sinks in Program to rely on config.
+  - Kept Serilog request logging enabled; bootstrap logger still writes console+file during early startup.
+
 ## Recent Commands and Tips
 - API run (local): from `clinic-backend/ClinicApi` → `dotnet run`
 - Portal run (local): from `clinic-portal` → `npm run dev` (ensure `.env.local` has `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080`)

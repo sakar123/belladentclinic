@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using ClinicApi.Models.Enumerations;
 
 namespace ClinicApi.Models.Entities
 {
@@ -21,7 +20,7 @@ namespace ClinicApi.Models.Entities
         
         public DateTime? date_of_birth { get; set; }
         
-        public GenderEnum? gender { get; set; }
+        public string? gender { get; set; }
         
         [StringLength(100)]
         [EmailAddress]

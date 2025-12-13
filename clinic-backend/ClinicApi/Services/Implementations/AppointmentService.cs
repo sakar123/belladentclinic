@@ -7,6 +7,8 @@ using ClinicApi.Models.DTOs;
 using ClinicApi.Models.Entities;
 using ClinicApi.Mappers;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Globalization;
 
 namespace ClinicApi.Services.Implementations
@@ -102,7 +104,47 @@ namespace ClinicApi.Services.Implementations
 
             // 5. Save and return
             await _appointmentRepository.AddAsync(newAppointment);
-            await _appointmentRepository.SaveChangesAsync();
+            try
+            {
+                await _appointmentRepository.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                var baseEx = ex.GetBaseException();
+                if (baseEx is PostgresException pg)
+                {
+                    _logger.LogError(ex,
+                        "Postgres error during SaveChanges for LandingPage appointment create. SqlState={SqlState}, MessageText='{MessageText}', Hint='{Hint}', Detail='{Detail}', Schema='{Schema}', Table='{Table}', Column='{Column}', DataType='{DataType}', Constraint='{Constraint}', Position={Position}. PatientId={PatientId}, StaffId={StaffId}, StatusId={StatusId}, Date='{Date}', Time='{Time}', ParsedDateTimeUtc='{ParsedUtc}'",
+                        pg.SqlState,
+                        pg.MessageText,
+                        pg.Hint,
+                        pg.Detail,
+                        pg.SchemaName,
+                        pg.TableName,
+                        pg.ColumnName,
+                        pg.DataTypeName,
+                        pg.ConstraintName,
+                        pg.Position,
+                        newAppointment.patient_id,
+                        newAppointment.staff_id,
+                        newAppointment.status_id,
+                        request.Date,
+                        request.Time,
+                        newAppointment.appointment_start_time);
+                }
+                else
+                {
+                    _logger.LogError(ex,
+                        "DbUpdateException during SaveChanges for LandingPage appointment create. PatientId={PatientId}, StaffId={StaffId}, StatusId={StatusId}, Date='{Date}', Time='{Time}', ParsedDateTimeUtc='{ParsedUtc}'",
+                        newAppointment.patient_id,
+                        newAppointment.staff_id,
+                        newAppointment.status_id,
+                        request.Date,
+                        request.Time,
+                        newAppointment.appointment_start_time);
+                }
+                throw;
+            }
 
             _logger.LogInformation("Successfully created new appointment with ID {AppointmentId} for Patient {PatientId}", newAppointment.id, newAppointment.patient_id);
 

@@ -11,13 +11,17 @@ using System;
 using System.Reflection;
 using FluentValidation;
 using FluentValidation.AspNetCore;
-using ClinicApi.Models.Enumerations; // Added
-using Npgsql; // Added
+using ClinicApi.Middleware;
 
-// Configure Serilog logger
+// Configure Serilog bootstrap logger (console + rolling file)
 Log.Logger = new LoggerConfiguration()
+    .Enrich.FromLogContext()
     .WriteTo.Console()
-    .WriteTo.File("logs/clinic-api-.log", rollingInterval: RollingInterval.Day)
+    .WriteTo.File(
+        path: "logs/clinic-api-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 30,
+        rollOnFileSizeLimit: true)
     .CreateBootstrapLogger();
 
 try
@@ -26,12 +30,11 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // Use Serilog for logging
+    // Use Serilog for logging (sinks configured via appsettings)
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .WriteTo.Console());
+        .Enrich.FromLogContext());
 
     // Ensure environment-specific settings are loaded if present
     builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
@@ -57,15 +60,10 @@ try
         );
     });
 
-    // Configure DbContext with NpgsqlDataSource for proper Enum mapping
-    var dataSourceBuilder = new NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("clinicDbConnection"));
-    dataSourceBuilder.MapEnum<GenderEnum>();
-    dataSourceBuilder.MapEnum<BillStatusEnum>();
-    dataSourceBuilder.MapEnum<PaymentMethodEnum>();
-    var dataSource = dataSourceBuilder.Build();
-
+    // Configure DbContext (database stores text values; no enum mapping needed)
+    var connString = builder.Configuration.GetConnectionString("clinicDbConnection");
     builder.Services.AddDbContextPool<DentalClinicContext>(options =>
-        options.UseNpgsql(dataSource));
+        options.UseNpgsql(connString));
 
     // Register repositories
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
@@ -105,7 +103,8 @@ try
         app.UseHttpsRedirection();
     }
     
-    // Add Serilog request logging
+    // Add request context enrichment then Serilog request logging
+    app.UseMiddleware<RequestLoggingContextMiddleware>();
     app.UseSerilogRequestLogging();
 
     // Enable CORS in Development and Docker environments

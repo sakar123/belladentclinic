@@ -36,6 +36,16 @@ namespace ClinicApi.Controllers
                 };
                 return StatusCode(201, response);
             }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid landing page request payload.");
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Cannot create appointment due to missing data/state.");
+                return BadRequest(new { Message = ex.Message });
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "An error occurred while creating an appointment from the landing page.");

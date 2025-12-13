@@ -1,6 +1,5 @@
 	using System;
 	using System.ComponentModel.DataAnnotations;
-using ClinicApi.Models.Enumerations;
 namespace ClinicApi.Models.DTOs
 {
 	public class PatientDTO
