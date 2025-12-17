@@ -24,6 +24,11 @@ namespace ClinicApi.Data.Repositories
             return await _dbSet.FindAsync(id);
         }
 
+        public IQueryable<T> GetAll()
+        {
+            return _dbSet;
+        }
+
         public async Task<IEnumerable<T>> GetAllAsync()
         {
             return await _dbSet.ToListAsync();

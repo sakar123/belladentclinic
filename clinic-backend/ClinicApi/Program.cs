@@ -12,6 +12,7 @@ using System.Reflection;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using ClinicApi.Middleware;
+using ClinicApi.Models.AppSettings;
 
 // Configure Serilog bootstrap logger (console + rolling file)
 Log.Logger = new LoggerConfiguration()
@@ -65,6 +66,9 @@ try
     builder.Services.AddDbContextPool<DentalClinicContext>(options =>
         options.UseNpgsql(connString));
 
+    // Configure EmailSettings
+    builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+
     // Register repositories
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
@@ -81,6 +85,7 @@ try
     builder.Services.AddScoped<IStaffService, StaffService>();
     builder.Services.AddScoped<IToothService, ToothService>();
     builder.Services.AddScoped<ITreatmentService, TreatmentService>();
+    builder.Services.AddScoped<IEmailService, EmailService>();
 
     // Configure AutoMapper
 

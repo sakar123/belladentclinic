@@ -13,8 +13,8 @@ export default function Hero() {
   return (
     // Section container: Full width, light gray background for a soft, clean look.
     // Ample vertical padding (py-20) for spacing, centered content.
-    <section className="w-full bg-slate-50">
-      <div className="container mx-auto flex min-h-screen flex-col items-center justify-center px-6 py-20 md:flex-row md:py-24 lg:gap-x-12">
+    <section className="w-full bg-slate-50 pt-28">
+      <div className="container mx-auto flex min-h-screen flex-col items-center justify-center px-6 pb-20 md:flex-row md:py-24 lg:gap-x-12">
         {/* Text content container */}
         <motion.div
           initial={{ opacity: 0, x: -30 }}
@@ -65,7 +65,7 @@ export default function Hero() {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
-          className="mt-12 w-full max-w-sm md:mt-0 md:w-1/2 lg:max-w-md"
+          className="mt-12 w-full max-w-sm md:mt-0 md:w-1/2 lg:max-w-md aspect-square overflow-hidden"
         >
           <Image
             src="/images/TempHeadShot.png" // Use a professional, warm headshot

@@ -21,6 +21,7 @@ namespace ClinicApi.Services.Implementations
         private readonly IRepository<Staff> _staffRepository;
         private readonly IPatientService _patientService;
         private readonly ILogger<AppointmentService> _logger;
+        private readonly IEmailService _emailService;
 
         public AppointmentService(
             IRepository<Appointment> appointmentRepository,
@@ -28,7 +29,8 @@ namespace ClinicApi.Services.Implementations
             IRepository<Patient> patientRepository,
             IRepository<Staff> staffRepository,
             IPatientService patientService,
-            ILogger<AppointmentService> logger)
+            ILogger<AppointmentService> logger,
+            IEmailService emailService)
         {
             _appointmentRepository = appointmentRepository;
             _statusRepository = statusRepository;
@@ -36,6 +38,7 @@ namespace ClinicApi.Services.Implementations
             _staffRepository = staffRepository;
             _patientService = patientService;
             _logger = logger;
+            _emailService = emailService;
         }
 
         public async Task<Appointment> CreateAppointmentFromLandingPageAsync(LandingPageAppointmentRequestDto request)
@@ -148,6 +151,19 @@ namespace ClinicApi.Services.Implementations
 
             _logger.LogInformation("Successfully created new appointment with ID {AppointmentId} for Patient {PatientId}", newAppointment.id, newAppointment.patient_id);
 
+            if (!string.IsNullOrEmpty(patientEntity.Person.email))
+            {
+                await _emailService.SendEmailAsync(
+                    patientEntity.Person.email,
+                    "Appointment Confirmation",
+                    $"Your appointment is confirmed for {newAppointment.appointment_start_time.ToShortDateString()} at {newAppointment.appointment_start_time.ToShortTimeString()}."
+                );
+            }
+            else
+            {
+                _logger.LogWarning("Patient {PatientId} has no email address. Skipping email notification.", newAppointment.patient_id);
+            }
+
             return newAppointment;
         }
 
@@ -165,7 +181,8 @@ namespace ClinicApi.Services.Implementations
 
         public async Task<AppointmentDTO> CreateAppointmentAsync(AppointmentDTO appointmentDto)
         {
-            if (!await _patientRepository.ExistsAsync(appointmentDto.patient_id))
+            var patient = await _patientRepository.GetAll().Include(p => p.Person).FirstOrDefaultAsync(p => p.id == appointmentDto.patient_id);
+            if (patient == null)
                 throw new KeyNotFoundException("Patient not found");
             if (!await _staffRepository.ExistsAsync(appointmentDto.staff_id))
                 throw new KeyNotFoundException("Staff not found");
@@ -173,9 +190,23 @@ namespace ClinicApi.Services.Implementations
                 throw new KeyNotFoundException("Appointment status not found");
 
             var appointment = appointmentDto.ToEntity();
+
             await _appointmentRepository.AddAsync(appointment);
             await _appointmentRepository.SaveChangesAsync();
-            
+
+            if (!string.IsNullOrEmpty(patient.Person.email))
+            {
+                await _emailService.SendEmailAsync(
+                    patient.Person.email,
+                    "Appointment Confirmation",
+                    $"Your appointment is confirmed for {appointment.appointment_start_time.ToShortDateString()} at {appointment.appointment_start_time.ToShortTimeString()}."
+                );
+            }
+            else
+            {
+                _logger.LogWarning("Patient {PatientId} has no email address. Skipping email notification.", appointment.patient_id);
+            }
+
             return appointment.ToDto();
         }
 
@@ -203,6 +234,20 @@ namespace ClinicApi.Services.Implementations
             
             _appointmentRepository.Update(existingAppointment);
             await _appointmentRepository.SaveChangesAsync();
+
+            var patient = await _patientRepository.GetAll().Include(p => p.Person).FirstOrDefaultAsync(p => p.id == existingAppointment.patient_id);
+            if (patient != null && !string.IsNullOrEmpty(patient.Person.email))
+            {
+                await _emailService.SendEmailAsync(
+                    patient.Person.email,
+                    "Appointment Updated",
+                    $"Your appointment has been updated to {existingAppointment.appointment_start_time.ToShortDateString()} at {existingAppointment.appointment_start_time.ToShortTimeString()}."
+                );
+            }
+            else
+            {
+                _logger.LogWarning("Patient {PatientId} has no email address. Skipping email notification.", existingAppointment.patient_id);
+            }
             
             return existingAppointment.ToDto();
         }
@@ -213,10 +258,25 @@ namespace ClinicApi.Services.Implementations
             if (appointment == null)
                 return false;
 
+            var patient = await _patientRepository.GetAll().Include(p => p.Person).FirstOrDefaultAsync(p => p.id == appointment.patient_id);
+
             try
             {
                 _appointmentRepository.Delete(appointment);
                 await _appointmentRepository.SaveChangesAsync();
+
+                if (patient != null && !string.IsNullOrEmpty(patient.Person.email))
+                {
+                    await _emailService.SendEmailAsync(
+                        patient.Person.email,
+                        "Appointment Cancelled",
+                        $"Your appointment for {appointment.appointment_start_time.ToShortDateString()} at {appointment.appointment_start_time.ToShortTimeString()} has been cancelled."
+                    );
+                }
+                else
+                {
+                    _logger.LogWarning("Patient {PatientId} has no email address. Skipping email notification.", appointment.patient_id);
+                }
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateException)
             {
