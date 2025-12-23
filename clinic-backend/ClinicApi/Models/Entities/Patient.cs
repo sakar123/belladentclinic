@@ -30,21 +30,31 @@ namespace ClinicApi.Models.Entities
         public virtual required Person Person { get; set; }
         
         [InverseProperty("patient")]
-        public virtual required ICollection<Appointment> appointments { get; set; }
+        public virtual ICollection<Appointment> appointments { get; set; }
         
         [InverseProperty("patient")]
-        public virtual required ICollection<Treatment> treatments { get; set; }
+        public virtual ICollection<Treatment> treatments { get; set; }
         
         [InverseProperty("patient")]
-        public virtual required ICollection<Billing> billings { get; set; }
+        public virtual ICollection<Billing> billings { get; set; }
         
         [InverseProperty("patient")]
-        public virtual required ICollection<Tooth> teeth { get; set; }
+        public virtual ICollection<Tooth> teeth { get; set; }
         
         [InverseProperty("patient")]
-        public virtual required ICollection<Document> documents { get; set; }
+        public virtual ICollection<Document> documents { get; set; }
         
         [InverseProperty("patient")]
-        public virtual required ICollection<SaleItem> sale_items { get; set; }
+        public virtual ICollection<SaleItem> sale_items { get; set; }
+
+        public Patient()
+        {
+            appointments = new HashSet<Appointment>();
+            treatments = new HashSet<Treatment>();
+            billings = new HashSet<Billing>();
+            teeth = new HashSet<Tooth>();
+            documents = new HashSet<Document>();
+            sale_items = new HashSet<SaleItem>();
+        }
     }
 }

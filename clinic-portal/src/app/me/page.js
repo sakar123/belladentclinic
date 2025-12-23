@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import Button from "../../components/ui/button";
@@ -10,7 +10,7 @@ import { http } from "../../lib/http";
 import { normalizePatient } from "../../lib/normalizers";
 import { CalendarDays, Clock, Pill } from "lucide-react";
 
-export default function MePage() {
+function MePageContent() {
   const router = useRouter();
   const search = useSearchParams();
   const [patient, setPatient] = useState(null);
@@ -222,6 +222,14 @@ export default function MePage() {
 
       <DetailDialog detail={detail} onClose={() => setDetail(null)} />
     </div>
+  );
+}
+
+export default function MePage() {
+  return (
+    <Suspense fallback={<div className="text-center p-10">Loading your portal...</div>}>
+      <MePageContent />
+    </Suspense>
   );
 }
 

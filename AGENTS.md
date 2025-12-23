@@ -43,7 +43,7 @@ Purpose: Keep persistent context for human contributors and AI agents so work ca
 - clinic-db
   - Schema: `clinic-db/database-schema.sql` (uses `uuid-ossp`, enums for genders/billing status/payment methods; tables: role, specialty, person, staff, patient, appointment, service, treatment, prescriptions, billing, payments, teeth, etc.)
   - Seed: `clinic-db/insert-statement.sql`
-  - Compose: `db` service (image `postgres:16-alpine`, port `5432:5432`, volume `pgdata`, mounts schema/seed to `/docker-entrypoint-initdb.d`)
+  - Compose: `db` service (image `postgres:16-alpine`, port `5433:5433`, volume `pgdata`, mounts schema/seed to `/docker-entrypoint-initdb.d`)
 
 - clinic-portal (Patient/Staff management portal)
   - Framework: Next.js (App Router)
@@ -101,7 +101,7 @@ Environment variables and endpoints:
 - Finalize Auth0 roles/claims and expand middleware protection to more routes as needed.
 - Add CI to build API, run tests, and lint portal; optionally compose-based integration job.
  - Optional: Add docker-compose.dev.yml for hot-reload (dotnet watch, next dev) to avoid rebuilds during active development.
- - Optional: Switch compose DB to custom image on 5433 or keep simple 5432 image; align API connection string accordingly.
+ - Optional: Switch compose DB to custom image on 5433 or keep simple 5433 image; align API connection string accordingly.
 
 ## Session Log
 - 2025-09-18: Established this AGENTS.md as persistent context. Current compose orchestrates db/api/portal/landing. DB schema + seeds ready. Backend has controllers/services and tests; minor mapper TODOs present. Portal integrates Auth0 and mock API routes; HTTP client uses snake/camel transforms; appointment range improvement recommended. Landing site ready with Dockerfile. Proposed Next Actions above.
@@ -129,6 +129,17 @@ Environment variables and endpoints:
     - Treatments: switched API routes to plural (/api/Treatments). Patient page shows treatments; Create Treatment dialog now supports:
       - Using an existing appointment (combobox), or creating a new appointment (staff, status, start/end) before creating the treatment; posts mapped DTOs accordingly.
   - Tests: adjusted seeds to use treatment.tooth_number instead of tooth_id and ensured DocumentType column mapping.
+
+- 2025-12-02: Fix Postgres enum binding for gender. Added model-level enum registrations in `DentalClinicContext` with `HasPostgresEnum<...>` and imported `Npgsql.EntityFrameworkCore.PostgreSQL`; keeps `gender`/`bill_status`/`payment_method` columns mapped to their Postgres enums so inserts from LandingPage no longer bind as Int32.
+  
+  - Added structured error logging for enum/DB issues:
+    - PatientService: log raw/parsed gender and detailed PostgresException fields on SaveChanges failures.
+    - AppointmentService: wrap SaveChanges with detailed PostgresException logging including FK IDs and parsed datetime.
+
+- 2025-12-12: Unified file logging with Serilog for full runtime.
+  - Added `RequestLoggingContextMiddleware` to enrich all logs with correlation ID, request ID, method, path, query, client IP, user agent, and user info.
+  - Configured Serilog sinks in `appsettings*.json` for console + rolling file `logs/clinic-api-.log` with 30-day retention; removed hard-coded sinks in Program to rely on config.
+  - Kept Serilog request logging enabled; bootstrap logger still writes console+file during early startup.
 
 ## Recent Commands and Tips
 - API run (local): from `clinic-backend/ClinicApi` → `dotnet run`

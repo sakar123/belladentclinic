@@ -1,6 +1,5 @@
 using ClinicApi.Models.DTOs;
 using ClinicApi.Models.Entities;
-using ClinicApi.Models.Enumerations;
 using System;
 using System.Collections.Generic;
 
@@ -25,7 +24,7 @@ namespace ClinicApi.Mappers
                 first_name = entity.first_name,
                 last_name = entity.last_name,
                 date_of_birth = entity.date_of_birth,
-                gender = entity.gender ?? GenderEnum.PreferNotToSay,
+                gender = entity.gender ?? "Prefer not to say",
                 email = entity.email,
                 phone_number = entity.phone_number,
                 address = entity.address,
@@ -44,8 +43,6 @@ namespace ClinicApi.Mappers
         {
             if (dto == null) return null;
             if (!visited.Add(dto)) return null;
-
-            //Enum.TryParse<GenderEnum>(dto.gender, true, out var genderEnum);
 
             return new Person
             {

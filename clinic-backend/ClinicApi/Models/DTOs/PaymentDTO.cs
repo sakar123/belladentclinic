@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel.DataAnnotations;
-using ClinicApi.Models.Enumerations;
 
 namespace ClinicApi.Models.DTOs
 {
@@ -18,7 +17,7 @@ namespace ClinicApi.Models.DTOs
         public DateTime payment_date { get; set; } = DateTime.UtcNow;
         
         [Required]
-        public PaymentMethodEnum  method { get; set; }
+        public string method { get; set; }
         
         [StringLength(255)]
         public string? transaction_ref { get; set; }

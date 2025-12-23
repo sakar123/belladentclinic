@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using ClinicApi.Models.Enumerations;
 using System.Collections.Generic;
 
 namespace ClinicApi.Models.Entities
@@ -30,7 +29,7 @@ namespace ClinicApi.Models.Entities
         public decimal amount_paid { get; set; } = 0.00m;
         
         [Required]
-        public BillStatusEnum status { get; set; } = BillStatusEnum.Draft;
+        public string status { get; set; } = "Draft";
         
         public DateTime created_at { get; set; } = DateTime.UtcNow;
         public DateTime updated_at { get; set; } = DateTime.UtcNow;

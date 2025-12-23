@@ -1,5 +1,4 @@
 using System;
-using ClinicApi.Models.Enumerations;
 
 namespace ClinicApi.Models.DTOs
 {
@@ -13,7 +12,7 @@ namespace ClinicApi.Models.DTOs
         
         public DateTime? date_of_birth { get; set; }
         
-        public GenderEnum gender { get; set; }  // you can use enum if you have GenderEnum
+        public string? gender { get; set; }
         
         public string? email { get; set; }
         

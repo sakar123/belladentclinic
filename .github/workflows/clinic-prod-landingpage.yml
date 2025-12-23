@@ -1,0 +1,59 @@
+name: Clinic Landing Page CI/CD (AWS) - OIDC
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'clinic-code/clinic-landingpage/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-south-1
+  ROLE_ARN: arn:aws:iam::816684203948:role/GitHubDeployRole-Prod
+  S3_BUCKET: belladentclinic.com
+  CF_DIST_ID: EVJQEPK1BANWB
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: clinic-code/clinic-landingpage/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: clinic-code/clinic-landingpage
+
+      - name: Build
+        run: npm run build
+        working-directory: clinic-code/clinic-landingpage
+
+      # Only needed if this is a static-export site that outputs /out
+      - name: Export (static) if available
+        run: npm run export --if-present
+        working-directory: clinic-code/clinic-landingpage
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3
+        run: aws s3 sync ./clinic-code/clinic-landingpage/out s3://${{ env.S3_BUCKET }} --delete
+
+      - name: Invalidate CloudFront cache
+        run: aws cloudfront create-invalidation --distribution-id ${{ env.CF_DIST_ID }} --paths "/*"
+

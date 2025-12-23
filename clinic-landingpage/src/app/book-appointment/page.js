@@ -1,39 +1,135 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useLanguage } from '../context/LanguageContext'
 import { translations } from '../lib/translations'
+import ReCAPTCHA from "react-google-recaptcha";
+
+// Helper function to generate time slots
+const generateTimeSlots = () => {
+  const slots = [];
+  const startHour = 7; // 7 AM
+  const endHour = 20; // 8 PM (20:00)
+
+  for (let h = startHour; h <= endHour; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      if (h === endHour && m > 0) continue; // Do not include 8:30 PM
+      const hour = String(h).padStart(2, '0');
+      const minute = String(m).padStart(2, '0');
+      slots.push(`${hour}:${minute}`);
+    }
+  }
+  return slots;
+};
 
 export default function BookAppointmentPage() {
   const { language } = useLanguage()
   const t = translations[language]
+  const [captchaValue, setCaptchaValue] = useState(null);
 
+  const [appointments, setAppointments] = useState([])
   const [form, setForm] = useState({
     fullName: '',
     email: '',
     phone: '',
+    gender: '',
     date: '',
     time: '',
     message: '',
     botField: '',
   })
 
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointment`);
+        console.log(res);
+        if (!res.ok) {
+          throw new Error('Failed to fetch appointments');
+        }
+        const data = await res.json();
+        setAppointments(data);
+      } catch (error) {
+        toast.error(error.message);
+      }
+    };
+
+    fetchAppointments();
+  }, []);
+
+  const availableTimeSlots = useMemo(() => {
+    const allSlots = generateTimeSlots();
+    if (!form.date) return allSlots;
+
+    const bookedSlots = appointments
+      .filter(appointment => appointment.date === form.date)
+      .map(appointment => appointment.time);
+
+    return allSlots.filter(slot => !bookedSlots.includes(slot));
+  }, [form.date, appointments]);
+
   const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState({})
+
+  const validate = () => {
+    const newErrors = {}
+    if (!form.fullName) newErrors.fullName = 'Full name is required.'
+    if (!form.email) {
+      newErrors.email = 'Email is required.'
+    } else if (!/\S+@\S+\.\S+/.test(form.email)) {
+      newErrors.email = 'Email is invalid.'
+    }
+    if (!form.phone) newErrors.phone = 'Phone number is required.'
+    if (!form.date) {
+      newErrors.date = 'Date is required.'
+    } else {
+      const selectedDate = new Date(form.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate < today) {
+        newErrors.date = 'Date must be in the future.'
+      }
+    }
+    if (!form.time) newErrors.time = 'Time is required.'
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target;
+    if (name === 'phone') {
+      const regex = /^[0-9+]*$/;
+      if (!regex.test(value)) {
+        return;
+      }
+    }
+    setForm({ ...form, [name]: value })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (form.botField) return // spam bot
 
+    if (!validate()) {
+      for (const error of Object.values(errors)) {
+        toast.error(error)
+      }
+      return
+    }
+
+    if (process.env.NEXT_PUBLIC_FEATURE_ENABLE_RECAPTCHA === 'true' && !captchaValue) {
+      toast.error("Please complete the CAPTCHA.");
+      return;
+    }
+
     setLoading(true)
-    const res = await fetch('/api/appointment', {
+    console.log('Submitting form:', form)
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
@@ -46,11 +142,15 @@ export default function BookAppointmentPage() {
         fullName: '',
         email: '',
         phone: '',
+        gender: '',
         date: '',
         time: '',
         message: '',
         botField: '',
       })
+      if (process.env.NEXT_PUBLIC_FEATURE_ENABLE_RECAPTCHA === 'true') {
+        setCaptchaValue(null);
+      }
     } else {
       toast.error(t.toastError)
     }
@@ -93,6 +193,19 @@ export default function BookAppointmentPage() {
           value={form.phone}
           onChange={handleChange}
         />
+        <select
+          name="gender"
+          required
+          value={form.gender}
+          onChange={handleChange}
+          className="block w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-base text-gray-700 placeholder-gray-400 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-sky-600"
+        >
+          <option value="" disabled>Select Gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+          <option value="Prefer not to say">Prefer not to say</option>
+        </select>
         <div className="flex gap-4">
           <Input
             type="date"
@@ -101,13 +214,18 @@ export default function BookAppointmentPage() {
             value={form.date}
             onChange={handleChange}
           />
-          <Input
-            type="time"
+          <select
             name="time"
             required
             value={form.time}
             onChange={handleChange}
-          />
+            className="block w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-base text-gray-700 placeholder-gray-400 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-sky-600"
+          >
+            <option value="" disabled>Select Time</option>
+            {availableTimeSlots.map(slot => (
+              <option key={slot} value={slot}>{slot}</option>
+            ))}
+          </select>
         </div>
         <Textarea
           name="message"
@@ -115,6 +233,12 @@ export default function BookAppointmentPage() {
           value={form.message}
           onChange={handleChange}
         />
+        {process.env.NEXT_PUBLIC_FEATURE_ENABLE_RECAPTCHA === 'true' && (
+          <ReCAPTCHA
+            sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+            onChange={(value) => setCaptchaValue(value)}
+          />
+        )}
         <Button type="submit" disabled={loading}>
           {loading ? t.sending : t.bookAppointment}
         </Button>

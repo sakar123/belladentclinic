@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel.DataAnnotations;
-using ClinicApi.Models.Enumerations;
 
 namespace ClinicApi.Models.DTOs
 {
@@ -26,6 +25,6 @@ namespace ClinicApi.Models.DTOs
         public decimal amount_paid { get; set; }
         
         [Required]
-        public BillStatusEnum status { get; set; }
+        public string status { get; set; }
     }
 }
