@@ -2,7 +2,7 @@ name: Clinic Landing Page CI/CD (AWS) - OIDC
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ not_so_dev ]
     paths:
       - 'clinic-landingpage/**'
   workflow_dispatch:
