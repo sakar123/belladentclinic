@@ -36,7 +36,7 @@ jobs:
       - name: Publish (linux-arm64)
         run: |
           dotnet restore clinic-backend/ClinicApi/ClinicApi.csproj
-          dotnet publish clinic-backend/ClinicApi/ClinicApi.csproj -c Release -r linux-arm64 --self-contained false -o publish
+          dotnet publish clinic-backend/ClinicApi/ClinicApi.csproj -c Release -r linux-x64 --self-contained false -o publish
 
       - name: Package zip
         run: |
