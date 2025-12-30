@@ -1,44 +1,75 @@
-name: Clinic Backend CI/CD
+name: Deploy ClinicApi (PROD) via S3 + SSM
 
 on:
   push:
     branches: [ main ]
     paths:
-      - 'clinic-code/clinic-backend/**'
+      - 'ClinicApi/**'
+      - '.github/workflows/deploy-clinicapi-prod.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-south-1
+  ROLE_ARN: arn:aws:iam::816684203948:role/GitHubDeployRole-Prod
+
+  ARTIFACT_BUCKET: belladent-prod-deploy-artifacts
+  INSTANCE_ID: i-0b1a3760dc3cda3d0
+
+  APP_DIR: /opt/ClinicApi
+  SERVICE_NAME: ClinicApi
 
 jobs:
-  build-and-publish:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Set up .NET Core
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '8.0.x'
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
 
-    - name: Restore dependencies
-      run: dotnet restore clinic-code/clinic-backend/ClinicApi.sln
+      - name: Publish (linux-arm64)
+        run: |
+          dotnet restore ClinicApi/ClinicApi.csproj
+          dotnet publish ClinicApi/ClinicApi.csproj -c Release -r linux-arm64 --self-contained false -o publish
 
-    - name: Build
-      run: dotnet build clinic-code/clinic-backend/ClinicApi.sln --configuration Release --no-restore
+      - name: Package zip
+        run: |
+          cd publish
+          zip -r ../ClinicApi_${{ github.sha }}.zip .
+          cd ..
 
-    - name: Test
-      run: dotnet test clinic-code/clinic-backend/ClinicApi.sln --no-build --verbosity normal
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v2
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact to S3
+        run: |
+          aws s3 cp "ClinicApi_${{ github.sha }}.zip" "s3://${{ env.ARTIFACT_BUCKET }}/clinicapi/ClinicApi_${{ github.sha }}.zip"
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v4
-      with:
-        context: ./clinic-code/clinic-backend
-        dockerfile: ./clinic-code/clinic-backend/ClinicApi/Dockerfile.API
-        push: true
-        tags: ghcr.io/${{ github.repository_owner }}/clinic-api:latest
+      - name: Deploy on EC2 via SSM
+        run: |
+          aws ssm send-command \
+            --region "${{ env.AWS_REGION }}" \
+            --instance-ids "${{ env.INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy ClinicApi ${{ github.sha }}" \
+            --parameters commands="[
+              \"set -e\",
+              \"cd /tmp\",
+              \"aws s3 cp s3://${{ env.ARTIFACT_BUCKET }}/clinicapi/ClinicApi_${{ github.sha }}.zip ClinicApi.zip\",
+              \"sudo systemctl stop ${{ env.SERVICE_NAME }} || true\",
+              \"sudo rm -rf ${{ env.APP_DIR }}/*\",
+              \"sudo unzip -o ClinicApi.zip -d ${{ env.APP_DIR }}\",
+              \"sudo chown -R root:root ${{ env.APP_DIR }}\",
+              \"sudo systemctl start ${{ env.SERVICE_NAME }}\",
+              \"sudo systemctl status ${{ env.SERVICE_NAME }} --no-pager || true\"
+            ]"
+
