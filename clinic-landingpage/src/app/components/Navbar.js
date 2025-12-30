@@ -84,12 +84,12 @@ export default function Navbar() {
             {/* --- Logo and Clinic Name --- */}
             <Link href="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
               <Image
-                src="/images/belladent-logo.svg"
+                src="/images/belladent_logo_with_name.jpg"
                 alt="BellaDent Dental Clinic and Implant Center"
-                width={250}
-                height={250}
+                width={300}
+                height={280}
                 className="rounded-lg"
-                onError={(e) => { e.currentTarget.src = '/images/belladent-logo.svg'; }}
+                onError={(e) => { e.currentTarget.src = ''; }}
               />
               <span className="hidden sm:block text-xl font-bold text-gray-800 tracking-tight">{t.clinicName}</span>
             </Link>

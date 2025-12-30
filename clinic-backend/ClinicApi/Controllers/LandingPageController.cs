@@ -13,11 +13,32 @@ namespace ClinicApi.Controllers
     {
         private readonly ILogger<LandingPageController> _logger;
         private readonly IAppointmentService _appointmentService;
+        private readonly IGoogleReviewsService _googleReviewsService;
 
-        public LandingPageController(ILogger<LandingPageController> logger, IAppointmentService appointmentService)
+        public LandingPageController(
+            ILogger<LandingPageController> logger,
+            IAppointmentService appointmentService,
+            IGoogleReviewsService googleReviewsService)
         {
             _logger = logger;
             _appointmentService = appointmentService;
+            _googleReviewsService = googleReviewsService;
+        }
+
+        [HttpGet("reviews")]
+        public async Task<IActionResult> GetReviews()
+        {
+            _logger.LogInformation("Fetching Google Reviews for landing page.");
+            try
+            {
+                var reviews = await _googleReviewsService.GetReviewsAsync();
+                return Ok(reviews);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while fetching Google Reviews.");
+                return StatusCode(500, "An internal error occurred. Please try again later.");
+            }
         }
 
         [HttpPost("appointment")]

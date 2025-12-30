@@ -86,6 +86,7 @@ try
     builder.Services.AddScoped<IToothService, ToothService>();
     builder.Services.AddScoped<ITreatmentService, TreatmentService>();
     builder.Services.AddScoped<IEmailService, EmailService>();
+    builder.Services.AddScoped<IGoogleReviewsService, GoogleReviewsService>();
 
     // Configure AutoMapper
 
