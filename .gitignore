@@ -39,7 +39,8 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 .env.*.local # Catch all local envs
-
+appsettings*.json
+!appsettings.template.json
 # IDE specific
 .idea/
 .vscode/*.code-workspace
