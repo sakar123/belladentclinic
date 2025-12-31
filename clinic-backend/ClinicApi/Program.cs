@@ -38,7 +38,7 @@ try
         .Enrich.FromLogContext());
 
     // Ensure environment-specific settings are loaded if present
-    builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
+    builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: false, reloadOnChange: true);
 
     // Add services to the container.
     builder.Services.AddControllers();
