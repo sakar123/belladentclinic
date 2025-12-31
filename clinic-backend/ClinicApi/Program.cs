@@ -38,7 +38,7 @@ try
         .Enrich.FromLogContext());
 
     // Ensure environment-specific settings are loaded if present
-    builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
+    builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: false, reloadOnChange: true);
 
     // Add services to the container.
     builder.Services.AddControllers();
@@ -95,6 +95,13 @@ try
     builder.Services.AddSwaggerGen();
 
     var app = builder.Build();
+    
+    //Setup Database
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<DentalClinicContext>();
+        db.Database.Migrate();
+    }
 
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
