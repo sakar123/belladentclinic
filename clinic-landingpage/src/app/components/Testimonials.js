@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getReviews } from '@/lib/api';
 
 export default function Testimonials() {
   const [testimonials, setTestimonials] = useState([]);
@@ -12,12 +13,7 @@ export default function Testimonials() {
   useEffect(() => {
     const fetchTestimonials = async () => {
       try {
-        // In a production environment, this URL should be configured properly.
-        const response = await fetch('http://localhost:5000/api/landingpage/reviews');
-        if (!response.ok) {
-          throw new Error('Failed to fetch testimonials');
-        }
-        const data = await response.json();
+        const data = await getReviews();
         setTestimonials(data);
       } catch (err) {
         setError(err.message);
