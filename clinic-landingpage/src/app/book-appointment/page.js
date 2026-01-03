@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { useLanguage } from '../context/LanguageContext'
 import { translations } from '../lib/translations'
 import ReCAPTCHA from "react-google-recaptcha";
+import { getAppointments, bookAppointment } from '@/lib/api';
 
 // Helper function to generate time slots
 const generateTimeSlots = () => {
@@ -46,12 +47,7 @@ export default function BookAppointmentPage() {
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointment`);
-        console.log(res);
-        if (!res.ok) {
-          throw new Error('Failed to fetch appointments');
-        }
-        const data = await res.json();
+        const data = await getAppointments();
         setAppointments(data);
       } catch (error) {
         toast.error(error.message);
@@ -127,17 +123,10 @@ export default function BookAppointmentPage() {
       return;
     }
 
-    setLoading(true)
-    console.log('Submitting form:', form)
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointment`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-
-    setLoading(false)
-    if (res.ok) {
-      toast.success(t.toastSuccess)
+    setLoading(true);
+    try {
+      await bookAppointment(form);
+      toast.success(t.toastSuccess);
       setForm({
         fullName: '',
         email: '',
@@ -147,12 +136,14 @@ export default function BookAppointmentPage() {
         time: '',
         message: '',
         botField: '',
-      })
+      });
       if (process.env.NEXT_PUBLIC_FEATURE_ENABLE_RECAPTCHA === 'true') {
         setCaptchaValue(null);
       }
-    } else {
-      toast.error(t.toastError)
+    } catch (error) {
+      toast.error(t.toastError);
+    } finally {
+      setLoading(false);
     }
   }
 

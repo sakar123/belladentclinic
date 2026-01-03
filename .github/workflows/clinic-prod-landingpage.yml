@@ -35,6 +35,9 @@ jobs:
         working-directory: clinic-landingpage
 
       - name: Build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
+          NEXT_PUBLIC_API_KEY: ${{ secrets.PROD_API_KEY }}
         run: npm run build
         working-directory: clinic-landingpage
 
