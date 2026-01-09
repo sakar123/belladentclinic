@@ -139,7 +139,7 @@ namespace ClinicApi.Services.Implementations
             existingPerson.address = staffDto.person.address;
             existingPerson.a_identifier = staffDto.person.a_identifier;
 
-            _personRepository.Update(existingPerson);
+            await _personRepository.UpdateAsync(existingPerson);
             await _personRepository.SaveChangesAsync();
 
             // Update Staff manually
@@ -148,7 +148,7 @@ namespace ClinicApi.Services.Implementations
             existingStaff.license_number = staffDto.license_number;
             existingStaff.is_active = staffDto.is_active;
 
-            _staffRepository.Update(existingStaff);
+            await _staffRepository.UpdateAsync(existingStaff);
             await _staffRepository.SaveChangesAsync();
 
             return StaffMapper.ToDto(existingStaff, new HashSet<object>());
@@ -168,7 +168,7 @@ namespace ClinicApi.Services.Implementations
                     // Deleting Person cascades to Staff (per model). If there are FK references
                     // (e.g., appointments), the database will reject the delete. Translate to
                     // a meaningful operation exception so the controller can return 409.
-                    _personRepository.Delete(person);
+                    await _personRepository.DeleteAsync(person);
                     await _personRepository.SaveChangesAsync();
                 }
                 catch (Microsoft.EntityFrameworkCore.DbUpdateException)

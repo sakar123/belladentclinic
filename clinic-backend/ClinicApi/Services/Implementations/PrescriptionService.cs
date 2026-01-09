@@ -69,7 +69,7 @@ namespace ClinicApi.Services.Implementations
             existingPrescription.instructions = prescriptionDto.instructions;
             existingPrescription.updated_at = DateTime.UtcNow;
             
-            _prescriptionRepository.Update(existingPrescription);
+            await _prescriptionRepository.UpdateAsync(existingPrescription);
             await _prescriptionRepository.SaveChangesAsync();
             
             return existingPrescription.ToDto();
@@ -81,7 +81,7 @@ namespace ClinicApi.Services.Implementations
             if (prescription == null)
                 return false;
 
-            _prescriptionRepository.Delete(prescription);
+            await _prescriptionRepository.DeleteAsync(prescription);
             await _prescriptionRepository.SaveChangesAsync();
             return true;
         }

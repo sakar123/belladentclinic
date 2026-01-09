@@ -89,7 +89,6 @@ export default function Navbar() {
                 width={300}
                 height={280}
                 className="rounded-lg"
-                onError={(e) => { e.currentTarget.src = ''; }}
               />
               <span className="hidden sm:block text-xl font-bold text-gray-800 tracking-tight">{t.clinicName}</span>
             </Link>

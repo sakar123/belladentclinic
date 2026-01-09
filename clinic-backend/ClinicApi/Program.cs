@@ -13,6 +13,8 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using ClinicApi.Middleware;
 using ClinicApi.Models.AppSettings;
+using ClinicApi.Models.Entities;
+using ClinicApi.Models.DTOs.Lookup;
 
 // Configure Serilog bootstrap logger (console + rolling file)
 Log.Logger = new LoggerConfiguration()
@@ -62,9 +64,12 @@ try
     });
 
     // Configure DbContext (database stores text values; no enum mapping needed)
-    var connString = builder.Configuration.GetConnectionString("clinicDbConnection");
-    builder.Services.AddDbContextPool<DentalClinicContext>(options =>
-        options.UseNpgsql(connString));
+    builder.Services.AddDbContextPool<DentalClinicContext>((serviceProvider, options) =>
+    {
+        var connString = builder.Configuration.GetConnectionString("clinicDbConnection");
+        options.UseNpgsql(connString);
+        options.ConfigureWarnings(warnings => warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    });
 
     // Configure EmailSettings
     builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
@@ -87,8 +92,16 @@ try
     builder.Services.AddScoped<ITreatmentService, TreatmentService>();
     builder.Services.AddScoped<IEmailService, EmailService>();
     builder.Services.AddScoped<IGoogleReviewsService, GoogleReviewsService>();
+    builder.Services.AddScoped(typeof(ILookupService<,>), typeof(LookupService<,>));
+    builder.Services.AddScoped<ILookupService<AppointmentStatus, CreateAppointmentStatusDto>, LookupService<AppointmentStatus, CreateAppointmentStatusDto>>();
+    builder.Services.AddScoped<ILookupService<DocumentType, CreateDocumentTypeDto>, LookupService<DocumentType, CreateDocumentTypeDto>>();
+    builder.Services.AddScoped<ILookupService<DiscountType, CreateDiscountTypeDto>, LookupService<DiscountType, CreateDiscountTypeDto>>();
+    builder.Services.AddScoped<ILookupService<Role, CreateRoleDto>, LookupService<Role, CreateRoleDto>>();
+    builder.Services.AddScoped<ILookupService<ToothStatus, CreateToothStatusDto>, LookupService<ToothStatus, CreateToothStatusDto>>();
+
 
     // Configure AutoMapper
+    builder.Services.AddAutoMapper(Assembly.GetExecutingAssembly());
 
     // Add Swagger
     builder.Services.AddEndpointsApiExplorer();

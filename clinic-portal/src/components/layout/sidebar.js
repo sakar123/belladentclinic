@@ -11,11 +11,14 @@ const navItems = [
   { href: "/appointments", label: "Appointments", icon: CalendarDays },
   { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/services", label: "Services", icon: Stethoscope },
-  { href: "/staff", label: "Staff", icon: UserCog },
   { href: "/reports", label: "Reports", icon: LineChart },
-  { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+const adminNavItems = [
+  { href: "/admin/staff", label: "Staff", icon: UserCog },
+  { href: "/admin/services", label: "Services", icon: Stethoscope },
+  { href: "/admin/lookups", label: "Lookups", icon: FlaskConical },
+]
 
 export default function Sidebar({ className }) {
   const pathname = usePathname();
@@ -38,6 +41,26 @@ export default function Sidebar({ className }) {
       <div className={cn("px-2 text-xs text-app-muted mb-2", collapsed && "opacity-0 w-0 overflow-hidden")}>Patient Portal</div>
       <nav className="space-y-1">
         {navItems.map((item) => {
+          const Icon = item.icon;
+          const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
+                active ? "bg-blue-50 text-blue-700" : "hover:bg-app-bg text-app-foreground"
+              )}
+            >
+              <Icon size={18} />
+              <span className={cn("transition-all", collapsed && "opacity-0 w-0 overflow-hidden")}>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+      <div className={cn("px-2 text-xs text-app-muted my-2", collapsed && "opacity-0 w-0 overflow-hidden")}>Admin</div>
+      <nav className="space-y-1">
+        {adminNavItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           return (

@@ -232,7 +232,7 @@ namespace ClinicApi.Services.Implementations
             existingAppointment.notes = appointmentDto.notes;
             existingAppointment.updated_at = DateTime.UtcNow;
             
-            _appointmentRepository.Update(existingAppointment);
+            await _appointmentRepository.UpdateAsync(existingAppointment);
             await _appointmentRepository.SaveChangesAsync();
 
             var patient = await _patientRepository.GetAll().Include(p => p.Person).FirstOrDefaultAsync(p => p.id == existingAppointment.patient_id);
@@ -262,7 +262,7 @@ namespace ClinicApi.Services.Implementations
 
             try
             {
-                _appointmentRepository.Delete(appointment);
+                await _appointmentRepository.DeleteAsync(appointment);
                 await _appointmentRepository.SaveChangesAsync();
 
                 if (patient != null && !string.IsNullOrEmpty(patient.Person.email))

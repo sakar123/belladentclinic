@@ -71,7 +71,7 @@ namespace ClinicApi.Services.Implementations
             existingTooth.tooth_status_id = toothDto.tooth_status_id;
             existingTooth.updated_at = DateTime.UtcNow;
 
-            _toothRepository.Update(existingTooth);
+            await _toothRepository.UpdateAsync(existingTooth);
             await _toothRepository.SaveChangesAsync();
 
             return ToothMapper.ToDto(existingTooth, new HashSet<object>());
@@ -83,7 +83,7 @@ namespace ClinicApi.Services.Implementations
             if (tooth == null)
                 return false;
 
-            _toothRepository.Delete(tooth);
+            await _toothRepository.DeleteAsync(tooth);
             await _toothRepository.SaveChangesAsync();
             return true;
         }

@@ -64,7 +64,7 @@ namespace ClinicApi.Services.Implementations
             existingBilling.due_date = billingDto.due_date;
             existingBilling.updated_at = DateTime.UtcNow;
 
-            _billingRepository.Update(existingBilling);
+            await _billingRepository.UpdateAsync(existingBilling);
             await _billingRepository.SaveChangesAsync();
 
             return existingBilling.ToDto();
@@ -76,7 +76,7 @@ namespace ClinicApi.Services.Implementations
             if (billing == null)
                 return false;
 
-            _billingRepository.Delete(billing);
+            await _billingRepository.DeleteAsync(billing);
             await _billingRepository.SaveChangesAsync();
             return true;
         }

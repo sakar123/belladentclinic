@@ -1,13 +1,29 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// Single source: Clinic API base URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_CLINIC_API_BASE_URL;
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
+const joinUrl = (base, path) => {
+    const b = (base || '').replace(/\/$/, '');
+    const p = path.startsWith('/') ? path : `/${path}`;
+    return `${b}${p}`;
+};
+
 const apiFetch = async (endpoint, options = {}) => {
-    const url = `${API_BASE_URL}${endpoint}`;
+    if (!API_BASE_URL) {
+        const hint = 'Set NEXT_PUBLIC_CLINIC_API_BASE_URL to the Clinic API origin, e.g., http://localhost:5112';
+        console.error('API base URL is undefined. ' + hint);
+        throw new Error('API base URL is undefined. ' + hint);
+    }
+
+    const url = joinUrl(API_BASE_URL, endpoint);
     const headers = {
         'Content-Type': 'application/json',
-        'X-Clinic-Key': API_KEY,
         ...options.headers,
     };
+
+    if (API_KEY) {
+        headers['X-Clinic-Key'] = API_KEY;
+    }
 
     const response = await fetch(url, { ...options, headers });
 

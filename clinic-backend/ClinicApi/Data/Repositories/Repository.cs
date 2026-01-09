@@ -44,13 +44,13 @@ namespace ClinicApi.Data.Repositories
             await _dbSet.AddAsync(entity);
         }
 
-        public void Update(T entity)
+        public async Task UpdateAsync(T entity)
         {
             _dbSet.Attach(entity);
             _context.Entry(entity).State = EntityState.Modified;
         }
 
-        public void Delete(T entity)
+        public async Task DeleteAsync(T entity)
         {
             if (_context.Entry(entity).State == EntityState.Detached)
             {

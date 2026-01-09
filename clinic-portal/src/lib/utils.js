@@ -1,43 +1,40 @@
-export function cn(...classes) {
-  return classes.filter(Boolean).join(" ");
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
 }
 
-// Case conversion utilities
-const toCamel = (str) =>
-  str.replace(/[_-](\w)/g, (_, c) => (c ? c.toUpperCase() : ""));
-
-const toSnake = (str) =>
-  str
-    .replace(/([A-Z]+)/g, "_$1")
-    .replace(/[-\s]+/g, "_")
-    .toLowerCase()
-    .replace(/^_/, "");
-
-function isObject(val) {
-  return val !== null && typeof val === "object" && !Array.isArray(val);
-}
-
-export function keysToCamel(input) {
-  if (Array.isArray(input)) return input.map(keysToCamel);
-  if (isObject(input)) {
-    const out = {};
-    Object.entries(input).forEach(([k, v]) => {
-      out[toCamel(k)] = keysToCamel(v);
-    });
-    return out;
+export function keysToCamel(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(v => keysToCamel(v));
+  } else if (obj !== null && obj.constructor === Object) {
+    return Object.keys(obj).reduce(
+      (result, key) => ({
+        ...result,
+        [key.replace(/([-_][a-z])/g, g => g.toUpperCase().replace(/[-_]/g, ''))]: keysToCamel(
+          obj[key]
+        ),
+      }),
+      {}
+    );
   }
-  return input;
+  return obj;
 }
 
-export function keysToSnake(input) {
-  if (Array.isArray(input)) return input.map(keysToSnake);
-  if (isObject(input)) {
-    const out = {};
-    Object.entries(input).forEach(([k, v]) => {
-      out[toSnake(k)] = keysToSnake(v);
-    });
-    return out;
+export function keysToSnake(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(v => keysToSnake(v));
+  } else if (obj !== null && obj.constructor === Object) {
+    return Object.keys(obj).reduce(
+      (result, key) => ({
+        ...result,
+        [key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)]: keysToSnake(
+          obj[key]
+        ),
+      }),
+      {}
+    );
   }
-  return input;
+  return obj;
 }
-

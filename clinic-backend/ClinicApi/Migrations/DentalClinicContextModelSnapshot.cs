@@ -91,6 +91,28 @@ namespace ClinicApi.Migrations
                         .IsUnique();
 
                     b.ToTable("appointment_status", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            id = new Guid("cf063462-6a13-43d1-ac87-c18d161aa954"),
+                            name = "Scheduled"
+                        },
+                        new
+                        {
+                            id = new Guid("68727843-03b7-4cec-bbe4-ba837a1f398d"),
+                            name = "Confirmed"
+                        },
+                        new
+                        {
+                            id = new Guid("b43df020-3abd-442c-8b04-c70a2bc42062"),
+                            name = "Cancelled"
+                        },
+                        new
+                        {
+                            id = new Guid("0b01d9d2-5645-48d7-8ed8-edb1e9b8af5b"),
+                            name = "Completed"
+                        });
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Billing", b =>
@@ -220,6 +242,24 @@ namespace ClinicApi.Migrations
                     b.HasKey("id");
 
                     b.ToTable("discount_type", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            id = new Guid("d0115ad2-4098-42f9-b1c2-1faddf373ccb"),
+                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1580),
+                            discount_name = "Senior Citizen",
+                            discount_percentage = 10m,
+                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1580)
+                        },
+                        new
+                        {
+                            id = new Guid("782b35f4-1252-4de6-a710-9b2681112f7f"),
+                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(2000),
+                            discount_name = "Student",
+                            discount_percentage = 5m,
+                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(2000)
+                        });
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Document", b =>
@@ -307,6 +347,32 @@ namespace ClinicApi.Migrations
                     b.HasKey("id");
 
                     b.ToTable("document_type", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            id = new Guid("de3b98d3-9281-439c-a014-0d87e38cdb5a"),
+                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(780),
+                            document_type_code = "XRAY",
+                            name = "X-Ray",
+                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(780)
+                        },
+                        new
+                        {
+                            id = new Guid("4ba01043-3d4d-440f-85ca-79f7c6fd52f2"),
+                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1240),
+                            document_type_code = "CONSENT",
+                            name = "Consent Form",
+                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1240)
+                        },
+                        new
+                        {
+                            id = new Guid("e8a3bf49-f083-443e-9749-00f54f7bc4bb"),
+                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1240),
+                            document_type_code = "OTHER",
+                            name = "Other",
+                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1240)
+                        });
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Patient", b =>
@@ -499,6 +565,23 @@ namespace ClinicApi.Migrations
                     b.HasKey("id");
 
                     b.ToTable("role");
+
+                    b.HasData(
+                        new
+                        {
+                            id = new Guid("4c64b60f-eb58-4c28-b4ee-8d5bf850b3b6"),
+                            name = "Admin"
+                        },
+                        new
+                        {
+                            id = new Guid("c96127a9-12dd-4211-85ed-8079504231ca"),
+                            name = "Dentist"
+                        },
+                        new
+                        {
+                            id = new Guid("1160be54-0d90-425d-aae1-e30491121809"),
+                            name = "Receptionist"
+                        });
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.SaleItem", b =>
@@ -699,6 +782,40 @@ namespace ClinicApi.Migrations
                         .IsUnique();
 
                     b.ToTable("tooth_status", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            id = new Guid("23ab8f4c-1944-46df-80d9-dc137752f649"),
+                            code = "HEALTHY",
+                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3240),
+                            description = "Healthy",
+                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3240)
+                        },
+                        new
+                        {
+                            id = new Guid("665eb447-6d2e-4889-97b0-ea80c931c7bd"),
+                            code = "CAVITY",
+                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3630),
+                            description = "Cavity",
+                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640)
+                        },
+                        new
+                        {
+                            id = new Guid("58921fa0-25c3-45f4-976c-ea17379a98ed"),
+                            code = "MISSING",
+                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640),
+                            description = "Missing",
+                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640)
+                        },
+                        new
+                        {
+                            id = new Guid("49bc7706-a3d4-4927-a4d8-9c505dbd426a"),
+                            code = "OTHER",
+                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640),
+                            description = "Other",
+                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640)
+                        });
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Treatment", b =>

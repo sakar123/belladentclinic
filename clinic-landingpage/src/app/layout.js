@@ -1,9 +1,8 @@
-import './globals.css'; // Your Tailwind base styles
-import Navbar from './components/Navbar';
-import WhatsAppButton from './components/WhatsAppButton';
+import './globals.css';
+import Header from './components/Header';
 import Footer from './components/Footer';
 import { LanguageProvider } from './context/LanguageContext';
-import { Toaster } from 'sonner'
+import { Toaster } from 'sonner';
 
 export default function RootLayout({ children }) {
   return (
@@ -11,14 +10,12 @@ export default function RootLayout({ children }) {
       <head>
         <meta charSet="utf-8"></meta>
       </head>
-      <body className="bg-white text-gray-900 min-h-screen flex flex-col">
+      <body className="bg-background text-foreground min-h-screen flex flex-col">
         <LanguageProvider>
-          <Navbar />
-          <main className="flex-grow">{children}</main>
+          <Header />
+          <main className="flex-grow pt-20">{children}</main>
           <Toaster />
-          <WhatsAppButton />
           <Footer />
-
         </LanguageProvider>
       </body>
     </html>
