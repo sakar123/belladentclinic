@@ -13,6 +13,7 @@
   </None>
 </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
     <PackageReference Include="AWSSDK.SimpleEmail" Version="4.0.2.8" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
 

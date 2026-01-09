@@ -1,19 +1,8 @@
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "../components/layout/sidebar";
 import Header from "../components/layout/header";
 import { cn } from "../lib/utils";
 import Providers from "./providers";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata = {
   title: "Clinic Patient Portal",
@@ -23,7 +12,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={cn(geistSans.variable, geistMono.variable, "antialiased bg-app-bg text-app-foreground")}>
+      <body className={cn("antialiased bg-app-bg text-app-foreground")}>
         <Providers>
           <div className="min-h-dvh grid grid-cols-[auto_1fr] grid-rows-[auto_1fr] md:grid-rows-[1fr] md:grid-cols-[280px_1fr]">
             <Sidebar className="row-span-2 hidden md:block" />

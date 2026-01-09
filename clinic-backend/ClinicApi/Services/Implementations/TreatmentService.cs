@@ -98,7 +98,7 @@ namespace ClinicApi.Services.Implementations
             existingTreatment.notes = treatmentDto.notes;
             existingTreatment.updated_at = DateTime.UtcNow;
 
-            _treatmentRepository.Update(existingTreatment);
+            await _treatmentRepository.UpdateAsync(existingTreatment);
             await _treatmentRepository.SaveChangesAsync();
 
             return TreatmentMapper.ToDto(existingTreatment, new HashSet<object>());
@@ -110,7 +110,7 @@ namespace ClinicApi.Services.Implementations
             if (treatment == null)
                 return false;
 
-            _treatmentRepository.Delete(treatment);
+            await _treatmentRepository.DeleteAsync(treatment);
             await _treatmentRepository.SaveChangesAsync();
             return true;
         }

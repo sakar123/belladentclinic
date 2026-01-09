@@ -55,7 +55,7 @@ namespace ClinicApi.Services.Implementations
             existingSpecialty.name = specialtyDto.name;
             existingSpecialty.description = specialtyDto.description;
 
-            _specialtyRepository.Update(existingSpecialty);
+            await _specialtyRepository.UpdateAsync(existingSpecialty);
             await _specialtyRepository.SaveChangesAsync();
 
             return SpecialtyMapper.ToDto(existingSpecialty, new HashSet<object>());
@@ -67,7 +67,7 @@ namespace ClinicApi.Services.Implementations
             if (specialty == null)
                 return false;
 
-            _specialtyRepository.Delete(specialty);
+            await _specialtyRepository.DeleteAsync(specialty);
             await _specialtyRepository.SaveChangesAsync();
             return true;
         }

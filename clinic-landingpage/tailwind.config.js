@@ -17,7 +17,6 @@ module.exports = {
         },
       },
       extend: {
-        // ... (rest of the theme config is identical)
         colors: {
           border: "hsl(var(--border))",
           input: "hsl(var(--input))",

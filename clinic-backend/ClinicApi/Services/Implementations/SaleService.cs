@@ -77,7 +77,7 @@ namespace ClinicApi.Services.Implementations
             existingSaleItem.cost = saleItemDto.cost;
             existingSaleItem.updated_at = DateTime.UtcNow;
 
-            _saleItemRepository.Update(existingSaleItem);
+            await _saleItemRepository.UpdateAsync(existingSaleItem);
             await _saleItemRepository.SaveChangesAsync();
 
             return SaleItemMapper.ToDto(existingSaleItem, new HashSet<object>());
@@ -89,7 +89,7 @@ namespace ClinicApi.Services.Implementations
             if (saleItem == null)
                 return false;
 
-            _saleItemRepository.Delete(saleItem);
+            await _saleItemRepository.DeleteAsync(saleItem);
             await _saleItemRepository.SaveChangesAsync();
             return true;
         }

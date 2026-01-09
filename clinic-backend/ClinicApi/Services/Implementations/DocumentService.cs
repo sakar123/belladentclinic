@@ -98,7 +98,7 @@ namespace ClinicApi.Services.Implementations
             existingDocument.description = documentDto.description;
             existingDocument.updated_at = DateTime.UtcNow;
 
-            _documentRepository.Update(existingDocument);
+            await _documentRepository.UpdateAsync(existingDocument);
             await _documentRepository.SaveChangesAsync();
 
             return existingDocument.ToDto();
@@ -110,7 +110,7 @@ namespace ClinicApi.Services.Implementations
             if (document == null)
                 return false;
 
-            _documentRepository.Delete(document);
+            await _documentRepository.DeleteAsync(document);
             await _documentRepository.SaveChangesAsync();
             return true;
         }

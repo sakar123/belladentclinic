@@ -36,11 +36,11 @@ export default function Testimonials() {
 
   return (
     <section className="max-w-4xl mx-auto mt-20 px-6 text-center">
-      <h2 className="text-3xl font-bold mb-12">What Our Clients Say</h2>
-      <div className="relative min-h-[150px] bg-white/20 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/30">
+      <h2 className="text-3xl font-bold mb-12 text-foreground">What Our Clients Say</h2>
+      <div className="relative min-h-[150px] bg-card/50 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/30">
         <AnimatePresence mode="wait">
-          {loading && <p>Loading testimonials...</p>}
-          {error && <p>Could not load testimonials at this time.</p>}
+          {loading && <p className="text-muted-foreground">Loading testimonials...</p>}
+          {error && <p className="text-destructive">Could not load testimonials at this time.</p>}
           {!loading && !error && testimonials.length > 0 && (
             <motion.blockquote
               key={testimonials[current].authorName}
@@ -48,10 +48,10 @@ export default function Testimonials() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.5 }}
-              className="text-lg italic"
+              className="text-lg italic text-foreground"
             >
               “{testimonials[current].text}”
-              <footer className="mt-4 font-semibold text-blue-200">
+              <footer className="mt-4 font-semibold text-primary">
                 — {testimonials[current].authorName}
               </footer>
             </motion.blockquote>
@@ -65,7 +65,7 @@ export default function Testimonials() {
               key={i}
               aria-label={`Show testimonial from ${t.authorName}`}
               className={`w-3 h-3 rounded-full transition-colors ${
-                i === current ? 'bg-purple-500' : 'bg-white/40'
+                i === current ? 'bg-primary' : 'bg-muted'
               }`}
               onClick={() => setCurrent(i)}
             />

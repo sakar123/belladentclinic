@@ -48,7 +48,7 @@ namespace ClinicApi.Services.Implementations
             existingRole.name = roleDto.name;
             existingRole.description = roleDto.description;
             
-            _roleRepository.Update(existingRole);
+            await _roleRepository.UpdateAsync(existingRole);
             await _roleRepository.SaveChangesAsync();
             
             return existingRole.ToDto();
@@ -60,7 +60,7 @@ namespace ClinicApi.Services.Implementations
             if (role == null)
                 return false;
 
-            _roleRepository.Delete(role);
+            await _roleRepository.DeleteAsync(role);
             await _roleRepository.SaveChangesAsync();
             return true;
         }

@@ -186,14 +186,14 @@ namespace ClinicApi.Services.Implementations
             existingPerson.address = patientDto.person.address ?? existingPerson.address;
             existingPerson.a_identifier = patientDto.person.a_identifier ?? existingPerson.a_identifier;
 
-            _personRepository.Update(existingPerson);
+            await _personRepository.UpdateAsync(existingPerson);
             await _personRepository.SaveChangesAsync();
 
             // Update Patient fields
             existingPatient.emergency_contact_name = patientDto.emergency_contact_name ?? existingPatient.emergency_contact_name;
             existingPatient.emergency_contact_phone = patientDto.emergency_contact_phone ?? existingPatient.emergency_contact_phone;
 
-            _patientRepository.Update(existingPatient);
+            await _patientRepository.UpdateAsync(existingPatient);
             await _patientRepository.SaveChangesAsync();
 
             return PatientMapper.ToDto(existingPatient, new HashSet<object>());
@@ -212,7 +212,7 @@ namespace ClinicApi.Services.Implementations
             {
                 // By deleting the Person, the cascade rule in the DbContext
                 // will automatically handle the deletion of the associated Patient.
-                _personRepository.Delete(person);
+                await _personRepository.DeleteAsync(person);
                 await _personRepository.SaveChangesAsync();
             }
 

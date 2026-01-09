@@ -63,7 +63,7 @@ namespace ClinicApi.Services.Implementations
             existingService.description = serviceDto.description;
             existingService.cost = serviceDto.cost;
 
-            _serviceRepository.Update(existingService);
+            await _serviceRepository.UpdateAsync(existingService);
             await _serviceRepository.SaveChangesAsync();
 
             return ServiceMapper.ToDto(existingService, new HashSet<object>());
@@ -75,7 +75,7 @@ namespace ClinicApi.Services.Implementations
             if (service == null)
                 return false;
 
-            _serviceRepository.Delete(service);
+            await _serviceRepository.DeleteAsync(service);
             await _serviceRepository.SaveChangesAsync();
             return true;
         }
