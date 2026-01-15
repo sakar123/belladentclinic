@@ -6,12 +6,15 @@ import { Phone, ArrowRight } from 'lucide-react';
 import { translations } from '../lib/translations.js';
 import { useLanguage } from '../context/LanguageContext';
 import WhatsAppButton from './WhatsAppButton';
+import BellaDentGPTButton from './BellaDentGPTButton';
+import InstagramButton from './InstagramButton';
 
 export default function Hero() {
   const { language, toggleLanguage } = useLanguage();
   const t = translations[language];
   return (
-    <section className="relative w-full overflow-hidden bg-gradient-to-r from-primary/5 via-background to-primary/10 pt-28">
+    <section className="relative w-full overflow-hidden bg-gradient-to-r from-primary/5 via-background to-primary/10">
+    
       <div className="container mx-auto flex min-h-screen flex-col items-center justify-center px-6 pb-20 md:flex-row md:py-24 lg:gap-x-12">
         {/* Text content container */}
         <motion.div
@@ -75,6 +78,8 @@ export default function Hero() {
           />
         </motion.div>
       </div>
+      <InstagramButton />
+      <BellaDentGPTButton />
       <WhatsAppButton />
     </section>
   );

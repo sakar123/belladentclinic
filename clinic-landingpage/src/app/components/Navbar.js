@@ -90,11 +90,11 @@ export default function Navbar() {
                 height={280}
                 className="rounded-lg"
               />
-              <span className="hidden sm:block text-xl font-bold text-gray-800 tracking-tight">{t.clinicName}</span>
+              <span className="hidden sm:block text-xl font-bold text-gray-800 tracking-tight">{t.SITE_NAME}</span>
             </Link>
 
             <span className="hidden sm:block text-base md:text-xl font-bold text-gray-800 tracking-tight">
-              {t.clinicName}
+              {t.SITE_NAME}
             </span>
             {/* --- Desktop Navigation --- */}
             <div className="hidden md:flex items-center space-x-8">

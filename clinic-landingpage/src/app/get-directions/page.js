@@ -37,7 +37,7 @@ export default function DirectionsPage() {
 
   return (
     <>
-      <div className="container mx-auto px-4 py-16 md:py-24 mt-40">
+      <div className="container mx-auto px-4 py-8 md:py-12 mt-0">
         {/* Page Header */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold text-primary tracking-tight">

@@ -6,10 +6,11 @@ import { useLanguage } from '../context/LanguageContext';
 import { translations } from '../lib/translations';
 
 const navigationLinks = [
-  { href: '/', label: 'home' },
-  { href: '/about', label: 'about' },
-  { href: '/services', label: 'services' },
-  { href: '/contact', label: 'contact' },
+  { href: '/', key: 'navHome' },
+  { href: '/about', key: 'navAbout' },
+  { href: '/services', key: 'navServices' },
+  { href: '/get-directions', key: 'navGetDirections' },
+  { href: '/contact', key: 'navContact' },
 ];
 
 export default function Header() {
@@ -26,16 +27,16 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-8">
-          {navigationLinks.map(({ href, label }) => (
+          {navigationLinks.map(({ href, key }) => (
             <a key={href} href={href} className="text-lg font-medium text-foreground hover:text-primary transition-colors">
-              {t[label]}
+              {t[key]}
             </a>
           ))}
         </nav>
 
         <div className="flex items-center space-x-4">
           <button onClick={toggleLanguage} className="text-sm font-semibold text-muted-foreground hover:text-primary">
-            {language === 'en' ? 'ES' : 'EN'}
+            {language === 'en' ? 'ने' : 'EN'}
           </button>
           <a href="/book-appointment" className="hidden md:inline-block bg-primary text-primary-foreground px-6 py-2 rounded-lg font-semibold hover:bg-primary/90 transition-colors">
             {t.bookNow}

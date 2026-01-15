@@ -1,35 +1,39 @@
 'use client';
 
 import { useState } from 'react';
-
-const services = [
-  {
-    id: 1,
-    title: 'Teeth Cleaning',
-    description: 'Professional cleaning to keep your smile fresh and healthy.',
-    icon: '🦷',
-  },
-  {
-    id: 2,
-    title: 'Dental Implants',
-    description: 'Permanent solutions to replace missing teeth with natural look.',
-    icon: '🔩',
-  },
-  {
-    id: 3,
-    title: 'Cosmetic Dentistry',
-    description: 'Whitening, veneers, and smile makeovers tailored for you.',
-    icon: '✨',
-  },
-];
+import { useLanguage } from '../context/LanguageContext';
+import { translations } from '../lib/translations';
 
 export default function ServicesPreview() {
+  const { language } = useLanguage();
+  const t = translations[language];
   const [hovered, setHovered] = useState(null);
+
+  const services = [
+    {
+      id: 1,
+      title: t.servicesTeethCleaningTitle,
+      description: t.servicesTeethCleaningDesc,
+      icon: '🦷',
+    },
+    {
+      id: 2,
+      title: t.servicesDentalImplantsTitle,
+      description: t.servicesDentalImplantsDesc,
+      icon: '🔩',
+    },
+    {
+      id: 3,
+      title: t.servicesCosmeticDentistryTitle,
+      description: t.servicesCosmeticDentistryDesc,
+      icon: '✨',
+    },
+  ];
 
   return (
     <section className="max-w-6xl mx-auto mt-20 px-6">
       <h2 className="text-3xl font-bold mb-12 text-center text-foreground">
-        Our Core Services
+        {t.servicesPreviewTitle}
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {services.map(({ id, title, description, icon }) => (
