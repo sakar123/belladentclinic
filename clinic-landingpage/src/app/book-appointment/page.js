@@ -231,7 +231,7 @@ export default function BookAppointmentPage() {
           />
         )}
         <Button type="submit" disabled={loading}>
-          {loading ? t.sending : t.bookAppointment}
+          {loading ? t.formSending : t.bookAppointment}
         </Button>
       </form>
     </section>

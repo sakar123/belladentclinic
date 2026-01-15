@@ -29,6 +29,7 @@ export const translations = {
       footerConnect: "Connect With Us",
       footerStayConnected: "Follow us on social media for updates and services.",
       footerRights: "All rights reserved",
+      // Header/Nav
       contactHeadline: "Get in Touch",
       contactSubtext: "We're here to help with any questions you may have. Reach out to us, and let's start the conversation.",
       contactDirectTitle: "Contact Us Directly",
@@ -82,7 +83,29 @@ export const translations = {
       meetTeamSubtitle: "Our diverse and experienced professionals bring expertise and heart to every smile.",
       trustTitle: "Why Patients Trust Us",
       trustDescription: "At BellaDent, we treat you like family. With cutting-edge equipment, transparent care plans, and a gentle approach, your trust is our greatest reward.",
-      bookConsultation: "Book a Consultation"
+      bookConsultation: "Book a Consultation",
+      // Stats
+      statsYearsExperience: "Years of Experience",
+      statsPatientsServed: "Patients Served",
+      statsCertifiedDentists: "Certified Dentists",
+      // Services preview
+      servicesPreviewTitle: "Our Core Services",
+      servicesTeethCleaningTitle: "Teeth Cleaning",
+      servicesTeethCleaningDesc: "Professional cleaning to keep your smile fresh and healthy.",
+      servicesDentalImplantsTitle: "Dental Implants",
+      servicesDentalImplantsDesc: "Permanent solutions to replace missing teeth with natural look.",
+      servicesCosmeticDentistryTitle: "Cosmetic Dentistry",
+      servicesCosmeticDentistryDesc: "Whitening, veneers, and smile makeovers tailored for you.",
+      privacyHeadline: "Privacy Policy",
+      privacyIntro: "Your privacy is important to us. This privacy statement explains the personal data BellaDent Clinic processes, how BellaDent Clinic processes it, and for what purposes.",
+      privacyBody1: "We collect data to operate effectively and provide you the best experiences with our services. You provide some of this data directly, such as when you book an appointment or contact us for support.",
+      reviewFollowTitle: "Review & Follow",
+      reviewFollowSubtitle: "We’d love your feedback and support. Leave a Google review or follow us on social.",
+      leaveGoogleReview: "Leave a Google Review",
+      followOnTikTok: "Follow on TikTok",
+      followOnInstagram: "Follow on Instagram",
+      followOnFacebook: "Follow on Facebook",
+      blogsTitle: "Blogs of Patan City Dental Clinic"
     },
     ne: {
       SITE_NAME: 'बेलाडेण्ट डेन्टल क्लिनिक तथा इम्प्लान्ट केन्द्र',
@@ -164,7 +187,29 @@ export const translations = {
       meetTeamSubtitle: "हाम्रो विविध र अनुभवी पेशेवर टोलीले प्रत्येक मुस्कानमा दक्षता र माया ल्याउँछ।",
       trustTitle: "बिरामीहरूले हामीलाई किन विश्वास गर्छन्",
       trustDescription: "बेलाडेन्टमा हामी तपाईंलाई परिवारको रूपमा व्यवहार गर्छौं। अत्याधुनिक उपकरण, पारदर्शी उपचार योजना र सौम्य दृष्टिकोणमार्फत तपाईंको विश्वास हाम्रो सबैभन्दा ठूलो पुरस्कार हो।",
-      bookConsultation: "परामर्श बुक गर्नुहोस्"
+      bookConsultation: "परामर्श बुक गर्नुहोस्",
+      // Stats
+      statsYearsExperience: "अनुभवका वर्ष",
+      statsPatientsServed: "सेवा प्राप्त बिरामी",
+      statsCertifiedDentists: "प्रमाणित दन्त चिकित्सक",
+      // Services preview
+      servicesPreviewTitle: "हाम्रा मुख्य सेवाहरू",
+      servicesTeethCleaningTitle: "दाँत सफा गर्ने सेवा",
+      servicesTeethCleaningDesc: "तपाईंको मुस्कानलाई ताजा र स्वस्थ राख्न व्यावसायिक सरसफाइ।",
+      servicesDentalImplantsTitle: "डेन्टल इम्प्लान्ट",
+      servicesDentalImplantsDesc: "हराएका दाँतहरूलाई प्राकृतिक देखिने स्थायी समाधान।",
+      servicesCosmeticDentistryTitle: "सौन्दर्य (Cosmetic) दन्त चिकित्सा",
+      servicesCosmeticDentistryDesc: "व्हाइटेनिङ, भिनियर्स, र तपाईंका लागि अनुकूल स्माइल मेकओभर।",
+      privacyHeadline: "गोपनीयता नीति",
+      privacyIntro: "हामी तपाईंको गोपनीयतालाई महत्त्व दिन्छौं। यस गोपनीयता वक्तव्यले BellaDent क्लिनिकले सङ्कलन गर्ने व्यक्तिगत डाटा, त्यसलाई कसरी प्रशोधन गर्छ र किन गर्छ भन्ने स्पष्ट गर्दछ।",
+      privacyBody1: "हामी प्रभावकारी रूपमा सञ्चालन गर्न र उत्तम सेवा अनुभव दिन डाटा सङ्कलन गर्छौं। तपाईंले सिधै केही डाटा दिनुहुन्छ, जस्तै अपोइन्टमेन्ट बुक गर्दा वा हामीलाई सहयोगका लागि सम्पर्क गर्दा।",
+      reviewFollowTitle: "रिभ्यू दिनुहोस् र फलो गर्नुहोस्",
+      reviewFollowSubtitle: "हामी तपाईंको प्रतिक्रियालाई कदर गर्छौं। कृपया Google मा रिभ्यू दिनुहोस् वा सामाजिक सञ्जालमा हामीलाई फलो गर्नुहोस्।",
+      leaveGoogleReview: "Google रिभ्यू दिनुहोस्",
+      followOnTikTok: "TikTok मा फलो गर्नुहोस्",
+      followOnInstagram: "Instagram मा फलो गर्नुहोस्",
+      followOnFacebook: "Facebook मा फलो गर्नुहोस्",
+      blogsTitle: "पाटन सिटी डेन्टल क्लिनिकका ब्लगहरू"
     },
   };
   
