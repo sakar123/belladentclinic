@@ -39,7 +39,7 @@ function HeroSection({ t }) {
         <motion.p variants={FADE_UP} className="mt-6 max-w-xl text-lg sm:text-xl">{t.aboutHeroSubtitle}</motion.p>
         <motion.div variants={FADE_UP} className="mt-8">
           <Button asChild size="lg" className="group rounded-full bg-blue-500 px-8 py-6 text-lg hover:bg-blue-600">
-            <a href="/book-appointment">{t.bookConsultation}<ArrowRight className="ml-2 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" /></a>
+            <a href="/book-appointment/">{t.bookConsultation}<ArrowRight className="ml-2 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" /></a>
           </Button>
         </motion.div>
       </motion.div>
@@ -121,7 +121,7 @@ function CtaSection({ t }) {
         <motion.p variants={FADE_UP} className="mx-auto mt-6 max-w-2xl text-lg leading-8">{t.trustDescription}</motion.p>
         <motion.div variants={FADE_UP} className="mt-10">
           <Button asChild size="lg" className="group rounded-full bg-blue-500 px-8 py-6 text-lg hover:bg-blue-600 shadow-lg shadow-blue-500/20">
-            <a href="/book-appointment">{t.bookConsultation}</a>
+            <a href="/book-appointment/">{t.bookConsultation}</a>
           </Button>
         </motion.div>
       </motion.div>

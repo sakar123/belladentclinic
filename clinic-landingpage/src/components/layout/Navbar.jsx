@@ -42,7 +42,7 @@ const Navbar = () => {
             ))}
           </nav>
           <div className="hidden md:flex">
-             <Link href="/book-appointment" className="bg-gradient-to-r from-electric-teal to-deep-purple text-white font-bold py-3 px-6 rounded-full hover:opacity-90 transition-opacity">
+             <Link href="/book-appointment/" className="bg-gradient-to-r from-electric-teal to-deep-purple text-white font-bold py-3 px-6 rounded-full hover:opacity-90 transition-opacity">
                 Book Now
               </Link>
           </div>
@@ -66,7 +66,7 @@ const Navbar = () => {
                 {link.label}
               </Link>
             ))}
-            <Link href="/book-appointment" onClick={() => setIsOpen(false)} className="bg-gradient-to-r from-electric-teal to-deep-purple text-white font-bold py-3 px-8 rounded-full hover:opacity-90 transition-opacity">
+            <Link href="/book-appointment/" onClick={() => setIsOpen(false)} className="bg-gradient-to-r from-electric-teal to-deep-purple text-white font-bold py-3 px-8 rounded-full hover:opacity-90 transition-opacity">
                 Book Now
             </Link>
           </nav>

@@ -7,10 +7,10 @@ import { translations } from '../lib/translations';
 
 const navigationLinks = [
   { href: '/', key: 'navHome' },
-  { href: '/about', key: 'navAbout' },
-  { href: '/services', key: 'navServices' },
-  { href: '/get-directions', key: 'navGetDirections' },
-  { href: '/contact', key: 'navContact' },
+  { href: '/about/', key: 'navAbout' },
+  { href: '/services/', key: 'navServices' },
+  { href: '/get-directions/', key: 'navGetDirections' },
+  { href: '/contact/', key: 'navContact' },
 ];
 
 export default function Header() {
@@ -38,7 +38,7 @@ export default function Header() {
           <button onClick={toggleLanguage} className="text-sm font-semibold text-muted-foreground hover:text-primary">
             {language === 'en' ? 'ने' : 'EN'}
           </button>
-          <a href="/book-appointment" className="hidden md:inline-block bg-primary text-primary-foreground px-6 py-2 rounded-lg font-semibold hover:bg-primary/90 transition-colors">
+          <a href="/book-appointment/" className="hidden md:inline-block bg-primary text-primary-foreground px-6 py-2 rounded-lg font-semibold hover:bg-primary/90 transition-colors">
             {t.bookNow}
           </a>
           <button
@@ -60,7 +60,7 @@ export default function Header() {
                 {t[label]}
               </a>
             ))}
-            <a href="/book-appointment" className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-semibold hover:bg-primary/90 transition-colors">
+            <a href="/book-appointment/" className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-semibold hover:bg-primary/90 transition-colors">
               {t.bookNow}
             </a>
           </nav>

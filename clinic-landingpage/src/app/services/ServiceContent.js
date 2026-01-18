@@ -151,7 +151,7 @@ export default function ServiceContent() {
                          <h3 className="text-2xl font-semibold mb-2">Ready for Your Perfect Smile?</h3>
                          <p className="text-muted-foreground mb-4 max-w-md">Our expert team in Lalitpur is here to help you achieve your dental goals.</p>
                          <Link 
-                          href="/book-appointment"
+                          href="/book-appointment/"
                           className="px-5 py-3 font-semibold bg-primary text-primary-foreground rounded-md shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200"
                         >
                           {t.navBookAppointment}

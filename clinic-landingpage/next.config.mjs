@@ -8,7 +8,7 @@ const nextConfig = {
     unoptimized: true,
   },
   // Optional: For cleaner URLs (e.g., /about/ instead of /about.html)
-  // trailingSlash: true,
+  trailingSlash: true,
 };
 
 export default nextConfig;

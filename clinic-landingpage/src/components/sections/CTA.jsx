@@ -33,7 +33,7 @@ const CTA = () => {
           viewport={{ once: true }}
           className="mt-12 flex flex-col sm:flex-row gap-6 justify-center"
         >
-          <Link href="/book-appointment" className="bg-white text-deep-purple font-bold py-4 px-10 rounded-full text-lg hover:scale-105 transition-transform transform-gpu shadow-2xl">
+          <Link href="/book-appointment/" className="bg-white text-deep-purple font-bold py-4 px-10 rounded-full text-lg hover:scale-105 transition-transform transform-gpu shadow-2xl">
             Book Appointment
           </Link>
           <Link href="tel:01-5456555" className="border-2 border-white text-white font-bold py-4 px-10 rounded-full text-lg hover:bg-white hover:text-deep-purple transition-colors">
