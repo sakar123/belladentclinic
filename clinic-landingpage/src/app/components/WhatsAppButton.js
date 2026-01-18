@@ -1,11 +1,12 @@
 'use client';
 
 import { FaWhatsapp } from 'react-icons/fa';
+import { WHATSAPP_URL } from '@/lib/socialLinks';
 
 export default function WhatsAppButton() {
   return (
     <a
-      href="https://wa.me/+9779849220563?text=Hi%20BellaDent%21%20I%E2%80%99d%20like%20to%20get%20in%20touch.%20Please%20help%20me%20with%20an%20appointment%20or%20question." // Replace with your number
+      href={WHATSAPP_URL}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat on WhatsApp"

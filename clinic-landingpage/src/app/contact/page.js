@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { translations } from '../lib/translations';
+import { INSTAGRAM_URL, FACEBOOK_URL, WHATSAPP_URL } from '@/lib/socialLinks';
 
 export default function ContactPage() {
   const { language } = useLanguage();
@@ -79,9 +80,9 @@ export default function ContactPage() {
               <CardTitle className="text-2xl">{t.contactDirectTitle}</CardTitle>
               <ContactLink icon={Phone} href={`tel:${t.PHONE_NUMBER}`} label={t.PHONE_NUMBER} ariaLabel={t.phoneLabel} />
               <ContactLink icon={Mail} href={`mailto:${t.EMAIL}`} label={t.EMAIL} ariaLabel={t.emailLabel} />
-              <ContactLink icon={MessageCircle} href="https://wa.me/+9779849220563?text=Hi%20BellaDent%21%20I%E2%80%99d%20like%20to%20get%20in%20touch.%20Please%20help%20me%20with%20an%20appointment%20or%20question." label={t.whatsappLabel} ariaLabel={t.whatsappLabel} />
-              <ContactLink icon={Instagram} href="https://www.instagram.com/belladent_dental_clinic?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" label={t.instagramLabel} ariaLabel={t.instagramLabel} />
-              <ContactLink icon={Facebook} href="https://www.facebook.com/p/Dr-Srishti-Poudel-61579305512885/" label={t.facebookLabel} ariaLabel={t.facebookLabel} />
+              <ContactLink icon={MessageCircle} href={WHATSAPP_URL} label={t.whatsappLabel} ariaLabel={t.whatsappLabel} />
+              <ContactLink icon={Instagram} href={INSTAGRAM_URL} label={t.instagramLabel} ariaLabel={t.instagramLabel} />
+              <ContactLink icon={Facebook} href={FACEBOOK_URL} label={t.facebookLabel} ariaLabel={t.facebookLabel} />
             </CardContent>
           </Card>
 

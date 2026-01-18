@@ -1,8 +1,7 @@
 'use client';
 
 import { Instagram } from 'lucide-react';
-
-const INSTAGRAM_URL = 'https://www.instagram.com/belladent_dental_clinic?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==';
+import { INSTAGRAM_URL } from '@/lib/socialLinks';
 
 export default function InstagramButton() {
   return (

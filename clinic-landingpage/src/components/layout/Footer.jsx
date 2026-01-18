@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Facebook, Instagram, Twitter } from "lucide-react";
+import { INSTAGRAM_URL, FACEBOOK_URL } from '@/lib/socialLinks';
 
 const Footer = () => {
   return (
@@ -32,8 +33,8 @@ const Footer = () => {
           <div>
             <h4 className="font-bold text-lg text-white tracking-wider">Follow Us</h4>
             <div className="flex mt-4 space-x-4">
-              <Link href="https://www.facebook.com/p/Dr-Srishti-Poudel-61579305512885/" className="hover:text-electric-teal transition-colors"><Facebook size={24} /></Link>
-              <Link href="https://www.instagram.com/belladent_dental_clinic?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" className="hover:text-electric-teal transition-colors"><Instagram size={24} /></Link>
+              <Link href={FACEBOOK_URL} className="hover:text-electric-teal transition-colors"><Facebook size={24} /></Link>
+              <Link href={INSTAGRAM_URL} className="hover:text-electric-teal transition-colors"><Instagram size={24} /></Link>
               <Link href="#" className="hover:text-electric-teal transition-colors"><Twitter size={24} /></Link>
             </div>
           </div>

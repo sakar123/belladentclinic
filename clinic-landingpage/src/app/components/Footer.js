@@ -1,8 +1,9 @@
 import { Facebook, Instagram, Twitter } from 'lucide-react';
+import { INSTAGRAM_URL, FACEBOOK_URL } from '@/lib/socialLinks';
 
 const socialLinks = [
-  { href: 'https://www.facebook.com/p/Dr-Srishti-Poudel-61579305512885/', icon: Facebook, label: 'Facebook' },
-  { href: 'https://www.instagram.com/belladent_dental_clinic?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==', icon: Instagram, label: 'Instagram' },
+  { href: FACEBOOK_URL, icon: Facebook, label: 'Facebook' },
+  { href: INSTAGRAM_URL, icon: Instagram, label: 'Instagram' },
   { href: '#', icon: Twitter, label: 'Twitter' },
 ];
 
