@@ -83,7 +83,7 @@ const MeetTheDoctor = () => {
             transition={{ duration: 0.8, delay: 0.8 }}
             viewport={{ once: true }}
         >
-            <Link href="/book-appointment" className="mt-12 inline-block bg-gradient-to-r from-vibrant-coral to-sunny-yellow text-white font-bold py-4 px-10 rounded-full text-lg hover:scale-105 transition-transform transform-gpu">
+            <Link href="/book-appointment/" className="mt-12 inline-block bg-gradient-to-r from-vibrant-coral to-sunny-yellow text-white font-bold py-4 px-10 rounded-full text-lg hover:scale-105 transition-transform transform-gpu">
                 Book with Dr. Poudel
             </Link>
         </motion.div>

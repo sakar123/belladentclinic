@@ -39,13 +39,13 @@ export default function Hero() {
           {/* Call-to-Action Buttons */}
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row md:justify-start">
             <a
-              href="/book-appointment"
+              href="/book-appointment/"
               className="inline-flex items-center justify-center rounded-lg bg-primary px-6 py-3 text-2xl font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
               {t.bookNow}
             </a>
             <a
-              href="/services"
+              href="/services/"
               className="inline-flex items-center gap-x-2 rounded-lg px-6 py-3 text-2xl font-semibold text-foreground transition-colors hover:bg-accent"
             >
               {t.viewServices} <ArrowRight className="h-4 w-4" />

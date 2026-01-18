@@ -35,16 +35,17 @@ export default function Navbar() {
     const { language, toggleLanguage } = useLanguage();
     const t = translations[language];
     const pathname = usePathname();
+    const normalize = (s) => (s.endsWith('/') && s !== '/' ? s.slice(0, -1) : s);
   
     // --- Navigation Links Configuration ---
     // Separated for clarity and easier maintenance
     const navLinks = [
       { href: '/', label: t.navHome },
-      { href: '/about', label: t.navAbout },
-      { href: '/services', label: t.navServices },
-      { href: '/contact', label: t.navContact },
-      { href: '/blogs', label: t.navBlogs },
-      { href: '/get-directions', label: t.navGetDirections },
+      { href: '/about/', label: t.navAbout },
+      { href: '/services/', label: t.navServices },
+      { href: '/contact/', label: t.navContact },
+      { href: '/blogs/', label: t.navBlogs },
+      { href: '/get-directions/', label: t.navGetDirections },
     ];
   
     // --- Effect for Scroll Detection ---
@@ -101,7 +102,7 @@ export default function Navbar() {
               <ul className="flex items-center space-x-6 text-gray-600 font-medium">
                 {navLinks.map(({ href, label }) => (
                   <li key={href}>
-                    <Link href={href} className={`transition-colors duration-200 hover:text-purple-600 ${pathname === href ? 'text-purple-600 font-semibold' : ''}`}>
+                    <Link href={href} className={`transition-colors duration-200 hover:text-purple-600 ${normalize(pathname) === normalize(href) ? 'text-purple-600 font-semibold' : ''}`}>
                       {label}
                     </Link>
                   </li>
@@ -115,7 +116,7 @@ export default function Navbar() {
                 >
                   {language === 'en' ? 'ने' : 'EN'}
                 </button>
-                <Link href="/book-appointment" className="px-5 py-2 text-sm font-semibold text-white bg-purple-600 rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200">
+                <Link href="/book-appointment/" className="px-5 py-2 text-sm font-semibold text-white bg-purple-600 rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200">
                   {t.navBookAppointment}
                 </Link>
               </div>
@@ -161,10 +162,10 @@ export default function Navbar() {
                     <ul className="space-y-4">
                         {navLinks.map(({ href, label }) => (
                             <li key={href}>
-                                <Link 
+                        <Link 
                                     href={href} 
                                     onClick={() => setMobileMenuOpen(false)}
-                                    className={`block py-2 text-lg font-medium transition-colors duration-200 hover:text-purple-600 ${pathname === href ? 'text-purple-600' : 'text-gray-700'}`}
+                                    className={`block py-2 text-lg font-medium transition-colors duration-200 hover:text-purple-600 ${normalize(pathname) === normalize(href) ? 'text-purple-600' : 'text-gray-700'}`}
                                 >
                                     {label}
                                 </Link>
@@ -174,7 +175,7 @@ export default function Navbar() {
                 </nav>
                 <div className="mt-8 space-y-4">
                     <Link 
-                        href="/book-appointment" 
+                        href="/book-appointment/" 
                         onClick={() => setMobileMenuOpen(false)}
                         className="block w-full text-center px-5 py-3 font-semibold text-white bg-purple-600 rounded-md shadow-sm hover:bg-purple-700 transition-all duration-200"
                     >

@@ -8,11 +8,11 @@ const socialLinks = [
 ];
 
 const footerLinks = [
-  { href: '/about', label: 'About Us' },
-  { href: '/services', label: 'Services' },
-  { href: '/contact', label: 'Contact' },
-  { href: '/get-directions', label: 'Get Directions' },
-  { href: '/privacy-policy', label: 'Privacy Policy' },
+  { href: '/about/', label: 'About Us' },
+  { href: '/services/', label: 'Services' },
+  { href: '/contact/', label: 'Contact' },
+  { href: '/get-directions/', label: 'Get Directions' },
+  { href: '/privacy-policy/', label: 'Privacy Policy' },
 ];
 
 export default function Footer() {

@@ -37,7 +37,7 @@ const Hero = () => {
               transition={{ duration: 0.8, delay: 0.4 }}
               className="mt-10 flex flex-col sm:flex-row gap-4 justify-center md:justify-start"
             >
-              <Link href="/book-appointment" className="bg-gradient-to-r from-electric-teal to-deep-purple text-white font-bold py-4 px-8 rounded-full text-lg hover:scale-105 transition-transform transform-gpu">
+              <Link href="/book-appointment/" className="bg-gradient-to-r from-electric-teal to-deep-purple text-white font-bold py-4 px-8 rounded-full text-lg hover:scale-105 transition-transform transform-gpu">
                 Book Your Visit
               </Link>
               <Link href="#watch-video" className="border-2 border-deep-purple text-deep-purple font-bold py-4 px-8 rounded-full text-lg hover:bg-deep-purple hover:text-white transition-colors">
