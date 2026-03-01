@@ -20,17 +20,14 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment: prod   # <-- change this to your exact Environment name
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
-          cache-dependency-path: clinic-landingpage/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -38,8 +35,13 @@ jobs:
 
       - name: Validate API base URL format
         env:
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
         run: |
+          if [[ -z "${NEXT_PUBLIC_API_BASE_URL}" ]]; then
+            echo "Missing secret NEXT_PUBLIC_API_BASE_URL (env secret not loading or wrong env name)" >&2
+            exit 1
+          fi
+
           if [[ "${NEXT_PUBLIC_API_BASE_URL}" =~ ^https://api ]]; then
             echo "NEXT_PUBLIC_API_BASE_URL looks like https://api..."
           else
@@ -49,12 +51,11 @@ jobs:
 
       - name: Build
         env:
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
-          NEXT_PUBLIC_API_KEY: ${{ secrets.PROD_API_KEY }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
         run: npm run build
         working-directory: clinic-landingpage
 
-      # Only needed if this is a static-export site that outputs /out
       - name: Export (static) if available
         run: npm run export --if-present
         working-directory: clinic-landingpage
