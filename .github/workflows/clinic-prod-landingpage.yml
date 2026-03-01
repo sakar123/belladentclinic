@@ -34,7 +34,13 @@ jobs:
         run: npm ci
         working-directory: clinic-landingpage
 
-      - name: Build
+      - name: Validate API base URL format
+  	run: |
+    	if [[ "$API_BASE_URL" =~ ^https://api ]]; then
+      		echo "API_BASE_URL looks like https://..."
+    	else
+      		echo "API_BASE_URL format looks wrong" && exit 1
+    	fi
         env:
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
           NEXT_PUBLIC_API_KEY: ${{ secrets.PROD_API_KEY }}
