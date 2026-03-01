@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'clinic-landingpage/**'
+      - "clinic-landingpage/**"
   workflow_dispatch:
 
 permissions:
@@ -28,19 +28,26 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: clinic-landingpage/package-lock.json
 
       - name: Install dependencies
         run: npm ci
         working-directory: clinic-landingpage
 
       - name: Validate API base URL format
-  	run: |
-    	if [[ "$API_BASE_URL" =~ ^https://api ]]; then
-      		echo "API_BASE_URL looks like https://..."
-    	else
-      		echo "API_BASE_URL format looks wrong" && exit 1
-    	fi
+        env:
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
+        run: |
+          if [[ "${NEXT_PUBLIC_API_BASE_URL}" =~ ^https://api ]]; then
+            echo "NEXT_PUBLIC_API_BASE_URL looks like https://api..."
+          else
+            echo "NEXT_PUBLIC_API_BASE_URL format looks wrong: ${NEXT_PUBLIC_API_BASE_URL}" >&2
+            exit 1
+          fi
+
+      - name: Build
         env:
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
           NEXT_PUBLIC_API_KEY: ${{ secrets.PROD_API_KEY }}
@@ -63,4 +70,3 @@ jobs:
 
       - name: Invalidate CloudFront cache
         run: aws cloudfront create-invalidation --distribution-id ${{ env.CF_DIST_ID }} --paths "/*"
-
