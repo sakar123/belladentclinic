@@ -20,7 +20,6 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment: prod   # change this if your environment name is different
 
     steps:
       - name: Checkout repository
