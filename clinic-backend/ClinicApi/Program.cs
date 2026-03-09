@@ -39,8 +39,9 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
-    // Ensure environment-specific settings are loaded if present
+    // Ensure environment-specific settings are loaded if present, plus optional local overlay
     builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: false, reloadOnChange: true);
+    builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
     // Add services to the container.
     builder.Services.AddControllers();
@@ -48,16 +49,12 @@ try
     builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
 
-    // CORS for local/dev usage (Portal at http://localhost:3000, Landing at http://localhost:3001)
+    // CORS: read allowed origins from configuration (Cors:AllowedOrigins)
     builder.Services.AddCors(options =>
     {
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
         options.AddPolicy("DevCors", policy =>
-            policy.WithOrigins(
-                    "http://localhost:3000",
-                    "http://127.0.0.1:3000",
-                    "http://localhost:3001",
-                    "http://127.0.0.1:3001"
-                )
+            policy.WithOrigins(allowedOrigins)
                 .AllowAnyHeader()
                 .AllowAnyMethod()
         );
@@ -133,11 +130,8 @@ try
     app.UseMiddleware<RequestLoggingContextMiddleware>();
     app.UseSerilogRequestLogging();
 
-    // Enable CORS in Development and Docker environments
-    if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
-    {
-        app.UseCors("DevCors");
-    }
+    // Enable CORS for configured origins in all environments
+    app.UseCors("DevCors");
 
     app.UseAuthorization();
 

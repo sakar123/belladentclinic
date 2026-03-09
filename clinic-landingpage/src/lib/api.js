@@ -25,7 +25,38 @@ const apiFetch = async (endpoint, options = {}) => {
         headers['X-Clinic-Key'] = API_KEY;
     }
 
-    const response = await fetch(url, { ...options, headers });
+    // Perform an explicit CORS preflight (OPTIONS) before the actual request when cross-origin.
+    try {
+        if (typeof window !== 'undefined') {
+            const targetOrigin = new URL(url).origin;
+            const currentOrigin = window.location.origin;
+            const isCrossOrigin = targetOrigin !== currentOrigin;
+            if (isCrossOrigin) {
+                const reqMethod = (options.method || 'GET').toUpperCase();
+                const headerNames = Object.keys(headers || {}).map(h => h.toLowerCase());
+                const preflightHeaders = {
+                    'Access-Control-Request-Method': reqMethod,
+                };
+                if (headerNames.length) {
+                    preflightHeaders['Access-Control-Request-Headers'] = headerNames.join(', ');
+                }
+                const preflightResp = await fetch(url, {
+                    method: 'OPTIONS',
+                    mode: 'cors',
+                    headers: preflightHeaders,
+                });
+                if (!preflightResp.ok) {
+                    const text = await preflightResp.text().catch(() => '');
+                    throw new Error(`CORS preflight failed with status ${preflightResp.status}: ${text}`);
+                }
+            }
+        }
+    } catch (preErr) {
+        console.error('CORS preflight error:', preErr);
+        throw preErr;
+    }
+
+    const response = await fetch(url, { ...options, headers, mode: 'cors' });
 
     if (!response.ok) {
         const errorBody = await response.text();
