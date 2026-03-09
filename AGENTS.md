@@ -141,6 +141,12 @@ Environment variables and endpoints:
   - Configured Serilog sinks in `appsettings*.json` for console + rolling file `logs/clinic-api-.log` with 30-day retention; removed hard-coded sinks in Program to rely on config.
   - Kept Serilog request logging enabled; bootstrap logger still writes console+file during early startup.
 
+- 2026-03-09: CORS origins now read from configuration.
+  - Program.cs loads optional `appsettings.local.json` overlay and reads `Cors:AllowedOrigins` array for the CORS policy (no typed models).
+  - Added `clinic-backend/ClinicApi/appsettings.local.json` with localhost:3000/3001 and 127.0.0.1 equivalents.
+  - Updated `appsettings.Production.json` to allow `https://belladentclinic.com`; enabled `UseCors` in all environments.
+  - Landing page API client (`clinic-landingpage/src/lib/api.js`) sends an explicit OPTIONS preflight before API requests when cross-origin.
+
 ## Recent Commands and Tips
 - API run (local): from `clinic-backend/ClinicApi` → `dotnet run`
 - Portal run (local): from `clinic-portal` → `npm run dev` (ensure `.env.local` has `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080`)
