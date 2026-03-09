@@ -1,27 +1,27 @@
 	-- 1. Insert Roles
-	INSERT INTO role (name, description) VALUES
-	('Dentist', 'Primary dental care provider'),
-	('Hygienist', 'Dental cleaning and preventive care specialist'),
-	('Receptionist', 'Front desk and administrative staff'),
-	('Oral Surgeon', 'Specializes in surgical procedures'),
-	('Orthodontist', 'Teeth alignment specialist'),
-	('Endodontist', 'Root canal specialist'),
-	('Periodontist', 'Gum disease specialist'),
-	('Prosthodontist', 'Dental prosthetics specialist'),
-	('Radiologist', 'Dental imaging specialist'),
-	('Administrator', 'Clinic management staff');
+	INSERT INTO role (id, name, description) VALUES
+(gen_random_uuid(), 'Dentist', 'Primary dental care provider'),
+(gen_random_uuid(), 'Hygienist', 'Dental cleaning and preventive care specialist'),
+(gen_random_uuid(), 'Receptionist', 'Front desk and administrative staff'),
+(gen_random_uuid(), 'Oral Surgeon', 'Specializes in surgical procedures'),
+(gen_random_uuid(), 'Orthodontist', 'Teeth alignment specialist'),
+(gen_random_uuid(), 'Endodontist', 'Root canal specialist'),
+(gen_random_uuid(), 'Periodontist', 'Gum disease specialist'),
+(gen_random_uuid(), 'Prosthodontist', 'Dental prosthetics specialist'),
+(gen_random_uuid(), 'Radiologist', 'Dental imaging specialist'),
+(gen_random_uuid(), 'Administrator', 'Clinic management staff');
 	-- 2. Insert Specialties
-	INSERT INTO specialty (name, description) VALUES
-	('General Dentistry', 'Routine dental care'),
-	('Orthodontics', 'Teeth straightening'),
-	('Oral Surgery', 'Surgical procedures'),
-	('Pediatric Dentistry', 'Children''s dental care'),
-	('Endodontics', 'Root canal therapy'),
-	('Periodontics', 'Gum treatment'),
-	('Prosthodontics', 'Dental prosthetics'),
-	('Radiology', 'Dental imaging'),
-	('Cosmetic Dentistry', 'Aesthetic procedures'),
-	('Preventive Care', 'Cleanings and checkups');
+	INSERT INTO specialty (id, name, description) VALUES
+	(gen_random_uuid(),'General Dentistry', 'Routine dental care'),
+	(gen_random_uuid(),'Orthodontics', 'Teeth straightening'),
+	(gen_random_uuid(),'Oral Surgery', 'Surgical procedures'),
+	(gen_random_uuid(),'Pediatric Dentistry', 'Children''s dental care'),
+	(gen_random_uuid(),'Endodontics', 'Root canal therapy'),
+	(gen_random_uuid(),'Periodontics', 'Gum treatment'),
+	(gen_random_uuid(),'Prosthodontics', 'Dental prosthetics'),
+	(gen_random_uuid(),'Radiology', 'Dental imaging'),
+	(gen_random_uuid(),'Cosmetic Dentistry', 'Aesthetic procedures'),
+	(gen_random_uuid(),'Preventive Care', 'Cleanings and checkups');
 	-- 3. Insert Persons (Staff and Patients)
 	INSERT INTO person (first_name, last_name, date_of_birth, gender, email, phone_number, address) VALUES
 	('John', 'Smith', '1980-05-15', 'Male', 'john.smith@example.com', '+15551234567', '123 Main St, Anytown'),
@@ -76,17 +76,16 @@
 	((SELECT id FROM person WHERE email = 'lisa.g@example1.com'), 'Paul Garcia', '+15550246802'),
 	((SELECT id FROM person WHERE email = 'rob.m@example1.com'), 'Amy Martinez', '+15551111111');
 	-- 6. Insert Appointment Statuses
-	INSERT INTO appointment_status (name) VALUES
-	('Scheduled'),
-	('Confirmed'),
-	('In Progress'),
-	('Completed'),
-	('Cancelled'),
-	('No Show'),
-	('Rescheduled'),
-	('Checked In'),
-	('Delayed'),
-	('Arrived');
+	INSERT INTO appointment_status (id, name) VALUES
+(gen_random_uuid(), 'Confirmed'),
+(gen_random_uuid(), 'In Progress'),
+(gen_random_uuid(), 'Completed'),
+(gen_random_uuid(), 'Cancelled'),
+(gen_random_uuid(), 'No Show'),
+(gen_random_uuid(), 'Rescheduled'),
+(gen_random_uuid(), 'Checked In'),
+(gen_random_uuid(), 'Delayed'),
+(gen_random_uuid(), 'Arrived');
 	-- 7. Insert Services
 	INSERT INTO service (specialty_id, name, description, cost) VALUES
 	((SELECT id FROM specialty WHERE name = 'General Dentistry'), 'Routine Checkup', 'Comprehensive dental examination', 150.00),
@@ -102,17 +101,17 @@
 	((SELECT id FROM specialty WHERE name = 'General Dentistry'), 'Filling', 'Amalgam filling', 200.00),
 	((SELECT id FROM specialty WHERE name = 'Orthodontics'), 'Retainer Fitting', 'Custom retainer placement', 350.00);
 	-- 8. Insert Tooth Statuses
-	INSERT INTO tooth_status (code, description) VALUES
-	('HEALTHY', 'No decay or damage'),
-	('DECAYED', 'Caries present'),
-	('FILLED', 'Restored with filling'),
-	('CROWNED', 'Covered with dental crown'),
-	('MISSING', 'Tooth extracted'),
-	('IMPACTED', 'Tooth not fully erupted'),
-	('FRACTURED', 'Cracked or broken'),
-	('ABSCESSED', 'Infection at root'),
-	('ERODED', 'Worn down surface'),
-	('MOBILITY', 'Loose tooth');
+	INSERT INTO tooth_status (id, code, description, created_at, updated_at) VALUES
+(gen_random_uuid(), 'HEALTHY', 'No decay or damage', NOW(), NOW()),
+(gen_random_uuid(), 'DECAYED', 'Caries present', NOW(), NOW()),
+(gen_random_uuid(), 'FILLED', 'Restored with filling', NOW(), NOW()),
+(gen_random_uuid(), 'CROWNED', 'Covered with dental crown', NOW(), NOW()),
+(gen_random_uuid(), 'MISSING', 'Tooth extracted', NOW(), NOW()),
+(gen_random_uuid(), 'IMPACTED', 'Tooth not fully erupted', NOW(), NOW()),
+(gen_random_uuid(), 'FRACTURED', 'Cracked or broken', NOW(), NOW()),
+(gen_random_uuid(), 'ABSCESSED', 'Infection at root', NOW(), NOW()),
+(gen_random_uuid(), 'ERODED', 'Worn down surface', NOW(), NOW()),
+(gen_random_uuid(), 'MOBILITY', 'Loose tooth', NOW(), NOW());
 	-- 9. Insert Teeth (for first patient)
 	INSERT INTO tooth (patient_id, tooth_number, tooth_name, tooth_status_id) VALUES
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 1, 'Third Molar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),

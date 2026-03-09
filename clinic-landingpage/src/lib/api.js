@@ -1,5 +1,5 @@
 // Single source: Clinic API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_CLINIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
 const joinUrl = (base, path) => {
