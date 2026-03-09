@@ -105,7 +105,53 @@ export const translations = {
       followOnTikTok: "Follow on TikTok",
       followOnInstagram: "Follow on Instagram",
       followOnFacebook: "Follow on Facebook",
-      blogsTitle: "Blogs of Patan City Dental Clinic"
+      blogsTitle: "Blogs of Patan City Dental Clinic",
+
+      aboutHeroTitle: "Dental Care That Puts You First",
+    aboutHeroSubtitle: "Expert treatment, gentle approach. At BellaDent, we believe great oral health starts with listening—and continues with care you can trust.",
+    
+    ourApproachTitle: "How We Care for You",
+    ourApproachP1: "Many people feel anxious about dental visits. We get it. That's why every appointment at BellaDent is designed to be clear, comfortable, and respectful of your time.",
+    ourApproachP2: "We explain what we're doing and why. We use modern techniques to minimize discomfort. And we never rush—your questions matter, and so does your comfort.",
+    ourApproachP3: "Whether you're here for a routine cleaning or a complex procedure, you'll work with a team that listens first and treats you like a person, not a patient number.",
+    
+    whatGuidesUsTitle: "What Guides Us",
+    
+    guideListenTitle: "We Listen Before We Treat",
+    guideListenDescription: "Every patient has unique concerns and goals. We start by understanding yours—whether it's managing dental anxiety, achieving a specific smile outcome, or simply maintaining healthy teeth.",
+    
+    guideToolsTitle: "We Use What Works",
+    guideToolsDescription: "From digital imaging to minimally invasive techniques, we choose tools and methods that deliver better outcomes with less discomfort. Modern dentistry should feel modern.",
+    
+    guideInformedTitle: "We Keep You Informed",
+    guideInformedDescription: "No surprise costs, no confusing jargon. We explain your treatment options in plain language, answer every question, and make sure you feel confident before we begin.",
+    
+    meetDoctorTitle: "Meet Dr. Srishti Poudel",
+    doctorSpecialty: "MDS, Perio-orthodontics Specialist",
+    doctorBioP1: "Dr. Poudel leads the BellaDent team with a focus on precision, patience, and helping each person feel at ease. She specializes in periodontics and orthodontics—areas that require both technical skill and a gentle touch.",
+    doctorBioP2: "Patients appreciate her clear explanations and her commitment to making every visit as comfortable as possible. Whether you're managing gum health, considering braces, or simply due for a checkup, you're in capable hands.",
+    doctorBioP3: "Outside the clinic, Dr. Poudel stays current with advances in dental care and believes that good dentistry is as much about trust as it is about technique.",
+    scheduleWithDoctor: "Schedule with Dr. Poudel",
+    
+    whyChooseUsTitle: "Why Patients Choose BellaDent",
+    
+    whyCommTitle: "Clear Communication",
+    whyCommDescription: "We explain your options, costs, and next steps before you commit to anything.",
+    
+    whyScheduleTitle: "Flexible Scheduling",
+    whyScheduleDescription: "We respect your time with punctual appointments and convenient booking.",
+    
+    whyServicesTitle: "Comprehensive Services",
+    whyServicesDescription: "From cleanings to implants, cosmetic work to emergency care—handled in one place.",
+    
+    whyEnvironmentTitle: "A Calming Environment",
+    whyEnvironmentDescription: "Our clinic is designed to reduce anxiety, not add to it.",
+    
+    readyToStartTitle: "Ready to Get Started?",
+    readyToStartSubtitle: "Book a consultation and experience dental care that actually listens.",
+    haveQuestions: "Have questions? Contact us",
+    
+    bookYourVisit: "Book Your Visit"
     },
     ne: {
       SITE_NAME: 'बेलाडेण्ट डेन्टल क्लिनिक तथा इम्प्लान्ट केन्द्र',
@@ -209,7 +255,53 @@ export const translations = {
       followOnTikTok: "TikTok मा फलो गर्नुहोस्",
       followOnInstagram: "Instagram मा फलो गर्नुहोस्",
       followOnFacebook: "Facebook मा फलो गर्नुहोस्",
-      blogsTitle: "पाटन सिटी डेन्टल क्लिनिकका ब्लगहरू"
+      blogsTitle: "पाटन सिटी डेन्टल क्लिनिकका ब्लगहरू",
+      aboutHeroTitle: "तपाईंलाई प्राथमिकता दिने दन्त उपचार",
+aboutHeroSubtitle: "विशेषज्ञ उपचार, कोमल व्यवहार। बेलाDent मा हामी विश्वास गर्छौं—उत्तम मुख स्वास्थ्य सुन्नेबाट सुरु हुन्छ, र तपाईंले विश्वास गर्न सक्ने हेरचाहसँगै अघि बढ्छ।",
+
+ourApproachTitle: "हामी तपाईंको हेरचाह कसरी गर्छौं",
+ourApproachP1: "धेरैलाई दन्त उपचारको भेटघाटले चिन्ता हुन्छ। हामी बुझ्छौं। त्यसैले बेलाDent मा हरेक अपोइन्टमेन्ट स्पष्ट, आरामदायी, र तपाईंको समयको सम्मान गर्ने गरी बनाइन्छ।",
+ourApproachP2: "हामी के गर्दैछौं र किन गर्दैछौं—स्पष्ट रूपमा बताउँछौं। असहजता कम गर्न आधुनिक प्रविधि प्रयोग गर्छौं। र हामी हतार गर्दैनौं—तपाईंका प्रश्नहरू महत्त्वपूर्ण छन्, तपाईंको आराम पनि।",
+ourApproachP3: "तपाईं नियमित सफाइका लागि आउनुहोस् वा जटिल प्रक्रिया लागि—तपाईंलाई पहिले सुन्ने र तपाईंलाई बिरामी नम्बर होइन, व्यक्तिजस्तै व्यवहार गर्ने टिमसँग काम हुनेछ।",
+
+whatGuidesUsTitle: "हामीलाई के मार्गदर्शन गर्छ",
+
+guideListenTitle: "उपचार अघि हामी सुन्छौं",
+guideListenDescription: "हरेक बिरामीका चिन्ता र लक्ष्य फरक हुन्छन्। हामी पहिले तपाईंका कुरा बुझ्छौं—दन्त उपचारको डर व्यवस्थापन गर्नु होस्, मुस्कानमा चाहिएको नतिजा होस्, वा केवल दाँत स्वस्थ राख्नु।",
+
+guideToolsTitle: "हामी काम लाग्ने कुरा प्रयोग गर्छौं",
+guideToolsDescription: "डिजिटल इमेजिङदेखि न्यून-आक्रामक प्रविधिसम्म—कम असहजतामा राम्रो नतिजा दिने उपकरण र विधि हामी रोज्छौं। आधुनिक दन्त उपचार आधुनिक नै महसुस हुनुपर्छ।",
+
+guideInformedTitle: "हामी तपाईंलाई जानकारीमा राख्छौं",
+guideInformedDescription: "अचानक खर्च छैन, अलमल्याउने प्राविधिक भाषा छैन। हामी उपचारका विकल्पहरू सरल भाषामा बुझाउँछौं, हरेक प्रश्नको जवाफ दिन्छौं, र सुरु गर्नु अघि तपाईंलाई आत्मविश्वासी बनाउँछौं।",
+
+meetDoctorTitle: "डॉ. सृष्टि पौडेललाई भेट्नुहोस्",
+doctorSpecialty: "MDS, पेरियो-अर्थोडन्टिक्स विशेषज्ञ",
+doctorBioP1: "डॉ. पौडेलले बेलाDent टिमको नेतृत्व सटिकता, धैर्य, र प्रत्येक व्यक्तिलाई सहज महसुस गराउने उद्देश्यका साथ गर्नुहुन्छ। उहाँको विशेषज्ञता पेरियोडन्टिक्स र अर्थोडन्टिक्समा छ—जसमा प्राविधिक दक्षता र कोमल हात दुबै चाहिन्छ।",
+doctorBioP2: "बिरामीहरूले उहाँका स्पष्ट व्याख्या र हरेक भेटलाई सकेसम्म आरामदायी बनाउने प्रतिबद्धता मन पराउँछन्। गिजाको स्वास्थ्य व्यवस्थापन होस्, ब्रेसेस विचार गर्दै हुनुहुन्छ, वा नियमित चेकअप नै होस्—तपाईं सक्षम हातमा हुनुहुन्छ।",
+doctorBioP3: "क्लिनिक बाहिर पनि डॉ. पौडेल दन्त उपचारका नयाँ प्रगतिहरूसँग अपडेट रहनुहुन्छ र राम्रो दन्त उपचार प्रविधिजत्तिकै विश्वासमा पनि आधारित हुन्छ भन्नेमा विश्वास गर्नुहुन्छ।",
+scheduleWithDoctor: "डॉ. पौडेलसँग अपोइन्टमेन्ट लिनुहोस्",
+
+whyChooseUsTitle: "बिरामीहरूले बेलाDent किन रोज्छन्",
+
+whyCommTitle: "स्पष्ट संवाद",
+whyCommDescription: "तपाईंले केही पनि निर्णय गर्नु अघि हामी विकल्प, खर्च, र अर्को चरणहरू स्पष्ट रूपमा बताउँछौं।",
+
+whyScheduleTitle: "लचिलो समय तालिका",
+whyScheduleDescription: "समयमै अपोइन्टमेन्ट र सजिलो बुकिङमार्फत हामी तपाईंको समयको सम्मान गर्छौं।",
+
+whyServicesTitle: "समग्र सेवाहरू",
+whyServicesDescription: "सफाइदेखि इम्प्लान्ट, सौन्दर्य उपचारदेखि आकस्मिक हेरचाहसम्म—सबै एउटै ठाउँमा।",
+
+whyEnvironmentTitle: "शान्त वातावरण",
+whyEnvironmentDescription: "हाम्रो क्लिनिक चिन्ता बढाउने होइन, घटाउने गरी डिजाइन गरिएको छ।",
+
+readyToStartTitle: "सुरु गर्न तयार हुनुहुन्छ?",
+readyToStartSubtitle: "परामर्श बुक गर्नुहोस् र साँच्चै सुन्ने दन्त उपचार अनुभव गर्नुहोस्।",
+haveQuestions: "प्रश्न छ? हामीलाई सम्पर्क गर्नुहोस्",
+
+bookYourVisit: "आफ्नो भेट बुक गर्नुहोस्"
+
     },
   };
   
