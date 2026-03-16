@@ -25,7 +25,6 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    env: prod
     steps:
       - uses: actions/checkout@v4
 
@@ -73,4 +72,3 @@ jobs:
               \"sudo systemctl start ${{ env.SERVICE_NAME }}\",
               \"sudo systemctl status ${{ env.SERVICE_NAME }} --no-pager || true\"
             ]"
-
