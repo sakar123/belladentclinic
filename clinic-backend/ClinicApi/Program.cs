@@ -9,6 +9,7 @@ using ClinicApi.Services.Implementations;
 using Serilog;
 using System;
 using System.Reflection;
+using System.Collections.Generic;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using ClinicApi.Middleware;
@@ -52,11 +53,18 @@ try
     // CORS: read allowed origins from configuration (Cors:AllowedOrigins)
     builder.Services.AddCors(options =>
     {
-        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+        var allowedOriginsFromConfig = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+        var mergedOrigins = new HashSet<string>(allowedOriginsFromConfig, StringComparer.OrdinalIgnoreCase)
+        {
+            "https://belladentclinic.com",
+            "https://www.belladentclinic.com"
+        };
+
         options.AddPolicy("DevCors", policy =>
-            policy.WithOrigins(allowedOrigins)
+            policy.WithOrigins([.. mergedOrigins])
                 .AllowAnyHeader()
                 .AllowAnyMethod()
+                .AllowCredentials()
         );
     });
 
