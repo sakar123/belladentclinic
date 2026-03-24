@@ -115,11 +115,16 @@ try
     var app = builder.Build();
     
     //Setup Database
-    using (var scope = app.Services.CreateScope())
+    if (app.Environment.IsDevelopment())
     {
-        var db = scope.ServiceProvider.GetRequiredService<DentalClinicContext>();
-        db.Database.Migrate();
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DentalClinicContext>();
+            db.Database.Migrate();
+        }
     }
+
+    
 
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
