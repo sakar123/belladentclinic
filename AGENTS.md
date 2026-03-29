@@ -147,6 +147,12 @@ Environment variables and endpoints:
   - Updated `appsettings.Production.json` to allow `https://belladentclinic.com`; enabled `UseCors` in all environments.
   - Landing page API client (`clinic-landingpage/src/lib/api.js`) sends an explicit OPTIONS preflight before API requests when cross-origin.
 
+- 2026-03-29: Fixed CORS preflight for landing page.
+  - Added `app.UseRouting()` before `app.UseCors("DevCors")` in `ClinicApi/Program.cs` to ensure proper preflight handling.
+  - Decorated `LandingPageController` with `[EnableCors("DevCors")]` and added explicit `OPTIONS` endpoints for `reviews` and `appointment` to satisfy manual preflight from the static site.
+  - Verified production `Cors:AllowedOrigins` includes `https://belladentclinic.com` and `https://www.belladentclinic.com`.
+  - Added `EnvironmentName` key to all `appsettings*.json` and a startup log line in `Program.cs` that prints both the runtime ASP.NET Core environment and the configured `EnvironmentName`.
+
 ## Recent Commands and Tips
 - API run (local): from `clinic-backend/ClinicApi` → `dotnet run`
 - Portal run (local): from `clinic-portal` → `npm run dev` (ensure `.env.local` has `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080`)
