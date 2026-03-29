@@ -1,6 +1,7 @@
 using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
@@ -9,6 +10,7 @@ namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [EnableCors("DevCors")]
     public class LandingPageController : ControllerBase
     {
         private readonly ILogger<LandingPageController> _logger;
@@ -39,6 +41,13 @@ namespace ClinicApi.Controllers
                 _logger.LogError(ex, "An error occurred while fetching Google Reviews.");
                 return StatusCode(500, "An internal error occurred. Please try again later.");
             }
+        }
+
+        // Explicit OPTIONS endpoints to satisfy cross-origin preflight requests
+        [HttpOptions("reviews")]
+        public IActionResult OptionsReviews()
+        {
+            return NoContent();
         }
 
         [HttpPost("appointment")]
@@ -72,6 +81,12 @@ namespace ClinicApi.Controllers
                 _logger.LogError(ex, "An error occurred while creating an appointment from the landing page.");
                 return StatusCode(500, "An internal error occurred. Please try again later.");
             }
+        }
+
+        [HttpOptions("appointment")]
+        public IActionResult OptionsAppointment()
+        {
+            return NoContent();
         }
     }
 }

@@ -44,6 +44,11 @@ try
     builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: false, reloadOnChange: true);
     builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
+    // Log the runtime environment and configured EnvironmentName
+    var runtimeEnv = builder.Environment.EnvironmentName;
+    var configuredEnvName = builder.Configuration["EnvironmentName"] ?? "(unset)";
+    Log.Information("Runtime environment = {RuntimeEnv}; Config EnvironmentName = {ConfigEnv}", runtimeEnv, configuredEnvName);
+
     // Add services to the container.
     builder.Services.AddControllers();
     // Configure FluentValidation
@@ -59,8 +64,7 @@ try
             "https://belladentclinic.com",
             "https://www.belladentclinic.com"
         };
-
-        options.AddPolicy("DevCors", policy =>
+         options.AddPolicy("DevCors", policy =>
             policy.WithOrigins([.. mergedOrigins])
                 .AllowAnyHeader()
                 .AllowAnyMethod()
@@ -143,7 +147,8 @@ try
     app.UseMiddleware<RequestLoggingContextMiddleware>();
     app.UseSerilogRequestLogging();
 
-    // Enable CORS for configured origins in all environments
+    // Enable routing then CORS (recommended order for preflight handling)
+    app.UseRouting();
     app.UseCors("DevCors");
 
     app.UseAuthorization();
