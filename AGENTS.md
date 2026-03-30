@@ -152,6 +152,7 @@ Environment variables and endpoints:
   - Decorated `LandingPageController` with `[EnableCors("DevCors")]` and added explicit `OPTIONS` endpoints for `reviews` and `appointment` to satisfy manual preflight from the static site.
   - Verified production `Cors:AllowedOrigins` includes `https://belladentclinic.com` and `https://www.belladentclinic.com`.
   - Added `EnvironmentName` key to all `appsettings*.json` and a startup log line in `Program.cs` that prints both the runtime ASP.NET Core environment and the configured `EnvironmentName`.
+  - Introduced `ClinicSettings.ClinicEmail` in all appsettings files and used it in `AppointmentService` to send the clinic notification email for landing page bookings.
 
 ## Recent Commands and Tips
 - API run (local): from `clinic-backend/ClinicApi` → `dotnet run`

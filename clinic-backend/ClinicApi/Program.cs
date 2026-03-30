@@ -80,8 +80,9 @@ try
         options.ConfigureWarnings(warnings => warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
     });
 
-    // Configure EmailSettings
+    // Configure EmailSettings and ClinicSettings
     builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+    builder.Services.Configure<ClinicSettings>(builder.Configuration.GetSection("ClinicSettings"));
 
     // Register repositories
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));

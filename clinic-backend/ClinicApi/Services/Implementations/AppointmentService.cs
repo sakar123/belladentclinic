@@ -22,6 +22,7 @@ namespace ClinicApi.Services.Implementations
         private readonly IPatientService _patientService;
         private readonly ILogger<AppointmentService> _logger;
         private readonly IEmailService _emailService;
+        private readonly Microsoft.Extensions.Options.IOptions<ClinicApi.Models.AppSettings.ClinicSettings> _clinicSettings;
 
         public AppointmentService(
             IRepository<Appointment> appointmentRepository,
@@ -30,7 +31,8 @@ namespace ClinicApi.Services.Implementations
             IRepository<Staff> staffRepository,
             IPatientService patientService,
             ILogger<AppointmentService> logger,
-            IEmailService emailService)
+            IEmailService emailService,
+            Microsoft.Extensions.Options.IOptions<ClinicApi.Models.AppSettings.ClinicSettings> clinicSettings)
         {
             _appointmentRepository = appointmentRepository;
             _statusRepository = statusRepository;
@@ -39,6 +41,7 @@ namespace ClinicApi.Services.Implementations
             _patientService = patientService;
             _logger = logger;
             _emailService = emailService;
+            _clinicSettings = clinicSettings;
         }
 
         public async Task<Appointment> CreateAppointmentFromLandingPageAsync(LandingPageAppointmentRequestDto request)
@@ -152,12 +155,30 @@ namespace ClinicApi.Services.Implementations
             _logger.LogInformation("Successfully created new appointment with ID {AppointmentId} for Patient {PatientId}", newAppointment.id, newAppointment.patient_id);
 
             if (!string.IsNullOrEmpty(patientEntity.Person.email))
-            {
-                await _emailService.SendEmailAsync(
+            { 
+                //send email to user
+                _emailService.SendEmailAsync(
                     patientEntity.Person.email,
                     "Appointment Confirmation",
                     $"Your appointment is confirmed for {newAppointment.appointment_start_time.ToShortDateString()} at {newAppointment.appointment_start_time.ToShortTimeString()}."
                 );
+                //send email to clinic
+                var clinicEmail = _clinicSettings.Value?.ClinicEmail;
+                if (!string.IsNullOrWhiteSpace(clinicEmail))
+                {
+                    _logger.LogInformation("Sending clinic notification to {ClinicEmail}", clinicEmail);
+                    var displayName = ($"{patientEntity.Person.first_name} {patientEntity.Person.last_name}").Trim();
+                    var who = string.IsNullOrWhiteSpace(displayName) ? patientEntity.Person.email : displayName;
+                    _emailService.SendEmailAsync(
+                        clinicEmail!,
+                        "Appointment Booked",
+                        $"New appointment booked by {who} for {newAppointment.appointment_start_time.ToShortDateString()} at {newAppointment.appointment_start_time.ToShortTimeString()}."
+                    );
+                }
+                else
+                {
+                    _logger.LogWarning("ClinicSettings.ClinicEmail is not configured. Skipping clinic notification email.");
+                }
             }
             else
             {
