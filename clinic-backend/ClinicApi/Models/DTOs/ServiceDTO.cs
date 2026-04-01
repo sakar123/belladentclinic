@@ -14,7 +14,7 @@ namespace ClinicApi.Models.DTOs
         public string name { get; set; }
         
         [StringLength(1000)]
-        public string description { get; set; }
+        public string? description { get; set; }
         
         [Required]
         [Range(0, 999999.99)]

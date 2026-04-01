@@ -19,8 +19,9 @@ namespace ClinicApi.Models.DTOs
         [Required]
         public Guid service_id { get; set; }
 
-        [Required]
-        public Guid tooth_id { get; set; }
+        // Either tooth_id or tooth_number can be provided for create/update.
+        // When tooth_id is not provided, services will try to resolve using (patient_id, tooth_number).
+        public Guid? tooth_id { get; set; }
 
         public int? tooth_number { get; set; }
         

@@ -14,9 +14,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/toast';
 
 export default function NewStaffPage() {
   const router = useRouter();
+  const { notify } = useToast();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -48,12 +50,18 @@ export default function NewStaffPage() {
       license_number: licenseNumber,
       is_active: true,
     });
+    notify({ title: 'Staff added' });
     router.push('/admin/staff');
   };
 
   return (
     <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-6">Add New Staff Member</h1>
+      <div className="flex items-start justify-between mb-6">
+        <h1 className="text-3xl font-bold">Add New Staff Member</h1>
+        <Button variant="destructive" onClick={() => router.push('/admin/staff')} className="rounded-full h-10 w-10 p-0 flex items-center justify-center" title="Cancel">
+          <span className="text-xl">×</span>
+        </Button>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-2 gap-6">
           <div>

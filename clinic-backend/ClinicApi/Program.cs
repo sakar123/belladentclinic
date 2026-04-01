@@ -50,7 +50,11 @@ try
     Log.Information("Runtime environment = {RuntimeEnv}; Config EnvironmentName = {ConfigEnv}", runtimeEnv, configuredEnvName);
 
     // Add services to the container.
-    builder.Services.AddControllers();
+    builder.Services.AddControllers()
+        .AddJsonOptions(opts =>
+        {
+            opts.JsonSerializerOptions.Converters.Add(new ClinicApi.Converters.NullableGuidEmptyToNullConverter());
+        });
     // Configure FluentValidation
     builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());

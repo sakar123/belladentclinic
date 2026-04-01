@@ -13,10 +13,10 @@ export default function Button({ as: Comp = "button", className, variant = "defa
     subtle: "bg-app-bg hover:bg-app-border/40",
   };
   const sizes = {
-    sm: "h-8 px-3 text-sm",
-    md: "h-10 px-4",
-    lg: "h-11 px-5 text-base",
-    icon: "h-10 w-10 p-0 inline-flex items-center justify-center",
+    sm: "h-9 px-3 text-sm",
+    md: "h-11 px-5 text-base",
+    lg: "h-12 px-6 text-base",
+    icon: "h-11 w-11 p-0 inline-flex items-center justify-center",
   };
   return (
     <Comp

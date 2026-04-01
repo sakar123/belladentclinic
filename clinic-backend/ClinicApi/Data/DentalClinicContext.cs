@@ -1,5 +1,7 @@
 using ClinicApi.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace ClinicApi.Data
 {
@@ -66,6 +68,35 @@ namespace ClinicApi.Data
                 }
             }
 
+            // Force all DateTime writes to use UTC to satisfy PostgreSQL TIMESTAMPTZ
+            // and avoid Npgsql "Kind=Unspecified" errors.
+            var dateTimeConverter = new ValueConverter<DateTime, DateTime>(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => DateTime.SpecifyKind(v, DateTimeKind.Utc)
+            );
+            var nullableDateTimeConverter = new ValueConverter<DateTime?, DateTime?>(
+                v => v.HasValue
+                    ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime())
+                    : v,
+                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v
+            );
+
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                var entity = modelBuilder.Entity(entityType.ClrType);
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTime))
+                    {
+                        entity.Property(property.Name).HasConversion(dateTimeConverter);
+                    }
+                    else if (property.ClrType == typeof(DateTime?))
+                    {
+                        entity.Property(property.Name).HasConversion(nullableDateTimeConverter);
+                    }
+                }
+            }
+
             // Override specific table names that use snake_case in the database
             modelBuilder.Entity<AppointmentStatus>().ToTable("appointment_status");
             modelBuilder.Entity<ToothStatus>().ToTable("tooth_status");
@@ -73,6 +104,11 @@ namespace ClinicApi.Data
             modelBuilder.Entity<DocumentType>().ToTable("document_type");
             modelBuilder.Entity<DiscountType>().ToTable("discount_type");
             modelBuilder.Entity<SaleItem>().ToTable("sale_item");
+
+            // Map known DATE columns explicitly (schema uses DATE, not TIMESTAMPTZ)
+            modelBuilder.Entity<Person>().Property(p => p.date_of_birth).HasColumnType("date");
+            modelBuilder.Entity<Billing>().Property(p => p.issue_date).HasColumnType("date");
+            modelBuilder.Entity<Billing>().Property(p => p.due_date).HasColumnType("date");
 
             // No enum conversions necessary; properties are strings.
             

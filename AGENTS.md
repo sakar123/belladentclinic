@@ -154,6 +154,37 @@ Environment variables and endpoints:
   - Added `EnvironmentName` key to all `appsettings*.json` and a startup log line in `Program.cs` that prints both the runtime ASP.NET Core environment and the configured `EnvironmentName`.
   - Introduced `ClinicSettings.ClinicEmail` in all appsettings files and used it in `AppointmentService` to send the clinic notification email for landing page bookings.
 
+- 2026-03-31: Portal UI redesign (BellaDent branding).
+  - Updated global theme (softer bg, subtle borders, teal/sky accents) and elevated card shadows for depth.
+  - New gradient header with BellaDent logo from landing page, quick actions (New Appointment, New Patient), and improved search.
+  - Sidebar refreshed with logo, modern active states, and a Settings shortcut; maintains collapse behavior.
+  - Dashboard rebuilt: KPIs (patients, today, next 7 days, invoices), a 7‑day appointments line chart (Recharts), and upcoming list.
+  - Patients page redesigned to card grid with avatars, email/phone icons, and search filtering; Appointments page similarly modernized with status pills.
+  - No backend or DB changes; all data wired to existing API calls. Assets copied from `clinic-landingpage/public/images` to `clinic-portal/public/images`.
+
+- 2026-03-31 (later): Production readiness sweep for portal.
+  - Header made full-width; sidebar and pages brought to consistent card-based design with icons/avatars.
+  - Staff, Billing, Documents, Reports redesigned; Services converted to cards with search; Lookups header polished.
+  - Fixed API call bug in appointment details (singular delete); added 404 (`not-found.js`) and error boundary (`error.js`).
+  - Dev-only API routes under `src/app/api/*` now return 404 in production unless required env is present for send-email/send-sms.
+  - Login page styled and routes back to `/`; currency switched to `Rs`.
+
+- 2026-03-31 (final): Portal UX enhancements and utilities.
+  - Global search page (`/search`) with header search navigation; results across patients, staff, appointments.
+  - Added route-level skeletons (`loading.js`) for core pages and app-wide `not-found`/`error` fallbacks.
+  - Reusable UI: `Empty`, `StatusPill`, `Money`, and floating action buttons (FAB) for quick create.
+  - Appointment and Patient detail pages updated to card-based layouts with icons and pills.
+  - Added Services “New” page with name/cost/specialty form (uses existing API); dev API routes remain disabled in prod.
+
+- 2026-03-31 (final+): API fixes + clinical workflows.
+  - Backend: fixed 400 on POST /api/service by accepting empty/invalid specialty_id as null via a custom Guid? JSON converter; ServiceDTO.description nullable.
+  - Backend: enforced UTC DateTime conversions globally; explicitly mapped DATE columns (dob/issue/due) to avoid Npgsql Kind=Unspecified errors.
+  - Backend: added `POST /api/document/upload` to store files under `uploads/<patient>` and create Document rows.
+  - Backend: (reverted) Removed temporary billing line items controller; flows now create a simple Billing row instead.
+  - Portal: global loading overlay provider + fetch monkey patch to prevent double-clicks and show pretty loading for all mutating actions; upgraded app-level `loading.js` to animated branded loader.
+  - Portal: Appointment details — Add Service dialog (inline create service if not listed, quantity, discount, lab flag) creates Billing line item; Reschedule dialog updates time/staff/status; status pill added near title.
+  - Portal: Patient details — Documents tab now supports uploads to API; refreshes after upload.
+
 ## Recent Commands and Tips
 - API run (local): from `clinic-backend/ClinicApi` → `dotnet run`
 - Portal run (local): from `clinic-portal` → `npm run dev` (ensure `.env.local` has `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080`)
@@ -165,9 +196,20 @@ Environment variables and endpoints:
 
 ## Notes for Future Agents
 - DTOs are snake_case at the API boundary; the portal’s HTTP client auto-converts, but normalization ensures nested person fields are flattened for rendering.
-- Treatments use tooth_number (int) — there is no `tooth_id` column in DB. Do not reintroduce a FK without a schema change.
+- Treatments reference teeth via `tooth_id` (FK). The API also accepts `tooth_number` and resolves it to the patient’s tooth; create the tooth first if it doesn’t exist.
 - Staff deletion will likely fail if the staff has appointments; the API returns 409 with guidance. Prefer deactivation (is_active) or reassignment flow.
 - AppointmentStatus dropdowns should use `id` as value; API expects `status_id` in DTOs.
 - When changing entities, confirm DB schema compatibility and update mappers + seeds; coordinate with portal normalizers.
 
 How to use this log: Append a new entry on each work session with date, what changed, and any decisions taken. Keep it concise (3–6 lines).
+
+## Session Log (new entries)
+- 2026-03-31: Multi-tooth treatment flow.
+  - Backend: TreatmentDTO `tooth_id` made optional; create/update now accept `tooth_number` (resolved by patient_id + tooth_number) and error if tooth missing.
+  - Portal: Add Treatment dialog supports “Apply to multiple teeth” with comma-separated numbers; creates or reuses teeth and posts one treatment per tooth. Maintains single-tooth flow.
+  - UX: Tooth status selector applies to created teeth. Appointment auto-advances to In Progress on first add.
+
+- 2026-03-31: Teeth auto-seeding + patient teeth management.
+  - Backend: On patient creation (API and Landing), auto-create teeth based on DOB using FDI: permanent (11–48) or primary (51–85). All set to HEALTHY (creates status if missing).
+  - Portal: Patient profile adds Teeth tab with full list, per-tooth status editing, region quick-select (quadrants, arches, full), and bulk apply. “Set appointment with selected” passes patient and teeth to new appointment.
+  - Appointments/new: Reads `patientId` and `teeth` query params; displays preselected teeth info and seeds notes.

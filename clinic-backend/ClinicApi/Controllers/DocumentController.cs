@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
+using Microsoft.AspNetCore.Http;
+using System.IO;
 
 namespace ClinicApi.Controllers
 {
@@ -42,6 +44,53 @@ namespace ClinicApi.Controllers
             {
                 var createdDocument = await _documentService.CreateDocumentAsync(documentDto);
                 return CreatedAtAction(nameof(GetDocument), new { id = createdDocument.id }, createdDocument);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("upload")]
+        [RequestSizeLimit(50_000_000)] // ~50MB
+        public async Task<ActionResult<DocumentDTO>> UploadDocument(
+            IFormFile file, // Removed [FromForm] here to fix Swagger crash
+            [FromForm] Guid patient_id,
+            [FromForm] Guid document_type_id,
+            [FromForm] string description,
+            [FromForm] bool? is_sensitive,
+            [FromForm] Guid? tooth_id,
+            [FromForm] Guid? treatment_id)
+        {
+            if (file == null || file.Length == 0) return BadRequest("file is required");
+            var uploadsRoot = Path.Combine(AppContext.BaseDirectory, "uploads");
+            var patientFolder = Path.Combine(uploadsRoot, patient_id.ToString());
+            Directory.CreateDirectory(patientFolder);
+            var safeFile = Path.GetFileName(file.FileName);
+            var saveName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid()}_{safeFile}";
+            var fullPath = Path.Combine(patientFolder, saveName);
+            
+            await using (var stream = System.IO.File.Create(fullPath))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var dto = new DocumentDTO
+            {
+                patient_id = patient_id,
+                document_type_id = document_type_id,
+                tooth_id = tooth_id,
+                treatment_id = treatment_id,
+                upload_date = DateTime.UtcNow,
+                description = description ?? safeFile,
+                is_sensitive = is_sensitive ?? false,
+                document_path = fullPath
+            };
+            
+            try
+            {
+                var created = await _documentService.CreateDocumentAsync(dto);
+                return CreatedAtAction(nameof(GetDocument), new { id = created.id }, created);
             }
             catch (KeyNotFoundException ex)
             {

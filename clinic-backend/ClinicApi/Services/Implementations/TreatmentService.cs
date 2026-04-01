@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using ClinicApi.Data.Repositories;
 using ClinicApi.Models.DTOs;
@@ -59,10 +60,46 @@ namespace ClinicApi.Services.Implementations
 
             if (!await _serviceRepository.ExistsAsync(treatmentDto.service_id))
                 throw new KeyNotFoundException("Service not found");
-            if (!await _toothRepository.ExistsAsync(treatmentDto.tooth_id))
-                throw new KeyNotFoundException("Tooth not found");
 
-            var treatment = TreatmentMapper.ToEntity(treatmentDto, new HashSet<object>());
+            // Resolve tooth by id or by (patient_id, tooth_number)
+            Guid resolvedToothId = Guid.Empty;
+            if (treatmentDto.tooth_id.HasValue && treatmentDto.tooth_id.Value != Guid.Empty)
+            {
+                if (!await _toothRepository.ExistsAsync(treatmentDto.tooth_id.Value))
+                    throw new KeyNotFoundException("Tooth not found");
+                resolvedToothId = treatmentDto.tooth_id.Value;
+            }
+            else if (treatmentDto.tooth_number.HasValue)
+            {
+                var toothList = await _toothRepository.FindAsync(t => t.patient_id == treatmentDto.patient_id && t.tooth_number == treatmentDto.tooth_number.Value);
+                var tooth = toothList.FirstOrDefault();
+                if (tooth == null)
+                    throw new KeyNotFoundException("Tooth not found for patient and tooth_number");
+                resolvedToothId = tooth.id;
+            }
+            else
+            {
+                throw new KeyNotFoundException("Tooth not specified");
+            }
+
+            // Build entity explicitly to ensure resolved tooth id is used
+            var treatment = new Treatment
+            {
+                id = treatmentDto.id ?? Guid.NewGuid(),
+                appointment_id = treatmentDto.appointment_id,
+                patient_id = treatmentDto.patient_id,
+                staff_id = treatmentDto.staff_id,
+                service_id = treatmentDto.service_id,
+                tooth_id = resolvedToothId,
+                notes = treatmentDto.notes,
+                appointment = null,
+                patient = null,
+                staff = null,
+                service = null,
+                prescriptions = new List<Prescription>(),
+                billing_line_item = new List<BillingLineItem>(),
+                documents = new List<Document>()
+            };
             await _treatmentRepository.AddAsync(treatment);
             await _treatmentRepository.SaveChangesAsync();
 
@@ -86,15 +123,30 @@ namespace ClinicApi.Services.Implementations
 
             if (!await _serviceRepository.ExistsAsync(treatmentDto.service_id))
                 throw new KeyNotFoundException("Service not found");
-            if (!await _toothRepository.ExistsAsync(treatmentDto.tooth_id))
-                throw new KeyNotFoundException("Tooth not found");
+
+            // Resolve tooth id if needed
+            Guid resolvedToothId = existingTreatment.tooth_id;
+            if (treatmentDto.tooth_id.HasValue && treatmentDto.tooth_id.Value != Guid.Empty)
+            {
+                if (!await _toothRepository.ExistsAsync(treatmentDto.tooth_id.Value))
+                    throw new KeyNotFoundException("Tooth not found");
+                resolvedToothId = treatmentDto.tooth_id.Value;
+            }
+            else if (treatmentDto.tooth_number.HasValue)
+            {
+                var toothList = await _toothRepository.FindAsync(t => t.patient_id == treatmentDto.patient_id && t.tooth_number == treatmentDto.tooth_number.Value);
+                var tooth = toothList.FirstOrDefault();
+                if (tooth == null)
+                    throw new KeyNotFoundException("Tooth not found for patient and tooth_number");
+                resolvedToothId = tooth.id;
+            }
 
             // Manual update
             existingTreatment.appointment_id = treatmentDto.appointment_id;
             existingTreatment.patient_id = treatmentDto.patient_id;
             existingTreatment.staff_id = treatmentDto.staff_id;
             existingTreatment.service_id = treatmentDto.service_id;
-            existingTreatment.tooth_id = treatmentDto.tooth_id;
+            existingTreatment.tooth_id = resolvedToothId;
             existingTreatment.notes = treatmentDto.notes;
             existingTreatment.updated_at = DateTime.UtcNow;
 

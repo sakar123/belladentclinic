@@ -50,7 +50,8 @@ namespace ClinicApi.Mappers
                 patient = null,
                 staff = null,
                 service = null,
-                tooth_id = dto.tooth_id,
+                // May be Guid.Empty if not provided; services should set a concrete tooth_id
+                tooth_id = dto.tooth_id ?? Guid.Empty,
                 notes = dto.notes,
                 prescriptions = new List<Prescription>(),
                 billing_line_item = new List<BillingLineItem>(),

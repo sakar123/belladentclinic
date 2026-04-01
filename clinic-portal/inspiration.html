@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dental Clinic App</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --line: #d9e1ec;
+      --text: #1e293b;
+      --muted: #64748b;
+      --accent: #0f766e;
+      --accent-2: #0ea5e9;
+      --danger: #b91c1c;
+      --warn: #92400e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      padding: 18px 22px;
+    }
+    header h1 { margin: 0; font-size: 26px; }
+    header p { margin: 6px 0 0; opacity: 0.95; }
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: #eef5f8;
+      border-bottom: 1px solid var(--line);
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    button, select, input, textarea {
+      font: inherit;
+    }
+    button {
+      border: 0;
+      background: var(--accent);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button.secondary { background: #334155; }
+    button.ghost {
+      background: white;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    button.danger { background: var(--danger); }
+    button.small { padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 16px 20px 0;
+    }
+    .tab-btn {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .tab-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+    .page { display: none; padding: 20px; }
+    .page.active { display: block; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+    }
+    .card h2, .card h3 { margin-top: 0; }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    label { font-weight: bold; font-size: 14px; }
+    input, select, textarea {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: white;
+      width: 100%;
+    }
+    textarea { min-height: 84px; }
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th {
+      background: #f8fafc;
+      position: sticky;
+      top: 0;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .kpi {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .kpi .label { color: var(--muted); font-size: 13px; }
+    .kpi .value { font-size: 24px; font-weight: bold; margin-top: 6px; }
+    .muted { color: var(--muted); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .pill {
+      display: inline-block;
+      background: #e0f2fe;
+      color: #075985;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .warn {
+      color: var(--warn);
+      font-weight: bold;
+    }
+    .right { text-align: right; }
+    .footer-note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="clinicTitle">Dental Clinic Management App</h1>
+    <p id="clinicSubtitle">Patients, appointments, doctors, daily register, expenses, reports and reminders in one place.</p>
+  </header>
+
+  <div class="topbar">
+    <div class="muted">Data is saved in your browser on this device.</div>
+    <div class="actions">
+      <button class="ghost" id="seedDemoBtn">Load Demo Data</button>
+      <button class="secondary" id="exportBtn">Export Backup</button>
+      <label class="ghost" style="padding:10px 14px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
+        Import Backup
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+      </label>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <section id="dashboard" class="page active"></section>
+  <section id="patients" class="page"></section>
+  <section id="appointments" class="page"></section>
+  <section id="daily" class="page"></section>
+  <section id="doctors" class="page"></section>
+  <section id="expenses" class="page"></section>
+  <section id="reports" class="page"></section>
+  <section id="paymentDetails" class="page"></section>
+  <section id="notifications" class="page"></section>
+
+<script>
+const STORAGE_KEY = 'dentalClinicAppDataV3';
+const bsMonths = ['Baishakh','Jestha','Asar','Shrawan','Bhadra','Ashoj','Kartik','Mangsir','Poush','Magh','Falgun','Chaitra'];
+const tabs = [
+  ['dashboard','Dashboard'],
+  ['patients','Patients'],
+  ['appointments','Appointments'],
+  ['daily','Daily Register'],
+  ['doctors','Doctors'],
+  ['expenses','Expenses'],
+  ['reports','Reports'],
+  ['paymentDetails','Payment Detail'],
+  ['notifications','Notifications']
+];
+
+const defaultData = {
+  clinic: {
+    name: 'Your Dental Clinic',
+    location: 'Clinic Location',
+    phone: 'Phone Number'
+  },
+  patients: [],
+  appointments: [],
+  doctors: [
+    {id: uid(), name: 'Dr. Srishti Poudel', percent: 20},
+    {id: uid(), name: 'Dr. Asha Adhikari', percent: 50},
+    {id: uid(), name: 'Dr. Mohammad Wolid', percent: 50},
+    {id: uid(), name: 'Dr. Utsav Gautam', percent: 60},
+    {id: uid(), name: 'Dr. Arun Kumar Mahat', percent: 50},
+  ],
+  dailyEntries: [],
+  expenses: [],
+  notifications: []
+};
+
+let state = loadState();
+let currentTab = 'dashboard';
+let currentPaymentDetailReg = '';
+const editState = { patientId: null, appointmentId: null, dailyId: null, doctorId: null, expenseId: null };
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+function loadState() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return structuredClone(defaultData);
+  try {
+    const parsed = JSON.parse(saved);
+    return {
+      ...structuredClone(defaultData),
+      ...parsed,
+      doctors: Array.isArray(parsed.doctors) && parsed.doctors.length ? parsed.doctors : structuredClone(defaultData.doctors)
+    };
+  } catch {
+    return structuredClone(defaultData);
+  }
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+function getClinic() {
+  return { name: state.clinic?.name || 'Your Dental Clinic', location: state.clinic?.location || 'Clinic Location', phone: state.clinic?.phone || 'Phone Number' };
+}
+function updateClinicBranding() {
+  const clinic = getClinic();
+  document.title = clinic.name + ' Dashboard';
+  const titleEl = document.getElementById('clinicTitle');
+  const subEl = document.getElementById('clinicSubtitle');
+  if (titleEl) titleEl.textContent = clinic.name + ' Management App';
+  if (subEl) subEl.textContent = clinic.location + ' | Phone: ' + clinic.phone;
+}
+function money(n) {
+  return 'Rs. ' + (Number(n || 0)).toLocaleString('en-IN', {maximumFractionDigits: 2});
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function getDoctorPercent(name) {
+  const doctor = state.doctors.find(d => d.name === name);
+  return doctor ? Number(doctor.percent || 0) : 0;
+}
+function matchBsYearMonthDay(obj, year, month, day='') {
+  return (!year || obj.bsYear === year) && (!month || obj.bsMonth === month) && (!day || String(obj.bsDay) === String(day));
+}
+function fullBs(obj) {
+  return `${obj.bsYear || ''} ${obj.bsMonth || ''} ${obj.bsDay || ''}`.trim();
+}
+function fullFinancialBs(obj) {
+  return `${obj.financialBsYear || ''} ${obj.financialBsMonth || ''} ${obj.financialBsDay || ''}`.trim();
+}
+function bsMonthIndex(month) {
+  const idx = bsMonths.indexOf(month);
+  return idx === -1 ? -1 : idx;
+}
+function compareBsDateParts(aYear='', aMonth='', aDay='', bYear='', bMonth='', bDay='') {
+  const ay = Number(aYear || 0), by = Number(bYear || 0);
+  if (ay !== by) return ay - by;
+  const am = bsMonthIndex(aMonth), bm = bsMonthIndex(bMonth);
+  if (am !== bm) return am - bm;
+  return Number(aDay || 0) - Number(bDay || 0);
+}
+function totalForDailyEntry(entry) {
+  return Number(entry.totalAmount || 0);
+}
+function labForDailyEntry(entry) {
+  return Number(entry.labExpense || 0);
+}
+function taxableBase(entry) {
+  return Math.max(0, totalForDailyEntry(entry) - labForDailyEntry(entry));
+}
+function doctorShare(entry) {
+  const pct = getDoctorPercent(entry.doctor);
+  return taxableBase(entry) * pct / 100;
+}
+function netAmount(entry) {
+  return taxableBase(entry) - doctorShare(entry);
+}
+function expenseTotalForMonth(year, month='') {
+  return state.expenses.filter(e => matchBsYearMonthDay(e, year, month)).reduce((a,e)=>a+Number(e.amount||0),0);
+}
+function collectYears() {
+  const years = Array.from(new Set([
+    ...state.patients.map(x=>x.bsYear),
+    ...state.appointments.map(x=>x.bsYear),
+    ...state.dailyEntries.map(x=>x.bsYear),
+    ...state.dailyEntries.map(x=>x.financialBsYear),
+    ...state.expenses.map(x=>x.bsYear),
+    '2080','2081','2082','2083','2084','2085'
+  ].filter(Boolean))).sort();
+  return years;
+}
+function yearSelectOptions(selected='') {
+  return `<option value="">Select year</option>${collectYears().map(y => `<option ${String(y)===String(selected)?'selected':''}>${esc(y)}</option>`).join('')}`;
+}
+
+function monthOptions(selected='', placeholder='Select month', allLabel='') {
+  const first = allLabel ? `<option value="">${esc(allLabel)}</option>` : `<option value="">${esc(placeholder)}</option>`;
+  return first + bsMonths.map(m => `<option value="${esc(m)}" ${String(m)===String(selected)?'selected':''}>${esc(m)}</option>`).join('');
+}
+function dayOptions(selected='') {
+  const days = Array.from({length: 32}, (_, i) => i).slice(1);
+  return `<option value="">Select day</option>` + days.map(d => `<option value="${d}" ${String(d)===String(selected)?'selected':''}>${d}</option>`).join('');
+}
+function clearEditState() {
+  editState.patientId = null;
+  editState.appointmentId = null;
+  editState.dailyId = null;
+  editState.doctorId = null;
+  editState.expenseId = null;
+}
+function cancelEdit(type) {
+  if (type === 'patient') editState.patientId = null;
+  if (type === 'appointment') editState.appointmentId = null;
+  if (type === 'daily') editState.dailyId = null;
+  if (type === 'doctor') editState.doctorId = null;
+  if (type === 'expense') editState.expenseId = null;
+  renderAll();
+}
+function updatePatientReferences(oldName, patientObj) {
+  state.appointments = state.appointments.map(a => (a.patientId === patientObj.id || a.patientName === oldName)
+    ? { ...a, patientId: patientObj.id, patientName: patientObj.name, registrationNumber: patientObj.registrationNumber }
+    : a);
+  state.dailyEntries = state.dailyEntries.map(d => (d.patientId === patientObj.id || d.patientName === oldName || d.registrationNumber === patientObj.registrationNumber)
+    ? { ...d, patientId: patientObj.id, patientName: patientObj.name, registrationNumber: patientObj.registrationNumber, bsYear: patientObj.bsYear, bsMonth: patientObj.bsMonth, bsDay: patientObj.bsDay, treatment: patientObj.treatment, totalPaymentDue: Number(patientObj.totalPayment || 0), totalAmount: Number(patientObj.totalPayment || 0), labExpense: Number(patientObj.labExpense || 0) }
+    : d);
+  state.notifications = state.notifications.map(n => ({
+    ...n,
+    message: String(n.message || '').split(oldName).join(patientObj.name)
+  }));
+}
+function updateDoctorReferences(oldName, doctorObj) {
+  state.patients = state.patients.map(p => p.doctorSpecified === oldName ? { ...p, doctorSpecified: doctorObj.name } : p);
+  state.appointments = state.appointments.map(a => a.doctor === oldName ? { ...a, doctor: doctorObj.name } : a);
+  state.dailyEntries = state.dailyEntries.map(d => d.doctor === oldName ? { ...d, doctor: doctorObj.name } : d);
+  state.notifications = state.notifications.map(n => ({
+    ...n,
+    message: String(n.message || '').split(oldName).join(doctorObj.name)
+  }));
+}
+function computeMonthlySummary(year, month='') {
+  const entries = state.dailyEntries.filter(e => matchBsYearMonthDay(e, year, month));
+  const totalCollection = entries.reduce((a,e)=>a+totalForDailyEntry(e),0);
+  const labExpenses = entries.reduce((a,e)=>a+labForDailyEntry(e),0);
+  const doctorsPercentage = entries.reduce((a,e)=>a+doctorShare(e),0);
+  const expenses = expenseTotalForMonth(year, month);
+  const net = totalCollection - labExpenses - doctorsPercentage - expenses;
+  return {entries, totalCollection, labExpenses, doctorsPercentage, expenses, net};
+}
+function monthlyRowsForYear(year) {
+  return bsMonths.map(month => ({ month, ...computeMonthlySummary(year, month) }));
+}
+function doctorWiseRows(year, month='') {
+  return state.doctors.map(d => {
+    const entries = state.dailyEntries.filter(e => matchBsYearMonthDay(e, year, month) && e.doctor === d.name);
+    const amount = entries.reduce((a,e)=>a + (taxableBase(e) * Number(d.percent || 0) / 100), 0);
+    return { doctor: d.name, amount, percent: Number(d.percent || 0) };
+  }).filter(r => r.amount > 0 || r.percent > 0);
+}
+function detailedMonthlyPatientRows(year, month='') {
+  const grouped = new Map();
+  state.dailyEntries.filter(e => matchBsYearMonthDay(e, year, month)).forEach(entry => {
+    const reg = String(entry.registrationNumber || '').trim();
+    const patient = state.patients.find(p => String(p.registrationNumber || '') === reg || p.id === entry.patientId);
+    const key = reg || String(entry.patientId || entry.id);
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        registrationNumber: reg || patient?.registrationNumber || '',
+        patientId: patient?.id || entry.patientId || '',
+        name: patient?.name || entry.patientName || '',
+        totalAmount: 0,
+        labExpenses: 0,
+        doctorsPercentage: 0,
+        netAmount: 0
+      });
+    }
+    const row = grouped.get(key);
+    row.totalAmount += totalForDailyEntry(entry);
+    row.labExpenses += labForDailyEntry(entry);
+    row.doctorsPercentage += doctorShare(entry);
+    row.netAmount += netAmount(entry);
+  });
+  return Array.from(grouped.values()).sort((a,b) => String(a.registrationNumber).localeCompare(String(b.registrationNumber), undefined, {numeric:true, sensitivity:'base'}));
+}
+function detailedMonthlyPatientTotals(rows) {
+  return rows.reduce((acc, row) => ({
+    totalAmount: acc.totalAmount + Number(row.totalAmount || 0),
+    labExpenses: acc.labExpenses + Number(row.labExpenses || 0),
+    doctorsPercentage: acc.doctorsPercentage + Number(row.doctorsPercentage || 0),
+    netAmount: acc.netAmount + Number(row.netAmount || 0)
+  }), { totalAmount: 0, labExpenses: 0, doctorsPercentage: 0, netAmount: 0 });
+}
+function openPaymentDetailByReg(reg) {
+  currentPaymentDetailReg = String(reg || '');
+  switchTab('paymentDetails');
+}
+function printMonthlySummaryReport() {
+  const area = document.getElementById('monthlySummaryPrintArea');
+  if (!area) return;
+  const clinic = getClinic();
+  const selectedYear = document.getElementById('reportYear')?.value || '';
+  const selectedMonth = document.getElementById('reportMonth')?.value || '';
+  const title = selectedYear && selectedMonth ? `Monthly Summary - ${selectedYear} ${selectedMonth}` : 'Monthly Summary';
+  const win = window.open('', '_blank');
+  win.document.write(`<!doctype html><html><head><title>${esc(clinic.name)} ${esc(title)}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111} h1,h2,h3{margin:8px 0} .head{text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px} table{width:100%;border-collapse:collapse;margin-top:10px} th,td{border:1px solid #777;padding:8px;text-align:left} th{text-align:center;background:#f3f4f6} tfoot td{font-weight:700;background:#f9fafb} .meta{margin:10px 0 16px 0;font-weight:600}</style></head><body>${area.innerHTML}</body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+function patientName(id) {
+  return state.patients.find(p => p.id === id)?.name || '';
+}
+function renderTabs() {
+  const el = document.getElementById('tabs');
+  el.innerHTML = tabs.map(([id, label]) => `<button type="button" class="tab-btn ${currentTab===id?'active':''}" data-tab="${id}" onclick="switchTab('${id}')">${label}</button>`).join('');
+}
+function renderCurrentTab() {
+  const renderers = {
+    dashboard: renderDashboard,
+    patients: renderPatients,
+    appointments: renderAppointments,
+    daily: renderDaily,
+    doctors: renderDoctors,
+    expenses: renderExpenses,
+    reports: renderReports,
+    paymentDetails: renderPaymentDetails,
+    notifications: renderNotifications
+  };
+  const fn = renderers[currentTab];
+  if (fn) fn();
+}
+function switchTab(id) {
+  currentTab = id;
+  renderTabs();
+  renderCurrentTab();
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === id));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+}
+
+function renderDashboard() {
+  const clinic = getClinic();
+  const upcoming = state.appointments
+    .slice()
+    .sort((a,b) => `${a.bsYear}-${a.bsMonth}-${a.bsDay}`.localeCompare(`${b.bsYear}-${b.bsMonth}-${b.bsDay}`))
+    .slice(0,5);
+  const totalCollection = state.dailyEntries.reduce((a,e)=>a+totalForDailyEntry(e),0);
+  const totalLab = state.dailyEntries.reduce((a,e)=>a+labForDailyEntry(e),0);
+  const totalDoctor = state.dailyEntries.reduce((a,e)=>a+doctorShare(e),0);
+  const el = document.getElementById('dashboard');
+  el.innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><div class="label">Total Patients</div><div class="value">${state.patients.length}</div></div>
+      <div class="kpi"><div class="label">Appointments</div><div class="value">${state.appointments.length}</div></div>
+      <div class="kpi"><div class="label">Total Collection</div><div class="value">${money(totalCollection)}</div></div>
+      <div class="kpi"><div class="label">Doctor Percentage</div><div class="value">${money(totalDoctor)}</div></div>
+      <div class="kpi"><div class="label">Lab Expenses</div><div class="value">${money(totalLab)}</div></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h2>${esc(clinic.name)}</h2>
+        <p><strong>Location:</strong> ${esc(clinic.location)}</p>
+        <p><strong>Phone:</strong> ${esc(clinic.phone)}</p>
+        <form id="clinicProfileForm">
+          <div class="grid">
+            <div class="field"><label>Dental Clinic Name</label><input name="name" value="${esc(clinic.name)}" required></div>
+            <div class="field"><label>Location</label><input name="location" value="${esc(clinic.location)}" required></div>
+            <div class="field"><label>Phone Number</label><input name="phone" value="${esc(clinic.phone)}" required></div>
+          </div>
+          <button type="submit">Save Clinic Details</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Upcoming Appointments</h2>
+        ${upcoming.length ? `<ul>${upcoming.map(a => `<li><strong>${esc(a.patientName)}</strong> — ${esc(a.doctor)} — ${fullBs(a)}</li>`).join('')}</ul>` : '<p class="muted">No appointments added yet.</p>'}
+      </div>
+      <div class="card">
+        <h2>Quick Notes</h2>
+        <p class="muted">Patient registration number is the main link between patient, daily register, and payment detail.</p>
+        <p class="muted">Payment Detail now prints as a clinic bill using the patient date from the Patient tab.</p>
+      </div>
+    </div>`;
+  document.getElementById('clinicProfileForm').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    state.clinic = {
+      name: String(f.get('name') || '').trim(),
+      location: String(f.get('location') || '').trim(),
+      phone: String(f.get('phone') || '').trim()
+    };
+    saveState();
+    updateClinicBranding();
+    renderDashboard();
+  };
+}
+
+function renderPatients() {
+  const el = document.getElementById('patients');
+  const doctorOptions = state.doctors.map(d => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('');
+  const editPatient = state.patients.find(p => p.id === editState.patientId) || null;
+  el.innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <h2>${editPatient ? 'Edit Patient' : 'Add Patient'}</h2>
+        <form id="patientForm">
+          <div class="grid">
+            <div class="field"><label>Registration Number</label><input name="registrationNumber" required value="${esc(editPatient?.registrationNumber || '')}" placeholder="Manual input"></div>
+            <div class="field"><label>Patient Name</label><input name="name" required value="${esc(editPatient?.name || '')}"></div>
+          </div>
+          <div class="field"><label>Contact Number</label><input name="contact" value="${esc(editPatient?.contact || '')}"></div>
+          <div class="field"><label>Age</label><input name="age" type="number" min="0" value="${esc(editPatient?.age || '')}"></div>
+          <div class="field"><label>Sex</label>
+            <select name="sex"><option value="">Select</option><option ${editPatient?.sex==='Male'?'selected':''}>Male</option><option ${editPatient?.sex==='Female'?'selected':''}>Female</option><option ${editPatient?.sex==='Other'?'selected':''}>Other</option></select>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Year (B.S.)</label><select name="bsYear" required>${yearSelectOptions(editPatient?.bsYear || '')}</select></div>
+            <div class="field"><label>Month (B.S.)</label><select name="bsMonth" required>${monthOptions(editPatient?.bsMonth || '')}</select></div>
+            <div class="field"><label>Day (B.S.)</label><select name="bsDay" required>${dayOptions(editPatient?.bsDay || '')}</select></div>
+          </div>
+          <div class="field"><label>Treatment Done</label><textarea name="treatment">${esc(editPatient?.treatment || '')}</textarea></div>
+          <div class="grid">
+            <div class="field"><label>Total Payment</label><input name="totalPayment" type="number" min="0" step="0.01" value="${esc(editPatient?.totalPayment || '')}"></div>
+            <div class="field"><label>Lab Expense</label><input name="labExpense" type="number" min="0" step="0.01" value="${esc(editPatient?.labExpense || '')}"></div>
+          </div>
+          <div class="field"><label>Doctor Specified</label><select name="doctorSpecified"><option value="">Select doctor</option>${doctorOptions}</select></div>
+          <div class="row">
+            <button type="submit">${editPatient ? 'Update Patient' : 'Save Patient'}</button>
+            ${editPatient ? '<button type="button" class="ghost" onclick="cancelEdit(&quot;patient&quot;)">Cancel</button>' : ''}
+          </div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Patient List</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Reg. No.</th><th>Name</th><th>Contact</th><th>B.S. Date</th><th>Treatment</th><th>Total Payment</th><th>Lab Expense</th><th>Doctor</th><th>Action</th></tr></thead>
+            <tbody>
+              ${state.patients.length ? state.patients.map(p => `
+                <tr>
+                  <td>${esc(p.registrationNumber || '')}</td>
+                  <td>${esc(p.name)}</td>
+                  <td>${esc(p.contact)}</td>
+                  <td>${fullBs(p)}</td>
+                  <td>${esc(p.treatment)}</td>
+                  <td>${money(p.totalPayment)}</td>
+                  <td>${money(p.labExpense)}</td>
+                  <td>${esc(p.doctorSpecified)}</td>
+                  <td><div class="row"><button class="small ghost" onclick="startEditPatient('${p.id}')">Edit</button><button class="danger small" onclick="deletePatient('${p.id}')">Delete</button></div></td>
+                </tr>`).join('') : '<tr><td colspan="9" class="muted">No patients saved yet.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+
+  document.querySelector('#patientForm select[name="doctorSpecified"]').value = editPatient?.doctorSpecified || '';
+  document.getElementById('patientForm').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const patientObj = {
+      id: editPatient ? editPatient.id : uid(),
+      registrationNumber: f.get('registrationNumber').trim(),
+      name: f.get('name').trim(),
+      contact: f.get('contact').trim(),
+      age: f.get('age'),
+      sex: f.get('sex'),
+      bsYear: f.get('bsYear').trim(),
+      bsMonth: f.get('bsMonth'),
+      bsDay: f.get('bsDay'),
+      treatment: f.get('treatment').trim(),
+      totalPayment: Number(f.get('totalPayment') || 0),
+      labExpense: Number(f.get('labExpense') || 0),
+      doctorSpecified: f.get('doctorSpecified')
+    };
+    const duplicateReg = state.patients.find(p => p.registrationNumber === patientObj.registrationNumber && p.id !== patientObj.id);
+    if (duplicateReg) {
+      alert('Registration number already exists.');
+      return;
+    }
+    if (editPatient) {
+      const oldName = editPatient.name;
+      state.patients = state.patients.map(p => p.id === editPatient.id ? patientObj : p);
+      updatePatientReferences(oldName, patientObj);
+      editState.patientId = null;
+    } else {
+      state.patients.unshift(patientObj);
+    }
+    saveState();
+    renderAll();
+    e.target.reset();
+  };
+}
+function startEditPatient(id) {
+  editState.patientId = id;
+  currentTab = 'patients';
+  renderAll();
+}
+function deletePatient(id) {
+  const p = state.patients.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm(`Delete patient ${p.name}?`)) return;
+  state.patients = state.patients.filter(x => x.id !== id);
+  state.appointments = state.appointments.filter(a => a.patientId !== id && a.patientName !== p.name);
+  state.dailyEntries = state.dailyEntries.filter(d => d.patientId !== id && d.patientName !== p.name);
+  saveState(); renderAll();
+}
+
+function renderAppointments() {
+  const el = document.getElementById('appointments');
+  const patientOptions = state.patients.map(p => `<option value="${p.id}">${esc(p.name)} — ${esc(p.contact || '')}</option>`).join('');
+  const doctorOptions = state.doctors.map(d => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('');
+  const filterDoctor = document.getElementById('appointmentDoctorFilter')?.value || '';
+  const filterYear = document.getElementById('appointmentYearFilter')?.value || '';
+  const filterMonth = document.getElementById('appointmentMonthFilter')?.value || '';
+  const editAppointment = state.appointments.find(a => a.id === editState.appointmentId) || null;
+  const filtered = state.appointments.filter(a => (!filterDoctor || a.doctor === filterDoctor) && (!filterYear || a.bsYear === filterYear) && (!filterMonth || a.bsMonth === filterMonth));
+  el.innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <h2>${editAppointment ? 'Edit Appointment' : 'Add Appointment'}</h2>
+        <form id="appointmentForm">
+          <div class="field"><label>Patient</label><select name="patientId" required><option value="">Select patient</option>${patientOptions}</select></div>
+          <div class="field"><label>Doctor</label><select name="doctor" required><option value="">Select doctor</option>${doctorOptions}</select></div>
+          <div class="grid">
+            <div class="field"><label>Year (B.S.)</label><select name="bsYear" required>${yearSelectOptions(editAppointment?.bsYear || '')}</select></div>
+            <div class="field"><label>Month (B.S.)</label><select name="bsMonth" required>${monthOptions(editAppointment?.bsMonth || '')}</select></div>
+            <div class="field"><label>Day (B.S.)</label><select name="bsDay" required>${dayOptions(editAppointment?.bsDay || '')}</select></div>
+          </div>
+          <div class="field"><label>Notes</label><textarea name="notes">${esc(editAppointment?.notes || '')}</textarea></div>
+          <div class="row"><button type="submit">${editAppointment ? 'Update Appointment' : 'Save Appointment'}</button>${editAppointment ? '<button type="button" class="ghost" onclick="cancelEdit(&quot;appointment&quot;)">Cancel</button>' : ''}</div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Appointment List</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <select id="appointmentDoctorFilter"><option value="">All Doctors</option>${doctorOptions}</select>
+          <select id="appointmentYearFilter">${yearSelectOptions(filterYear)}</select>
+          <select id="appointmentMonthFilter">${monthOptions(filterMonth, 'Select month', 'All Months')}</select>
+          <button class="ghost" id="appointmentFilterBtn">Filter</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Patient</th><th>Doctor</th><th>Date (B.S.)</th><th>Notes</th><th>Action</th></tr></thead>
+            <tbody>
+              ${filtered.length ? filtered.map(a => `
+              <tr>
+                <td>${esc(a.patientName)}</td>
+                <td>${esc(a.doctor)}</td>
+                <td>${fullBs(a)}</td>
+                <td>${esc(a.notes)}</td>
+                <td><div class="row"><button class="small ghost" onclick="startEditAppointment('${a.id}')">Edit</button><button class="danger small" onclick="deleteAppointment('${a.id}')">Delete</button></div></td>
+              </tr>`).join('') : '<tr><td colspan="5" class="muted">No appointments for this filter.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('appointmentDoctorFilter').value = filterDoctor;
+  document.querySelector('#appointmentForm select[name="patientId"]').value = editAppointment?.patientId || '';
+  document.querySelector('#appointmentForm select[name="doctor"]').value = editAppointment?.doctor || '';
+  document.getElementById('appointmentFilterBtn').onclick = () => renderAppointments();
+  document.getElementById('appointmentForm').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const patientId = f.get('patientId');
+    const p = state.patients.find(x => x.id === patientId);
+    const appointmentObj = {
+      id: editAppointment ? editAppointment.id : uid(),
+      patientId,
+      patientName: p ? p.name : '',
+      doctor: f.get('doctor'),
+      bsYear: f.get('bsYear').trim(),
+      bsMonth: f.get('bsMonth'),
+      bsDay: f.get('bsDay'),
+      notes: f.get('notes').trim()
+    };
+    if (editAppointment) {
+      state.appointments = state.appointments.map(a => a.id === editAppointment.id ? appointmentObj : a);
+      state.notifications = state.notifications.map(n => n.message === `${editAppointment.patientName} has an appointment with ${editAppointment.doctor} on ${editAppointment.bsYear} ${editAppointment.bsMonth} ${editAppointment.bsDay}.` ? { ...n, message: `${appointmentObj.patientName} has an appointment with ${appointmentObj.doctor} on ${appointmentObj.bsYear} ${appointmentObj.bsMonth} ${appointmentObj.bsDay}.`, bsYear: appointmentObj.bsYear, bsMonth: appointmentObj.bsMonth, bsDay: appointmentObj.bsDay } : n);
+      editState.appointmentId = null;
+    } else {
+      state.appointments.unshift(appointmentObj);
+      state.notifications.unshift({
+        id: uid(),
+        type: 'Appointment Reminder',
+        message: `${p ? p.name : 'Patient'} has an appointment with ${f.get('doctor')} on ${f.get('bsYear')} ${f.get('bsMonth')} ${f.get('bsDay')}.`,
+        bsYear: f.get('bsYear').trim(),
+        bsMonth: f.get('bsMonth'),
+        bsDay: f.get('bsDay')
+      });
+    }
+    saveState(); renderAll(); e.target.reset();
+  };
+}
+function startEditAppointment(id) {
+  editState.appointmentId = id;
+  currentTab = 'appointments';
+  renderAll();
+}
+function deleteAppointment(id) {
+  if (!confirm('Delete this appointment?')) return;
+  state.appointments = state.appointments.filter(a => a.id !== id);
+  saveState(); renderAll();
+}
+
+function patientFinancialSummaryById(patientId, excludeDailyId='') {
+  const patient = state.patients.find(p => p.id === patientId);
+  const totalPaymentDue = Number(patient?.totalPayment || 0);
+  const paymentTillNow = state.dailyEntries.filter(d => d.patientId === patientId && d.id !== excludeDailyId).reduce((a,d)=>a+Number(d.todaysPayment || 0),0);
+  const pending = Math.max(0, totalPaymentDue - paymentTillNow);
+  return { totalPaymentDue, paymentTillNow, pending, patient };
+}
+function updateDailyPatientLinkedFields() {
+  const form = document.getElementById('dailyForm');
+  if (!form) return;
+  const regNo = form.querySelector('[name="registrationNumber"]').value;
+  const patient = state.patients.find(p => String(p.registrationNumber) === String(regNo));
+  form.querySelector('[name="patientId"]').value = patient?.id || '';
+  form.querySelector('[name="patientName"]').value = patient?.name || '';
+  form.querySelector('[name="bsYear"]').value = patient?.bsYear || '';
+  form.querySelector('[name="bsMonth"]').value = patient?.bsMonth || '';
+  form.querySelector('[name="bsDay"]').value = patient?.bsDay || '';
+  form.querySelector('[name="treatment"]').value = patient?.treatment || '';
+  form.querySelector('[name="totalAmount"]').value = patient?.totalPayment || 0;
+  form.querySelector('[name="labExpense"]').value = patient?.labExpense || 0;
+  const summary = patientFinancialSummaryById(patient?.id || '', editState.dailyId || '');
+  const todaysPayment = Number(form.querySelector('[name="todaysPayment"]').value || 0);
+  form.querySelector('[name="totalPaymentDue"]').value = summary.totalPaymentDue || 0;
+  form.querySelector('[name="paymentTillNow"]').value = summary.paymentTillNow + todaysPayment;
+  form.querySelector('[name="pending"]').value = Math.max(0, summary.totalPaymentDue - (summary.paymentTillNow + todaysPayment));
+  if (!editState.dailyId) {
+    form.querySelector('[name="financialBsYear"]').value = patient?.bsYear || '';
+    form.querySelector('[name="financialBsMonth"]').value = patient?.bsMonth || '';
+    form.querySelector('[name="financialBsDay"]').value = patient?.bsDay || '';
+  }
+}
+function filterDailyListByRegistration(regNo='') {
+  const body = document.getElementById('dailyListBody');
+  if (!body) return;
+  const rows = Array.from(body.querySelectorAll('tr[data-reg]'));
+  let visible = 0;
+  rows.forEach(row => {
+    const show = !!regNo && row.dataset.reg === String(regNo);
+    row.style.display = show ? '' : 'none';
+    if (show) visible += 1;
+  });
+  let emptyRow = document.getElementById('dailyListEmptyRow');
+  if (!emptyRow) {
+    emptyRow = document.createElement('tr');
+    emptyRow.id = 'dailyListEmptyRow';
+    emptyRow.innerHTML = '<td colspan="13" class="muted">No daily register entries for the selected registration number.</td>';
+    body.appendChild(emptyRow);
+  }
+  emptyRow.style.display = (!regNo || visible > 0) ? 'none' : '';
+}
+function renderDaily() {
+  const el = document.getElementById('daily');
+  const doctorOptions = state.doctors.map(d => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('');
+  const regOptions = state.patients.map(p => `<option value="${esc(p.registrationNumber || '')}">${esc(p.registrationNumber || '')} — ${esc(p.name)}</option>`).join('');
+  const editDaily = state.dailyEntries.find(d => d.id === editState.dailyId) || null;
+  const selectedPatient = editDaily ? state.patients.find(p => p.id === editDaily.patientId) : null;
+  const paymentBase = patientFinancialSummaryById(editDaily?.patientId || '', editDaily?.id || '');
+  const editTodaysPayment = Number(editDaily?.todaysPayment || 0);
+  el.innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <h2>${editDaily ? 'Edit Daily Register Entry' : 'Add Daily Register Entry'}</h2>
+        <form id="dailyForm">
+          <input type="hidden" name="patientId" value="${esc(editDaily?.patientId || '')}">
+          <div class="field"><label>Registration Number</label><select name="registrationNumber" required><option value="">Select registration number</option>${regOptions}</select></div>
+          <div class="grid">
+            <div class="field"><label>Patient Name</label><input name="patientName" readonly value="${esc(selectedPatient?.name || editDaily?.patientName || '')}"></div>
+            <div class="field"><label>Doctor</label><select name="doctor" required><option value="">Select doctor</option>${doctorOptions}</select></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Year (B.S.)</label><input name="bsYear" readonly value="${esc(selectedPatient?.bsYear || editDaily?.bsYear || '')}"></div>
+            <div class="field"><label>Month (B.S.)</label><input name="bsMonth" readonly value="${esc(selectedPatient?.bsMonth || editDaily?.bsMonth || '')}"></div>
+            <div class="field"><label>Day (B.S.)</label><input name="bsDay" readonly value="${esc(selectedPatient?.bsDay || editDaily?.bsDay || '')}"></div>
+          </div>
+          <div class="field"><label>Treatment Done</label><textarea name="treatment" readonly>${esc(selectedPatient?.treatment || editDaily?.treatment || '')}</textarea></div>
+          <div class="grid">
+            <div class="field"><label>Total Amount</label><input name="totalAmount" readonly value="${esc(selectedPatient?.totalPayment || editDaily?.totalAmount || 0)}"></div>
+            <div class="field"><label>Lab Expense</label><input name="labExpense" readonly value="${esc(selectedPatient?.labExpense || editDaily?.labExpense || 0)}"></div>
+          </div>
+          <h3>Financial Detail of Patient</h3>
+          <div class="grid">
+            <div class="field"><label>Year (B.S.)</label><select name="financialBsYear" required>${yearSelectOptions(editDaily?.financialBsYear || selectedPatient?.bsYear || '')}</select></div>
+            <div class="field"><label>Month (B.S.)</label><select name="financialBsMonth" required>${monthOptions(editDaily?.financialBsMonth || selectedPatient?.bsMonth || '')}</select></div>
+            <div class="field"><label>Day (B.S.)</label><select name="financialBsDay" required>${dayOptions(editDaily?.financialBsDay || selectedPatient?.bsDay || '')}</select></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Total Payment To Be Done</label><input name="totalPaymentDue" readonly value="${esc(selectedPatient?.totalPayment || editDaily?.totalPaymentDue || 0)}"></div>
+            <div class="field"><label>Today's Payment</label><input name="todaysPayment" type="number" min="0" step="0.01" value="${esc(editTodaysPayment || '')}"></div>
+            <div class="field"><label>Payment Till Now</label><input name="paymentTillNow" readonly value="${paymentBase.paymentTillNow + editTodaysPayment}"></div>
+            <div class="field"><label>Pending</label><input name="pending" readonly value="${Math.max(0, paymentBase.totalPaymentDue - (paymentBase.paymentTillNow + editTodaysPayment))}"></div>
+          </div>
+          <div class="row"><button type="submit">${editDaily ? 'Update Entry' : 'Save Entry'}</button>${editDaily ? '<button type="button" class="ghost" onclick="cancelEdit(&quot;daily&quot;)">Cancel</button>' : ''}</div>
+          <div class="footer-note">Patient details are linked from the Patient tab using registration number.</div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Daily Register List</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <div class="field" style="min-width:260px;margin:0;">
+            <label>Selected Registration Number List</label>
+            <select id="dailyListRegFilter"><option value="">Select registration number</option>${regOptions}</select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Reg. No.</th><th>Date</th><th>Patient</th><th>Treatment</th><th>Doctor</th><th>Total</th><th>Today's Payment</th><th>Payment Till Now</th><th>Pending</th><th>Lab</th><th>Doctor %</th><th>Net</th><th>Action</th></tr></thead>
+            <tbody id="dailyListBody">
+            ${state.dailyEntries.length ? state.dailyEntries.map(d => `
+              <tr data-reg="${esc(d.registrationNumber || '')}">
+                <td>${esc(d.registrationNumber || '')}</td>
+                <td>${fullBs(d)}</td>
+                <td>${esc(d.patientName)}</td>
+                <td>${esc(d.treatment)}</td>
+                <td>${esc(d.doctor)}</td>
+                <td>${money(d.totalAmount)}</td>
+                <td>${money(d.todaysPayment)}</td>
+                <td>${money(d.paymentTillNow)}</td>
+                <td>${money(d.pending)}</td>
+                <td>${money(d.labExpense)}</td>
+                <td>${money(doctorShare(d))}</td>
+                <td>${money(netAmount(d))}</td>
+                <td><div class="row"><button class="small ghost" onclick="startEditDaily('${d.id}')">Edit</button><button class="danger small" onclick="deleteDaily('${d.id}')">Delete</button></div></td>
+              </tr>`).join('') : '<tr><td colspan="13" class="muted">No daily register entries yet.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  const currentRegSelection = selectedPatient?.registrationNumber || editDaily?.registrationNumber || '';
+  document.querySelector('#dailyForm select[name="registrationNumber"]').value = currentRegSelection;
+  document.querySelector('#dailyForm select[name="doctor"]').value = editDaily?.doctor || selectedPatient?.doctorSpecified || '';
+  const listFilter = document.getElementById('dailyListRegFilter');
+  if (listFilter) listFilter.value = currentRegSelection;
+  document.querySelector('#dailyForm [name="registrationNumber"]').onchange = () => {
+    updateDailyPatientLinkedFields();
+    const selectedReg = document.querySelector('#dailyForm select[name="registrationNumber"]').value || '';
+    const filterEl = document.getElementById('dailyListRegFilter');
+    if (filterEl) filterEl.value = selectedReg;
+    filterDailyListByRegistration(selectedReg);
+  };
+  document.querySelector('#dailyForm [name="todaysPayment"]').oninput = updateDailyPatientLinkedFields;
+  if (listFilter) listFilter.onchange = () => filterDailyListByRegistration(listFilter.value || '');
+  updateDailyPatientLinkedFields();
+  filterDailyListByRegistration((listFilter && listFilter.value) || currentRegSelection || '');
+  document.getElementById('dailyForm').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const regNo = f.get('registrationNumber');
+    const patient = state.patients.find(p => String(p.registrationNumber) === String(regNo));
+    if (!patient) {
+      alert('Please select a valid registration number.');
+      return;
+    }
+    const summary = patientFinancialSummaryById(patient.id, editDaily?.id || '');
+    const todaysPayment = Number(f.get('todaysPayment') || 0);
+    const paymentTillNow = summary.paymentTillNow + todaysPayment;
+    const totalPaymentDue = Number(patient.totalPayment || 0);
+    const dailyObj = {
+      id: editDaily ? editDaily.id : uid(),
+      patientId: patient.id,
+      registrationNumber: patient.registrationNumber,
+      patientName: patient.name,
+      bsYear: patient.bsYear,
+      bsMonth: patient.bsMonth,
+      bsDay: patient.bsDay,
+      treatment: patient.treatment,
+      doctor: f.get('doctor'),
+      totalAmount: Number(patient.totalPayment || 0),
+      labExpense: Number(patient.labExpense || 0),
+      financialBsYear: f.get('financialBsYear').trim(),
+      financialBsMonth: f.get('financialBsMonth'),
+      financialBsDay: f.get('financialBsDay'),
+      totalPaymentDue,
+      todaysPayment,
+      paymentTillNow,
+      pending: Math.max(0, totalPaymentDue - paymentTillNow)
+    };
+    if (editDaily) {
+      state.dailyEntries = state.dailyEntries.map(d => d.id === editDaily.id ? dailyObj : d);
+      editState.dailyId = null;
+    } else {
+      state.dailyEntries.unshift(dailyObj);
+    }
+    saveState(); renderAll(); e.target.reset();
+  };
+}
+function startEditDaily(id) {
+  editState.dailyId = id;
+  currentTab = 'daily';
+  renderAll();
+}
+function deleteDaily(id) {
+  if (!confirm('Delete this daily register entry?')) return;
+  state.dailyEntries = state.dailyEntries.filter(d => d.id !== id);
+  saveState(); renderAll();
+}
+
+function renderDoctors() {
+  const el = document.getElementById('doctors');
+  const editDoctor = state.doctors.find(d => d.id === editState.doctorId) || null;
+  el.innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <h2>${editDoctor ? 'Edit Doctor' : 'Add Doctor'}</h2>
+        <form id="doctorForm">
+          <div class="field"><label>Doctor Name</label><input name="name" required value="${esc(editDoctor?.name || '')}"></div>
+          <div class="field"><label>Percentage (%)</label><input name="percent" type="number" min="0" max="100" step="0.01" required value="${esc(editDoctor?.percent || '')}"></div>
+          <div class="row"><button type="submit">${editDoctor ? 'Update Doctor' : 'Save Doctor'}</button>${editDoctor ? '<button type="button" class="ghost" onclick="cancelEdit(&quot;doctor&quot;)">Cancel</button>' : ''}</div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Doctor List</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Doctor</th><th>Percentage</th><th>Current Collection</th><th>Action</th></tr></thead>
+            <tbody>
+              ${state.doctors.length ? state.doctors.map(d => {
+                const rows = state.dailyEntries.filter(x => x.doctor === d.name);
+                const amount = rows.reduce((a,e)=>a+doctorShare(e),0);
+                return `<tr><td>${esc(d.name)}</td><td>${esc(d.percent)}%</td><td>${money(amount)}</td><td><div class="row"><button class="small ghost" onclick="startEditDoctor('${d.id}')">Edit</button><button class="danger small" onclick="deleteDoctor('${d.id}')">Delete</button></div></td></tr>`;
+              }).join('') : '<tr><td colspan="4" class="muted">No doctors added yet.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+        <div class="footer-note">Deleting a doctor will also remove that doctor from appointments and daily register entries using the same doctor name.</div>
+      </div>
+    </div>`;
+  document.getElementById('doctorForm').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const doctorObj = { id: editDoctor ? editDoctor.id : uid(), name: f.get('name').trim(), percent: Number(f.get('percent') || 0) };
+    if (editDoctor) {
+      const oldName = editDoctor.name;
+      state.doctors = state.doctors.map(d => d.id === editDoctor.id ? doctorObj : d);
+      updateDoctorReferences(oldName, doctorObj);
+      editState.doctorId = null;
+    } else {
+      state.doctors.push(doctorObj);
+    }
+    saveState(); renderAll(); e.target.reset();
+  };
+}
+function startEditDoctor(id) {
+  editState.doctorId = id;
+  currentTab = 'doctors';
+  renderAll();
+}
+function deleteDoctor(id) {
+  const doctor = state.doctors.find(d => d.id === id);
+  if (!doctor) return;
+  if (!confirm(`Delete doctor ${doctor.name}?`)) return;
+  state.doctors = state.doctors.filter(d => d.id !== id);
+  state.appointments = state.appointments.filter(a => a.doctor !== doctor.name);
+  state.dailyEntries = state.dailyEntries.filter(e => e.doctor !== doctor.name);
+  state.patients = state.patients.map(p => p.doctorSpecified === doctor.name ? {...p, doctorSpecified: ''} : p);
+  saveState(); renderAll();
+}
+
+function renderExpenses() {
+  const el = document.getElementById('expenses');
+  const yearFilter = document.getElementById('expenseYearFilter')?.value || '';
+  const monthFilter = document.getElementById('expenseMonthFilter')?.value || '';
+  const filteredExpenses = state.expenses.filter(x => (!yearFilter || x.bsYear === yearFilter) && (!monthFilter || x.bsMonth === monthFilter));
+  const editExpense = state.expenses.find(x => x.id === editState.expenseId) || null;
+  const isOtherEdit = editExpense?.category === 'Other Expense';
+  el.innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <h2>${editExpense ? 'Edit Expense' : 'Add Expense'}</h2>
+        <form id="expenseForm">
+          <div class="grid">
+            <div class="field"><label>Year (B.S.)</label><select name="bsYear" required>${yearSelectOptions(!isOtherEdit ? (editExpense?.bsYear || '') : '')}</select></div>
+            <div class="field"><label>Month (B.S.)</label><select name="bsMonth" required>${monthOptions(!isOtherEdit ? (editExpense?.bsMonth || '') : '')}</select></div>
+            <div class="field"><label>Day (B.S.)</label><select name="bsDay" required>${dayOptions(!isOtherEdit ? (editExpense?.bsDay || '') : '')}</select></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Rent</label><input name="rent" type="number" min="0" step="0.01" value="${editExpense?.title==='Rent' ? esc(editExpense.amount) : '0'}"></div>
+            <div class="field"><label>Electricity</label><input name="electricity" type="number" min="0" step="0.01" value="${editExpense?.title==='Electricity' ? esc(editExpense.amount) : '0'}"></div>
+            <div class="field"><label>Water Supply</label><input name="waterSupply" type="number" min="0" step="0.01" value="${editExpense?.title==='Water Supply' ? esc(editExpense.amount) : '0'}"></div>
+            <div class="field"><label>Salary - Doctor</label><input name="salaryDoctor" type="number" min="0" step="0.01" value="${editExpense?.title==='Salary - Doctor' ? esc(editExpense.amount) : '0'}"></div>
+            <div class="field"><label>Salary - Hygienist</label><input name="salaryHygienist" type="number" min="0" step="0.01" value="${editExpense?.title==='Salary - Hygienist' ? esc(editExpense.amount) : '0'}"></div>
+            <div class="field"><label>Salary - Cleaner</label><input name="salaryCleaner" type="number" min="0" step="0.01" value="${editExpense?.title==='Salary - Cleaner' ? esc(editExpense.amount) : '0'}"></div>
+            <div class="field"><label>Salary - Receptionist</label><input name="salaryReceptionist" type="number" min="0" step="0.01" value="${editExpense?.title==='Salary - Receptionist' ? esc(editExpense.amount) : '0'}"></div>
+          </div>
+          <div class="row"><button type="submit">${editExpense && !isOtherEdit ? 'Update Main Expense' : 'Save Main Expenses'}</button>${editExpense && !isOtherEdit ? '<button type="button" class="ghost" onclick="cancelEdit(&quot;expense&quot;)">Cancel</button>' : ''}</div>
+        </form>
+
+        <hr style="margin:18px 0;border:none;border-top:1px solid var(--line);">
+
+        <h3>Other Expenses</h3>
+        <form id="otherExpenseForm">
+          <div class="grid">
+            <div class="field"><label>Year (B.S.)</label><select name="bsYear" required>${yearSelectOptions(isOtherEdit ? (editExpense?.bsYear || '') : '')}</select></div>
+            <div class="field"><label>Month (B.S.)</label><select name="bsMonth" required>${monthOptions(isOtherEdit ? (editExpense?.bsMonth || '') : '')}</select></div>
+            <div class="field"><label>Day (B.S.)</label><select name="bsDay" required>${dayOptions(isOtherEdit ? (editExpense?.bsDay || '') : '')}</select></div>
+          </div>
+          <div class="grid">
+            <div class="field"><label>Other Expense Title</label><input name="otherTitle" placeholder="Example: Internet, Repair, Stationery" required value="${isOtherEdit ? esc(editExpense?.title || '') : ''}"></div>
+            <div class="field"><label>Other Expense Amount</label><input name="otherAmount" type="number" min="0" step="0.01" value="${isOtherEdit ? esc(editExpense?.amount || 0) : '0'}" required></div>
+          </div>
+          <div class="row"><button type="submit">${isOtherEdit ? 'Update Other Expense' : 'Save Other Expense'}</button>${isOtherEdit ? '<button type="button" class="ghost" onclick="cancelEdit(&quot;expense&quot;)">Cancel</button>' : ''}</div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Expenses</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <select id="expenseYearFilter">${yearSelectOptions(yearFilter)}</select>
+          <select id="expenseMonthFilter">${monthOptions(monthFilter, 'Select month', 'All Months')}</select>
+          <button class="ghost" id="expenseFilterBtn">Filter</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Title</th><th>Amount</th><th>Action</th></tr></thead><tbody>
+          ${filteredExpenses.length ? filteredExpenses.map(x=>`<tr><td>${fullBs(x)}</td><td>${esc(x.category || 'Expense')}</td><td>${esc(x.title)}</td><td>${money(x.amount)}</td><td><div class="row"><button class="small ghost" onclick="startEditExpense('${x.id}')">Edit</button><button class="danger small" onclick="deleteExpense('${x.id}')">Delete</button></div></td></tr>`).join('') : '<tr><td colspan="5" class="muted">No expenses added yet.</td></tr>'}
+        </tbody></table></div>
+      </div>
+    </div>`;
+  document.getElementById('expenseFilterBtn').onclick = () => renderExpenses();
+  document.getElementById('expenseForm').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const base = { bsYear: String(f.get('bsYear')).trim(), bsMonth: f.get('bsMonth'), bsDay: f.get('bsDay') };
+    const rows = [
+      ['Rent', Number(f.get('rent') || 0)],
+      ['Electricity', Number(f.get('electricity') || 0)],
+      ['Water Supply', Number(f.get('waterSupply') || 0)],
+      ['Salary - Doctor', Number(f.get('salaryDoctor') || 0)],
+      ['Salary - Hygienist', Number(f.get('salaryHygienist') || 0)],
+      ['Salary - Cleaner', Number(f.get('salaryCleaner') || 0)],
+      ['Salary - Receptionist', Number(f.get('salaryReceptionist') || 0)]
+    ].filter(([title, amount]) => title && amount > 0)
+     .map(([title, amount]) => ({ id: editExpense && !isOtherEdit ? editExpense.id : uid(), title, amount, category: 'Main Expense', ...base }));
+    if (!rows.length) {
+      alert('Enter at least one main expense amount.');
+      return;
+    }
+    if (editExpense && !isOtherEdit) {
+      state.expenses = state.expenses.map(x => x.id === editExpense.id ? rows[0] : x);
+      editState.expenseId = null;
+    } else {
+      state.expenses.unshift(...rows);
+    }
+    saveState(); renderAll(); e.target.reset();
+  };
+  document.getElementById('otherExpenseForm').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const title = String(f.get('otherTitle') || '').trim();
+    const amount = Number(f.get('otherAmount') || 0);
+    if (!title || amount <= 0) {
+      alert('Enter other expense title and amount.');
+      return;
+    }
+    const expenseObj = {
+      id: isOtherEdit ? editExpense.id : uid(),
+      bsYear: String(f.get('bsYear')).trim(),
+      bsMonth: f.get('bsMonth'),
+      bsDay: f.get('bsDay'),
+      title,
+      amount,
+      category: 'Other Expense'
+    };
+    if (isOtherEdit) {
+      state.expenses = state.expenses.map(x => x.id === editExpense.id ? expenseObj : x);
+      editState.expenseId = null;
+    } else {
+      state.expenses.unshift(expenseObj);
+    }
+    saveState(); renderAll(); e.target.reset();
+  };
+}
+function startEditExpense(id) {
+  editState.expenseId = id;
+  currentTab = 'expenses';
+  renderAll();
+}
+function deleteExpense(id) {
+  if (!confirm('Delete this expense?')) return;
+  state.expenses = state.expenses.filter(x => x.id !== id);
+  saveState(); renderAll();
+}
+
+function renderReports() {
+  const currentYear = document.getElementById('reportYear')?.value || '';
+  const currentMonth = document.getElementById('reportMonth')?.value || '';
+  const currentDoctorYear = document.getElementById('doctorWiseYear')?.value || '';
+  const currentDoctorMonth = document.getElementById('doctorWiseMonth')?.value || '';
+  const el = document.getElementById('reports');
+  const patientRows = currentYear && currentMonth ? detailedMonthlyPatientRows(currentYear, currentMonth) : [];
+  const totals = detailedMonthlyPatientTotals(patientRows);
+  const monthExpenseTotal = currentYear && currentMonth ? expenseTotalForMonth(currentYear, currentMonth) : 0;
+  const doctorRows = currentDoctorYear && currentDoctorMonth ? doctorWiseRows(currentDoctorYear, currentDoctorMonth) : [];
+  el.innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <h2>Monthly Summary</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <select id="reportYear">${yearSelectOptions(currentYear)}</select>
+          <select id="reportMonth">${monthOptions(currentMonth, 'Select month')}</select>
+          <button class="ghost" id="reportYearBtn">Show</button>
+          <button class="secondary" id="printMonthlySummaryBtn" ${(currentYear && currentMonth && patientRows.length) ? '' : 'disabled'}>Print Monthly Summary</button>
+        </div>
+        <div id="monthlySummaryPrintArea">
+          <div class="print-area">
+            <div style="text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px;">
+              <h1 style="margin:0 0 8px 0;font-size:28px;">${esc(getClinic().name)}</h1>
+              <div>${esc(getClinic().location)}</div>
+              <div>Phone: ${esc(getClinic().phone)}</div>
+              <div style="margin-top:8px;font-weight:bold;">Monthly Summary Report</div>
+            </div>
+            <div style="margin:8px 0 14px 0;font-weight:600;">Year: ${esc(currentYear || '-')} | Month: ${esc(currentMonth || '-')} | Monthly Expenses: ${money(monthExpenseTotal)}</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Registration Number</th><th>Name</th><th>Total Amount</th><th>Lab Expenses</th><th>Doctors Percentage</th><th>Net Amount</th></tr></thead>
+                <tbody>
+                  ${patientRows.length ? patientRows.map(r => `<tr><td><a href="#" onclick="openPaymentDetailByReg('${esc(r.registrationNumber)}');return false;">${esc(r.registrationNumber)}</a></td><td>${esc(r.name)}</td><td>${money(r.totalAmount)}</td><td>${money(r.labExpenses)}</td><td>${money(r.doctorsPercentage)}</td><td>${money(r.netAmount)}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">Select year and month to view the patient-wise monthly summary.</td></tr>'}
+                </tbody>
+                ${patientRows.length ? `<tfoot><tr><td colspan="2">Total</td><td>${money(totals.totalAmount)}</td><td>${money(totals.labExpenses)}</td><td>${money(totals.doctorsPercentage)}</td><td>${money(totals.netAmount)}</td></tr></tfoot>` : ''}
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Doctor Wise Collection</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <select id="doctorWiseYear">${yearSelectOptions(currentDoctorYear)}</select>
+          <select id="doctorWiseMonth"><option value="">Select month</option>${bsMonths.map(m=>`<option ${m===currentDoctorMonth?'selected':''}>${m}</option>`).join('')}</select>
+          <button class="ghost" id="doctorWiseBtn">Show</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Doctor Name</th><th>Amount</th></tr></thead>
+            <tbody>
+              ${doctorRows.length ? doctorRows.map(r => `<tr><td>${esc(r.doctor)}</td><td>${money(r.amount)}</td></tr>`).join('') : '<tr><td colspan="2" class="muted">Select year and month to view doctor wise collection. Doctor names are linked from the Doctors tab.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('reportYearBtn').onclick = () => renderReports();
+  document.getElementById('doctorWiseBtn').onclick = () => renderReports();
+  const printBtn = document.getElementById('printMonthlySummaryBtn');
+  if (printBtn) printBtn.onclick = printMonthlySummaryReport;
+}
+
+
+function paymentDoneForPatient(patientId) {
+  return state.dailyEntries.filter(d => d.patientId === patientId).reduce((a,d)=>a+Number(d.todaysPayment || 0),0);
+}
+function latestAppointmentForPatient(patientId) {
+  const arr = state.appointments.filter(a => a.patientId === patientId);
+  if (!arr.length) return null;
+  return arr[arr.length - 1];
+}
+function renderPaymentDetails() {
+  const el = document.getElementById('paymentDetails');
+  const clinic = getClinic();
+  const selectedReg = document.getElementById('paymentDetailReg')?.value || currentPaymentDetailReg || '';
+  currentPaymentDetailReg = selectedReg;
+  const regList = Array.from(new Set(state.dailyEntries.map(d => String(d.registrationNumber || '')).filter(Boolean)));
+  const options = regList.map(reg => {
+    const patient = state.patients.find(p => String(p.registrationNumber) === String(reg));
+    return `<option value="${esc(reg)}">${esc(reg)}${patient ? ' — ' + esc(patient.name) : ''}</option>`;
+  }).join('');
+  const patient = state.patients.find(p => String(p.registrationNumber) === String(selectedReg));
+  const dailyRows = selectedReg ? state.dailyEntries.filter(d => String(d.registrationNumber) === String(selectedReg)) : [];
+  const totalPaymentDone = patient ? paymentDoneForPatient(patient.id) : 0;
+  const totalPaymentToBeDone = Number(patient?.totalPayment || 0);
+  const pending = Math.max(0, totalPaymentToBeDone - totalPaymentDone);
+  const billDate = dailyRows.length ? dailyRows.slice().sort((a,b) => compareBsDateParts(b.financialBsYear || b.bsYear, b.financialBsMonth || b.bsMonth, b.financialBsDay || b.bsDay, a.financialBsYear || a.bsYear, a.financialBsMonth || a.bsMonth, a.financialBsDay || a.bsDay))[0] : null;
+  const billDateText = billDate ? fullFinancialBs(billDate) || fullBs(billDate) : '';
+  const appointedDoctor = patient?.doctorSpecified || '';
+  const treatments = Array.from(new Set(dailyRows.map(d => d.treatment).filter(Boolean))).join(', ') || (patient?.treatment || '');
+  el.innerHTML = `
+    <div class="grid">
+      <div class="card">
+        <h2>Payment Detail Bill</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <select id="paymentDetailReg"><option value="">Select registration number</option>${options}</select>
+          <button class="ghost" id="paymentDetailShowBtn">Show Bill</button>
+          <button class="secondary" id="paymentPrintBtn" ${selectedReg ? '' : 'disabled'}>Print Bill</button>
+        </div>
+        ${patient ? `
+        <div id="paymentPrintArea">
+          <div class="print-area">
+            <div style="text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px;">
+              <h1 style="margin:0 0 8px 0;font-size:28px;">${esc(clinic.name)}</h1>
+              <div>${esc(clinic.location)}</div>
+              <div>Phone: ${esc(clinic.phone)}</div>
+              <div style="margin-top:8px;font-weight:bold;">Patient Bill</div>
+            </div>
+            <div class="grid">
+              <div class="field"><label>Registration Number</label><input readonly value="${esc(patient.registrationNumber || '')}"></div>
+              <div class="field"><label>Patient Name</label><input readonly value="${esc(patient.name || '')}"></div>
+              <div class="field"><label>Bill Date</label><input readonly value="${esc(billDateText)}"></div>
+            </div>
+            <div class="grid">
+              <div class="field"><label>Doctor Appointed</label><input readonly value="${esc(appointedDoctor)}"></div>
+              <div class="field"><label>Total Payment Done</label><input readonly value="${esc(money(totalPaymentDone))}"></div>
+              <div class="field"><label>Total Payment To Be Done</label><input readonly value="${esc(money(totalPaymentToBeDone))}"></div>
+            </div>
+            <div class="field"><label>Treatment Done</label><textarea readonly>${esc(treatments)}</textarea></div>
+            <div class="field"><label>Pending Amount</label><input readonly value="${esc(money(pending))}"></div>
+            <h3>Visit and Payment List</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Financial Date</th><th>Treatment Done</th><th>Today's Payment</th><th>Payment Till Now</th><th>Pending</th></tr></thead>
+                <tbody>${dailyRows.length ? dailyRows.map(d => `<tr><td>${fullFinancialBs(d) || fullBs(d)}</td><td>${esc(d.treatment || '')}</td><td>${money(d.todaysPayment || 0)}</td><td>${money(d.paymentTillNow || 0)}</td><td>${money(d.pending || 0)}</td></tr>`).join('') : '<tr><td colspan="5" class="muted">No daily register entries found.</td></tr>'}</tbody>
+              </table>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:28px;gap:24px;">
+              <div>Prepared By: ____________________</div>
+              <div>Authorized Signature: ____________________</div>
+            </div>
+          </div>
+        </div>` : '<p class="muted">Select a registration number from Daily Register to generate the clinic bill.</p>'}
+      </div>
+    </div>`;
+  document.getElementById('paymentDetailReg').value = selectedReg;
+  document.getElementById('paymentDetailShowBtn').onclick = () => { currentPaymentDetailReg = document.getElementById('paymentDetailReg').value || ''; renderPaymentDetails(); };
+  const printBtn = document.getElementById('paymentPrintBtn');
+  if (printBtn) printBtn.onclick = printPaymentDetail;
+}
+function printPaymentDetail() {
+  const area = document.getElementById('paymentPrintArea');
+  if (!area) return;
+  const clinic = getClinic();
+  const win = window.open('', '_blank');
+  win.document.write(`<!doctype html><html><head><title>${esc(clinic.name)} Bill</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111} h1,h2,h3{margin:12px 0} table{width:100%;border-collapse:collapse;margin-top:10px} th,td{border:1px solid #999;padding:8px;text-align:left} .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px} .field label{display:block;font-size:12px;color:#444;margin-bottom:4px} .field input,.field textarea{width:100%;padding:8px;border:1px solid #bbb;border-radius:6px} textarea{min-height:60px}</style></head><body>${area.innerHTML}</body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+function renderNotifications() {
+  const el = document.getElementById('notifications');
+  const sorted = state.notifications.slice().sort((a,b)=>`${a.bsYear}-${a.bsMonth}-${a.bsDay}`.localeCompare(`${b.bsYear}-${b.bsMonth}-${b.bsDay}`));
+  el.innerHTML = `
+    <div class="card">
+      <h2>Appointment Reminders</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date (B.S.)</th><th>Type</th><th>Message</th><th>Action</th></tr></thead>
+          <tbody>
+            ${sorted.length ? sorted.map(n=>`<tr><td>${fullBs(n)}</td><td><span class="pill">${esc(n.type)}</span></td><td>${esc(n.message)}</td><td><button class="danger small" onclick="deleteNotification('${n.id}')">Delete</button></td></tr>`).join('') : '<tr><td colspan="4" class="muted">No reminders yet.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+function deleteNotification(id) {
+  state.notifications = state.notifications.filter(n=>n.id!==id);
+  saveState(); renderAll();
+}
+
+function renderAll() {
+  updateClinicBranding();
+  renderTabs();
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === currentTab));
+  renderCurrentTab();
+}
+
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'dental-clinic-backup.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      state = JSON.parse(reader.result);
+      if (!state.clinic) state.clinic = structuredClone(defaultData.clinic);
+      saveState();
+      renderAll();
+      alert('Backup imported successfully.');
+    } catch {
+      alert('Invalid backup file.');
+    }
+  };
+  reader.readAsText(file);
+}
+function loadDemoData() {
+  state = structuredClone(defaultData);
+  const p1 = {id: uid(), registrationNumber:'1001', name:'Sita Shrestha', contact:'9800000001', age:32, sex:'Female', bsYear:'2082', bsMonth:'Baishakh', bsDay:'5', treatment:'RCT', totalPayment:5000, labExpense:800, doctorSpecified:'Dr. Asha Adhikari'};
+  const p2 = {id: uid(), registrationNumber:'1002', name:'Ram Maharjan', contact:'9800000002', age:28, sex:'Male', bsYear:'2082', bsMonth:'Baishakh', bsDay:'7', treatment:'Scaling', totalPayment:2000, labExpense:0, doctorSpecified:'Dr. Srishti Poudel'};
+  state.patients = [p1,p2];
+  state.appointments = [
+    {id: uid(), patientId:p1.id, patientName:p1.name, doctor:'Dr. Asha Adhikari', bsYear:'2082', bsMonth:'Jestha', bsDay:'3', notes:'Review visit'},
+    {id: uid(), patientId:p2.id, patientName:p2.name, doctor:'Dr. Srishti Poudel', bsYear:'2082', bsMonth:'Jestha', bsDay:'4', notes:'Cleaning follow-up'}
+  ];
+  state.dailyEntries = [
+    {id: uid(), patientId:p1.id, patientName:p1.name, bsYear:'2082', bsMonth:'Baishakh', bsDay:'5', treatment:'RCT', doctor:'Dr. Asha Adhikari', totalAmount:5000, labExpense:800},
+    {id: uid(), patientId:p2.id, patientName:p2.name, bsYear:'2082', bsMonth:'Baishakh', bsDay:'7', treatment:'Scaling', doctor:'Dr. Srishti Poudel', totalAmount:2000, labExpense:0}
+  ];
+  state.expenses = [
+    {id: uid(), title:'Chair repair', bsYear:'2082', bsMonth:'Baishakh', bsDay:'8', amount:1500, category:'Other Expense'}
+  ];
+  state.notifications = state.appointments.map(a => ({id: uid(), type:'Appointment Reminder', message:`${a.patientName} has an appointment with ${a.doctor} on ${a.bsYear} ${a.bsMonth} ${a.bsDay}.`, bsYear:a.bsYear, bsMonth:a.bsMonth, bsDay:a.bsDay}));
+  saveState(); renderAll();
+}
+
+document.getElementById('exportBtn').onclick = exportBackup;
+document.getElementById('importFile').onchange = (e) => { if (e.target.files[0]) importBackup(e.target.files[0]); };
+document.getElementById('seedDemoBtn').onclick = loadDemoData;
+
+renderAll();
+</script>
+</body>
+</html>

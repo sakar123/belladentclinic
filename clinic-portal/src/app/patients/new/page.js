@@ -6,9 +6,11 @@ import Button from '@/components/ui/button';
 import Input from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/toast';
 
 export default function NewPatientPage() {
   const router = useRouter();
+  const { notify } = useToast();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -34,12 +36,18 @@ export default function NewPatientPage() {
       emergency_contact_name: emergencyContactName,
       emergency_contact_phone: emergencyContactPhone,
     });
+    notify({ title: 'Patient added' });
     router.push('/patients');
   };
 
   return (
     <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-6">Add New Patient</h1>
+      <div className="flex items-start justify-between mb-6">
+        <h1 className="text-3xl font-bold">Add New Patient</h1>
+        <Button variant="destructive" onClick={() => router.push('/patients')} className="rounded-full h-10 w-10 p-0 flex items-center justify-center" title="Cancel">
+          <span className="text-xl">×</span>
+        </Button>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-2 gap-6">
           <div>

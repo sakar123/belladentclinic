@@ -13,8 +13,11 @@ export default function LookupsPage() {
   ];
 
   return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-6">Manage Lookups</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Lookups</h1>
+        <p className="text-sm text-app-muted">Manage reference data and enums</p>
+      </div>
       <Tabs defaultValue="appointmentStatus">
         <TabsList>
           {lookups.map((lookup) => (

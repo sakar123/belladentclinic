@@ -4,16 +4,16 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* White-first palette with blue secondary and pink accent */
-  --app-bg: #ffffff; /* primary background */
+  /* Light brand palette (teal + sky from inspiration) */
+  --app-bg: #f6f8fb; /* softer background */
   --app-surface: #ffffff; /* surfaces/cards remain white */
   --app-foreground: #0f172a; /* slate-900 */
-  --app-muted: #6b7280; /* gray-500 */
-  --app-border: #e5e7eb; /* gray-200 */
+  --app-muted: #64748b; /* slate-500 */
+  --app-border: #d9e1ec; /* subtle borders */
   /* semantic colors */
-  --app-primary: #ffffff; /* primary = white */
-  --app-primary-foreground: #0f172a; /* dark text on white */
-  --app-secondary: #3b82f6; /* blue-500 */
+  --app-primary: #0f766e; /* teal-700 */
+  --app-primary-foreground: #ffffff; /* white on teal */
+  --app-secondary: #0ea5e9; /* sky-500 */
   --app-tertiary: #ec4899; /* pink-500 */ --radius: 0.625rem; --background: oklch(1 0 0); --foreground: oklch(0.145 0 0); --card: oklch(1 0 0); --card-foreground: oklch(0.145 0 0); --popover: oklch(1 0 0); --popover-foreground: oklch(0.145 0 0); --primary: oklch(0.205 0 0); --primary-foreground: oklch(0.985 0 0); --secondary: oklch(0.97 0 0); --secondary-foreground: oklch(0.205 0 0); --muted: oklch(0.97 0 0); --muted-foreground: oklch(0.556 0 0); --accent: oklch(0.97 0 0); --accent-foreground: oklch(0.205 0 0); --destructive: oklch(0.577 0.245 27.325); --border: oklch(0.922 0 0); --input: oklch(0.922 0 0); --ring: oklch(0.708 0 0); --chart-1: oklch(0.646 0.222 41.116); --chart-2: oklch(0.6 0.118 184.704); --chart-3: oklch(0.398 0.07 227.392); --chart-4: oklch(0.828 0.189 84.429); --chart-5: oklch(0.769 0.188 70.08); --sidebar: oklch(0.985 0 0); --sidebar-foreground: oklch(0.145 0 0); --sidebar-primary: oklch(0.205 0 0); --sidebar-primary-foreground: oklch(0.985 0 0); --sidebar-accent: oklch(0.97 0 0); --sidebar-accent-foreground: oklch(0.205 0 0); --sidebar-border: oklch(0.922 0 0); --sidebar-ring: oklch(0.708 0 0);
 }
 
@@ -69,20 +69,20 @@
 /* Force light (white) theme even when the OS is in dark mode */
 @media (prefers-color-scheme: dark) {
   :root {
-    --app-bg: #ffffff;
+    --app-bg: #f6f8fb;
     --app-surface: #ffffff;
     --app-foreground: #0f172a;
-    --app-muted: #6b7280;
-    --app-border: #e5e7eb;
-    --app-primary: #ffffff;
-    --app-primary-foreground: #0f172a;
-    --app-secondary: #3b82f6;
+    --app-muted: #64748b;
+    --app-border: #d9e1ec;
+    --app-primary: #0f766e;
+    --app-primary-foreground: #ffffff;
+    --app-secondary: #0ea5e9;
     --app-tertiary: #ec4899;
   }
 }
 
 html, body {
-  background: #ffffff !important;
+  background: var(--app-bg) !important;
   color: var(--app-foreground);
   min-height: 100%;
 }
@@ -95,8 +95,8 @@ html, body {
 /* Subtle card shadow */
 .elevate {
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 4px 12px rgba(15, 23, 42, 0.06);
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 8px 22px rgba(15, 23, 42, 0.06);
 }
 
 /* Utility for nice focus ring */

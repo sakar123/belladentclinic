@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5112/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
 
 async function fetcher(url, options = {}) {
   const response = await fetch(`${API_BASE_URL}${url}`, options);
@@ -49,6 +49,14 @@ export const api = {
   document: {
     getAll: () => fetcher('/document'),
     getById: (id) => fetcher(`/document/${id}`),
+    upload: async (formData) => {
+      const res = await fetch(`${API_BASE_URL}/document/upload`, { method: 'POST', body: formData });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Upload failed');
+      }
+      return res.json();
+    },
     create: (data) => fetcher('/document', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

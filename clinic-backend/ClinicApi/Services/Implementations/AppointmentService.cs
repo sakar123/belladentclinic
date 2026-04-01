@@ -7,6 +7,7 @@ using ClinicApi.Models.DTOs;
 using ClinicApi.Models.Entities;
 using ClinicApi.Mappers;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Globalization;
@@ -23,6 +24,7 @@ namespace ClinicApi.Services.Implementations
         private readonly ILogger<AppointmentService> _logger;
         private readonly IEmailService _emailService;
         private readonly Microsoft.Extensions.Options.IOptions<ClinicApi.Models.AppSettings.ClinicSettings> _clinicSettings;
+        private readonly bool _suppressEmails;
 
         public AppointmentService(
             IRepository<Appointment> appointmentRepository,
@@ -32,7 +34,8 @@ namespace ClinicApi.Services.Implementations
             IPatientService patientService,
             ILogger<AppointmentService> logger,
             IEmailService emailService,
-            Microsoft.Extensions.Options.IOptions<ClinicApi.Models.AppSettings.ClinicSettings> clinicSettings)
+            Microsoft.Extensions.Options.IOptions<ClinicApi.Models.AppSettings.ClinicSettings> clinicSettings,
+            IConfiguration configuration)
         {
             _appointmentRepository = appointmentRepository;
             _statusRepository = statusRepository;
@@ -42,6 +45,8 @@ namespace ClinicApi.Services.Implementations
             _logger = logger;
             _emailService = emailService;
             _clinicSettings = clinicSettings;
+            var envName = configuration["EnvironmentName"] ?? string.Empty;
+            _suppressEmails = string.Equals(envName, "local", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<Appointment> CreateAppointmentFromLandingPageAsync(LandingPageAppointmentRequestDto request)
@@ -154,7 +159,11 @@ namespace ClinicApi.Services.Implementations
 
             _logger.LogInformation("Successfully created new appointment with ID {AppointmentId} for Patient {PatientId}", newAppointment.id, newAppointment.patient_id);
 
-            if (!string.IsNullOrEmpty(patientEntity.Person.email))
+            if (_suppressEmails)
+            {
+                _logger.LogInformation("EnvironmentName=local; skipping email sends for appointment booking (landing page).");
+            }
+            else if (!string.IsNullOrEmpty(patientEntity.Person.email))
             { 
                 //send email to user
                 _emailService.SendEmailAsync(
@@ -215,7 +224,11 @@ namespace ClinicApi.Services.Implementations
             await _appointmentRepository.AddAsync(appointment);
             await _appointmentRepository.SaveChangesAsync();
 
-            if (!string.IsNullOrEmpty(patient.Person.email))
+            if (_suppressEmails)
+            {
+                _logger.LogInformation("EnvironmentName=local; skipping email sends for appointment booking.");
+            }
+            else if (!string.IsNullOrEmpty(patient.Person.email))
             {
                 await _emailService.SendEmailAsync(
                     patient.Person.email,
