@@ -6,6 +6,7 @@ using ClinicApi.Data.Repositories;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Models.Entities;
 using ClinicApi.Mappers;
+using Microsoft.EntityFrameworkCore;
 
 namespace ClinicApi.Services.Implementations
 {
@@ -36,14 +37,20 @@ namespace ClinicApi.Services.Implementations
 
         public async Task<IEnumerable<TreatmentDTO>> GetAllTreatmentsAsync()
         {
-            var treatments = await _treatmentRepository.GetAllAsync();
+            var treatments = await _treatmentRepository
+                .GetAll()
+                .Include(t => t.teeth)
+                .ToListAsync();
             var visited = new HashSet<object>();
             return treatments.Select(t => TreatmentMapper.ToDto(t, visited)).ToList();
         }
 
         public async Task<TreatmentDTO> GetTreatmentByIdAsync(Guid id)
         {
-            var treatment = await _treatmentRepository.GetByIdAsync(id);
+            var treatment = await _treatmentRepository
+                .GetAll()
+                .Include(t => t.teeth)
+                .FirstOrDefaultAsync(t => t.id == id);
             return TreatmentMapper.ToDto(treatment, new HashSet<object>());
         }
 
@@ -61,28 +68,21 @@ namespace ClinicApi.Services.Implementations
             if (!await _serviceRepository.ExistsAsync(treatmentDto.service_id))
                 throw new KeyNotFoundException("Service not found");
 
-            // Resolve tooth by id or by (patient_id, tooth_number)
-            Guid resolvedToothId = Guid.Empty;
-            if (treatmentDto.tooth_id.HasValue && treatmentDto.tooth_id.Value != Guid.Empty)
+            // Optional: validate service allows requested scope if configured
+            var requestedScope = ResolveScope(treatmentDto);
+            var serviceWithScopes = await _serviceRepository
+                .GetAll()
+                .Include(s => s.tooth_scopes)
+                .FirstOrDefaultAsync(s => s.id == treatmentDto.service_id);
+            if (serviceWithScopes != null && serviceWithScopes.tooth_scopes != null &&
+                serviceWithScopes.tooth_scopes.Count > 0)
             {
-                if (!await _toothRepository.ExistsAsync(treatmentDto.tooth_id.Value))
-                    throw new KeyNotFoundException("Tooth not found");
-                resolvedToothId = treatmentDto.tooth_id.Value;
-            }
-            else if (treatmentDto.tooth_number.HasValue)
-            {
-                var toothList = await _toothRepository.FindAsync(t => t.patient_id == treatmentDto.patient_id && t.tooth_number == treatmentDto.tooth_number.Value);
-                var tooth = toothList.FirstOrDefault();
-                if (tooth == null)
-                    throw new KeyNotFoundException("Tooth not found for patient and tooth_number");
-                resolvedToothId = tooth.id;
-            }
-            else
-            {
-                throw new KeyNotFoundException("Tooth not specified");
+                var allowed = new HashSet<string>(serviceWithScopes.tooth_scopes.Select(ts => ts.tooth_scope));
+                if (!allowed.Contains(requestedScope))
+                    throw new KeyNotFoundException($"Service does not support scope '{requestedScope}'");
             }
 
-            // Build entity explicitly to ensure resolved tooth id is used
+            // Build entity; resolve teeth based on scope and provided tooth ids/numbers
             var treatment = new Treatment
             {
                 id = treatmentDto.id ?? Guid.NewGuid(),
@@ -90,7 +90,7 @@ namespace ClinicApi.Services.Implementations
                 patient_id = treatmentDto.patient_id,
                 staff_id = treatmentDto.staff_id,
                 service_id = treatmentDto.service_id,
-                tooth_id = resolvedToothId,
+                treatment_scope = requestedScope,
                 notes = treatmentDto.notes,
                 appointment = null,
                 patient = null,
@@ -98,8 +98,34 @@ namespace ClinicApi.Services.Implementations
                 service = null,
                 prescriptions = new List<Prescription>(),
                 billing_line_item = new List<BillingLineItem>(),
-                documents = new List<Document>()
+                documents = new List<Document>(),
+                teeth = new List<Tooth>()
             };
+
+            var targetToothIds = await ResolveToothIdsAsync(treatmentDto);
+            if (treatment.treatment_scope == "NonTooth")
+            {
+                // No teeth linked
+            }
+            else if (treatment.treatment_scope == "FullMouth")
+            {
+                // Link all existing teeth for the patient
+                var allTeeth = await _toothRepository.FindAsync(t => t.patient_id == treatmentDto.patient_id);
+                foreach (var tooth in allTeeth)
+                {
+                    treatment.teeth.Add(tooth);
+                }
+            }
+            else
+            {
+                // Single or Multiple using resolved list
+                foreach (var tid in targetToothIds)
+                {
+                    var tooth = await _toothRepository.GetByIdAsync(tid);
+                    if (tooth != null) treatment.teeth.Add(tooth);
+                }
+            }
+
             await _treatmentRepository.AddAsync(treatment);
             await _treatmentRepository.SaveChangesAsync();
 
@@ -108,7 +134,10 @@ namespace ClinicApi.Services.Implementations
 
         public async Task<TreatmentDTO> UpdateTreatmentAsync(Guid id, TreatmentDTO treatmentDto)
         {
-            var existingTreatment = await _treatmentRepository.GetByIdAsync(id);
+            var existingTreatment = await _treatmentRepository
+                .GetAll()
+                .Include(t => t.teeth)
+                .FirstOrDefaultAsync(t => t.id == id);
             if (existingTreatment == null)
                 throw new KeyNotFoundException("Treatment not found");
 
@@ -124,31 +153,31 @@ namespace ClinicApi.Services.Implementations
             if (!await _serviceRepository.ExistsAsync(treatmentDto.service_id))
                 throw new KeyNotFoundException("Service not found");
 
-            // Resolve tooth id if needed
-            Guid resolvedToothId = existingTreatment.tooth_id;
-            if (treatmentDto.tooth_id.HasValue && treatmentDto.tooth_id.Value != Guid.Empty)
-            {
-                if (!await _toothRepository.ExistsAsync(treatmentDto.tooth_id.Value))
-                    throw new KeyNotFoundException("Tooth not found");
-                resolvedToothId = treatmentDto.tooth_id.Value;
-            }
-            else if (treatmentDto.tooth_number.HasValue)
-            {
-                var toothList = await _toothRepository.FindAsync(t => t.patient_id == treatmentDto.patient_id && t.tooth_number == treatmentDto.tooth_number.Value);
-                var tooth = toothList.FirstOrDefault();
-                if (tooth == null)
-                    throw new KeyNotFoundException("Tooth not found for patient and tooth_number");
-                resolvedToothId = tooth.id;
-            }
-
             // Manual update
             existingTreatment.appointment_id = treatmentDto.appointment_id;
             existingTreatment.patient_id = treatmentDto.patient_id;
             existingTreatment.staff_id = treatmentDto.staff_id;
             existingTreatment.service_id = treatmentDto.service_id;
-            existingTreatment.tooth_id = resolvedToothId;
+            existingTreatment.treatment_scope = ResolveScope(treatmentDto);
             existingTreatment.notes = treatmentDto.notes;
             existingTreatment.updated_at = DateTime.UtcNow;
+
+            // Update teeth links
+            var newToothIds = await ResolveToothIdsAsync(treatmentDto);
+            existingTreatment.teeth.Clear();
+            if (existingTreatment.treatment_scope == "FullMouth")
+            {
+                var allTeeth = await _toothRepository.FindAsync(t => t.patient_id == treatmentDto.patient_id);
+                foreach (var tooth in allTeeth) existingTreatment.teeth.Add(tooth);
+            }
+            else if (existingTreatment.treatment_scope != "NonTooth")
+            {
+                foreach (var tid in newToothIds)
+                {
+                    var tooth = await _toothRepository.GetByIdAsync(tid);
+                    if (tooth != null) existingTreatment.teeth.Add(tooth);
+                }
+            }
 
             await _treatmentRepository.UpdateAsync(existingTreatment);
             await _treatmentRepository.SaveChangesAsync();
@@ -166,5 +195,58 @@ namespace ClinicApi.Services.Implementations
             await _treatmentRepository.SaveChangesAsync();
             return true;
         }
+
+        // Helper methods for scope/tooth resolution
+        private static string ResolveScope(TreatmentDTO dto)
+        {
+            if (!string.IsNullOrWhiteSpace(dto.treatment_scope)) return dto.treatment_scope!;
+            // Infer scope from provided tooth fields
+            var hasMulti = (dto.tooth_ids != null && dto.tooth_ids.Count > 1) ||
+                           (dto.tooth_numbers != null && dto.tooth_numbers.Count > 1);
+            var hasSingle = (dto.tooth_id.HasValue && dto.tooth_id.Value != Guid.Empty) ||
+                            (dto.tooth_number.HasValue) || (dto.tooth_ids != null && dto.tooth_ids.Count == 1) ||
+                            (dto.tooth_numbers != null && dto.tooth_numbers.Count == 1);
+            if (hasMulti) return "MultipleTeeth";
+            if (hasSingle) return "SingleTooth";
+            return "NonTooth"; // default if no tooth info
+        }
+
+        private async Task<List<Guid>> ResolveToothIdsAsync(TreatmentDTO dto)
+        {
+            var ids = new HashSet<Guid>();
+            if (dto.tooth_id.HasValue && dto.tooth_id.Value != Guid.Empty)
+            {
+                ids.Add(dto.tooth_id.Value);
+            }
+
+            if (dto.tooth_ids != null)
+            {
+                foreach (var tid in dto.tooth_ids)
+                    if (tid != Guid.Empty)
+                        ids.Add(tid);
+            }
+
+            if (dto.tooth_number.HasValue)
+            {
+                var found = await _toothRepository.FindAsync(t =>
+                    t.patient_id == dto.patient_id && t.tooth_number == dto.tooth_number.Value);
+                var tooth = found.FirstOrDefault();
+                if (tooth != null) ids.Add(tooth.id);
+            }
+
+            if (dto.tooth_numbers != null)
+            {
+                foreach (var n in dto.tooth_numbers)
+                {
+                    var found = await _toothRepository.FindAsync(t =>
+                        t.patient_id == dto.patient_id && t.tooth_number == n);
+                    var tooth = found.FirstOrDefault();
+                    if (tooth != null) ids.Add(tooth.id);
+                }
+            }
+
+            return ids.ToList();
+        }
     }
 }
+    

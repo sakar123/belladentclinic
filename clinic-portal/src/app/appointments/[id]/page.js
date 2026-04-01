@@ -1,6 +1,6 @@
 'use client';
 
-import useSWR from 'swr';
+import useSWR, { mutate as swrMutate } from 'swr';
 import { api } from '@/lib/api';
 import Button from '@/components/ui/button';
 import { useRouter, useParams } from 'next/navigation';
@@ -14,6 +14,7 @@ import Empty from '@/components/ui/empty';
 import { useToast } from '@/components/ui/toast';
 import TeethSelector from '@/components/dental/teeth-selector';
 import { getAdultToothName, getPrimaryToothName } from '@/components/dental/tooth-data';
+import AddTreatment from '@/components/treatments/add-treatment';
 
 export default function AppointmentDetailsPage() {
   const router = useRouter();
@@ -29,9 +30,22 @@ export default function AppointmentDetailsPage() {
   const { data: statuses } = useSWR('appt-status', () => api.lookup.appointmentStatus.getAll());
   const { data: allTeeth } = useSWR('teeth', () => api.teeth.getAll());
   const { data: toothStatuses } = useSWR('tooth-status', () => api.lookup.toothStatus.getAll());
-  const { data: apptTreatments } = useSWR('appt-treatments', () => api.treatments.getAll());
+  const { data: apptTreatments, mutate: mutateApptTreatments } = useSWR('appt-treatments', () => api.treatments.getAll());
   const { data: docTypes } = useSWR('doc-types', () => api.lookup.documentTypes.getAll());
   const { data: documents, mutate: mutateDocs } = useSWR('docs', () => api.document.getAll());
+
+  // UI state (must be declared before any early returns to keep hook order stable)
+  // Add treatment drawer
+  const [openAdd, setOpenAdd] = useState(false);
+  // Inline tooth selection (for the summary/inline selector below)
+  const [selectedToothInline, setSelectedToothInline] = useState({ mode: 'adult', tooth: null });
+  const selectedFDIInline = selectedToothInline?.tooth ? [Number(selectedToothInline.tooth)] : [];
+  // Reschedule dialog
+  const [openReschedule, setOpenReschedule] = useState(false);
+  const [newStaffId, setNewStaffId] = useState(appointment?.staff?.id || appointment?.staff_id || '');
+  const [newStatusId, setNewStatusId] = useState(appointment?.status?.id || appointment?.status_id || '');
+  const [newStartISO, setNewStartISO] = useState(appointment?.appointment_start_time?.slice(0,16) || '');
+  const [newDuration, setNewDuration] = useState(appointment?.duration_minutes || 30);
 
   const handleCancel = async () => {
     const hasTreatments = (apptTreatments || []).some(t => t.appointment_id === appointment.id);
@@ -74,139 +88,12 @@ export default function AppointmentDetailsPage() {
   const s = appointment.staff?.person || staff?.find(x => x.id === (appointment.staff?.id || appointment.staff_id))?.person || {};
   const t = new Date(appointment.appointment_start_time);
 
-  // Add treatment dialog state
-  const [openAdd, setOpenAdd] = useState(false);
-  const [selServiceId, setSelServiceId] = useState('');
-  const [createNew, setCreateNew] = useState(false);
-  const [newServiceName, setNewServiceName] = useState('');
-  const [newServiceCost, setNewServiceCost] = useState('');
-  const [note, setNote] = useState('');
-  // tooth selection helpers
+  // tooth selection helpers (for inline chart below)
   const patientId = appointment.patient?.id || appointment.patient_id;
   const patientTeeth = (allTeeth || []).filter(t => t.patient_id === patientId);
-  const [selToothId, setSelToothId] = useState('');
-  const [newToothNumber, setNewToothNumber] = useState('');
-  const [newToothStatusId, setNewToothStatusId] = useState('');
-  const [toothChart, setToothChart] = useState({ mode: 'adult', tooth: null });
-  const [selectedToothInline, setSelectedToothInline] = useState({ mode: 'adult', tooth: null });
-  const selectedFDIInline = selectedToothInline?.tooth ? [Number(selectedToothInline.tooth)] : [];
-  // multi-teeth mode
-  const [multiTeeth, setMultiTeeth] = useState(false);
-  const [multiToothNumbers, setMultiToothNumbers] = useState('');
+  // (legacy add-treatment modal state removed)
 
-  // Reschedule dialog state
-  const [openReschedule, setOpenReschedule] = useState(false);
-  const [newStaffId, setNewStaffId] = useState(appointment.staff?.id || appointment.staff_id || '');
-  const [newStatusId, setNewStatusId] = useState(appointment.status?.id || appointment.status_id || '');
-  const [newStartISO, setNewStartISO] = useState(appointment.appointment_start_time?.slice(0,16) || '');
-  const [newDuration, setNewDuration] = useState(appointment.duration_minutes || 30);
-
-  async function addTreatment() {
-    // Create service if needed
-    let svc = null;
-    if (createNew) {
-      svc = await api.service.create({ name: newServiceName, cost: Number(newServiceCost || 0) });
-    } else {
-      svc = (services || []).find(s => s.id === selServiceId);
-    }
-    if (!svc) return;
-    const tsOptions = toothStatuses || [];
-    const chosenStatus = tsOptions.find(ts => ts.id === newToothStatusId) || tsOptions.find(ts => (ts.code || '').toUpperCase() === 'HEALTHY') || tsOptions[0];
-
-    if (multiTeeth) {
-      // Parse comma-separated numbers and create a treatment per tooth
-      const numbers = (multiToothNumbers || '')
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-        .map(n => Number(n))
-        .filter(n => !Number.isNaN(n));
-      const uniqueNumbers = Array.from(new Set(numbers));
-      if (uniqueNumbers.length === 0) return;
-
-      const { getAdultToothName, getPrimaryToothName } = await import('@/components/dental/tooth-data');
-      let createdCount = 0;
-      for (const num of uniqueNumbers) {
-        // Check if tooth exists for patient
-        let tooth = (allTeeth || []).find(t => t.patient_id === patientId && Number(t.tooth_number) === Number(num));
-        if (!tooth) {
-          const isPrimary = Number(num) >= 51 && Number(num) <= 85;
-          const toothName = isPrimary ? getPrimaryToothName(Number(num)) : getAdultToothName(Number(num));
-          const createdTooth = await api.teeth.create({ patient_id: patientId, tooth_number: Number(num), tooth_status_id: chosenStatus?.id, tooth_name: toothName });
-          tooth = createdTooth;
-        }
-        await api.treatments.create({
-          appointment_id: appointment.id,
-          patient_id: patientId,
-          staff_id: appointment.staff?.id || appointment.staff_id,
-          service_id: svc.id,
-          tooth_id: tooth.id,
-          tooth_number: Number(num),
-          notes: note || undefined,
-        });
-        createdCount += 1;
-      }
-      // Update appointment status to in-progress if available
-      const inprog = (statuses || []).find(s => (s.name || '').toLowerCase() === 'in progress' || (s.name || '').toLowerCase() === 'in-progress' || (s.name || '').toLowerCase() === 'inprogress');
-      if (inprog) {
-        await api.appointment.update(id, {
-          appointment_start_time: appointment.appointment_start_time,
-          duration_minutes: appointment.duration_minutes,
-          staff_id: appointment.staff?.id || appointment.staff_id,
-          status_id: inprog.id,
-          notes: appointment.notes,
-          reason_for_visit: appointment.reason_for_visit,
-          patient_id: patientId,
-        });
-      }
-      setOpenAdd(false);
-      notify({ title: `Added ${createdCount} treatment${createdCount>1?'s':''}` });
-      return;
-    }
-
-    // Single tooth flow: ensure tooth (existing or create new)
-    let toothId = selToothId;
-    if (!toothId) {
-      const toothNumber = newToothNumber || toothChart.tooth;
-      if (!toothNumber) return; // need a number if not selecting existing
-      const { getAdultToothName, getPrimaryToothName } = await import('@/components/dental/tooth-data');
-      const toothName = (toothChart.mode === 'adult') ? getAdultToothName(Number(toothNumber)) : getPrimaryToothName(Number(toothNumber));
-      const createdTooth = await api.teeth.create({ patient_id: patientId, tooth_number: Number(toothNumber), tooth_status_id: chosenStatus?.id, tooth_name: toothName });
-      toothId = createdTooth.id;
-    }
-
-    await api.treatments.create({
-      appointment_id: appointment.id,
-      patient_id: patientId,
-      staff_id: appointment.staff?.id || appointment.staff_id,
-      service_id: svc.id,
-      tooth_id: toothId,
-      tooth_number: selToothId ? undefined : Number(newToothNumber),
-      notes: note || undefined,
-    });
-    // Optional: update tooth status if the user chose one and we have the current tooth
-    if (newToothStatusId) {
-      const currentTooth = (allTeeth || []).find(t => t.id === toothId);
-      if (currentTooth && currentTooth.tooth_status_id !== newToothStatusId) {
-        await api.teeth.update(currentTooth.id, { ...currentTooth, tooth_status_id: newToothStatusId });
-      }
-    }
-    // Update appointment status to "In progress" if available
-    const inprog = (statuses || []).find(s => (s.name || '').toLowerCase() === 'in progress' || (s.name || '').toLowerCase() === 'in-progress' || (s.name || '').toLowerCase() === 'inprogress');
-    if (inprog) {
-      await api.appointment.update(id, {
-        appointment_start_time: appointment.appointment_start_time,
-        duration_minutes: appointment.duration_minutes,
-        staff_id: appointment.staff?.id || appointment.staff_id,
-        status_id: inprog.id,
-        notes: appointment.notes,
-        reason_for_visit: appointment.reason_for_visit,
-        patient_id: patientId,
-      });
-    }
-    setOpenAdd(false);
-    notify({ title: 'Treatment added' });
-  }
+  // (legacy addTreatment modal removed in favor of TreatmentDrawer)
 
   const sid = appointment.status_id || appointment.status?.id;
   const statusName = (statuses || []).find(st => st.id === sid)?.name || appointment.status?.name || '—';
@@ -317,94 +204,39 @@ export default function AppointmentDetailsPage() {
         </CardContent>
       </Card>
 
-      {/* Add Treatment Dialog */}
-      <Dialog open={openAdd} onClose={() => setOpenAdd(false)}>
-        <DialogHeader><DialogTitle>Add Treatment</DialogTitle></DialogHeader>
-        <DialogBody>
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <input id="multiTeeth" type="checkbox" checked={multiTeeth} onChange={(e) => setMultiTeeth(e.target.checked)} />
-              <label htmlFor="multiTeeth">Apply to multiple teeth</label>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <input id="createNewService" type="checkbox" checked={createNew} onChange={(e) => { setCreateNew(e.target.checked); setSelServiceId(''); }} />
-              <label htmlFor="createNewService">Service not listed — create new</label>
-            </div>
-            {!createNew && (
-              <>
-                <label className="text-xs text-app-muted">Select service</label>
-                <select
-                  className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm"
-                  value={selServiceId}
-                  onChange={(e) => { setSelServiceId(e.target.value); }}
-                >
-                  <option value="">Choose…</option>
-                  {(services || []).map(s => (<option key={s.id} value={s.id}>{s.name} — Rs {Number(s.cost || 0).toLocaleString()}</option>))}
-                </select>
-              </>
-            )}
-            {createNew && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xs text-app-muted mb-1">Service name</div>
-                  <Input value={newServiceName} onChange={(e) => setNewServiceName(e.target.value)} />
-                </div>
-                <div>
-                  <div className="text-xs text-app-muted mb-1">Base cost (Rs)</div>
-                  <Input type="number" min="0" step="1" value={newServiceCost} onChange={(e) => { setNewServiceCost(e.target.value); }} />
-                </div>
-              </div>
-            )}
-            {!multiTeeth && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xs text-app-muted mb-1">Existing tooth (optional)</div>
-                  <select className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm" value={selToothId} onChange={(e) => { setSelToothId(e.target.value); setNewToothNumber(''); }}>
-                    <option value="">Select existing…</option>
-                    {patientTeeth.map(t => (<option key={t.id} value={t.id}>Tooth #{t.tooth_number}</option>))}
-                  </select>
-                </div>
-                <div>
-                <div className="text-xs text-app-muted mb-1">Or pick from chart</div>
-                <TeethSelector
-                  showPermanent={true}
-                  showPrimary={true}
-                  selectMode="single"
-                  value={toothChart.tooth ? [Number(toothChart.tooth)] : []}
-                  onChange={(arr) => setToothChart(prev => ({ ...prev, tooth: (Array.isArray(arr) && arr.length>0) ? arr[0] : null }))}
-                />
-                  <div className="text-xs text-app-muted mt-2">Or enter a number</div>
-                  <Input type="number" min="1" max="85" value={newToothNumber} onChange={(e) => { setNewToothNumber(e.target.value); setSelToothId(''); }} />
-                </div>
-              </div>
-            )}
-            {multiTeeth && (
-              <div>
-                <div className="text-xs text-app-muted mb-1">Tooth numbers (comma-separated)</div>
-                <Input placeholder="e.g., 11, 12, 13" value={multiToothNumbers} onChange={(e) => setMultiToothNumbers(e.target.value)} />
-              </div>
-            )}
-            {((!multiTeeth && (selToothId || newToothNumber || toothChart.tooth)) || (multiTeeth && multiToothNumbers.trim().length > 0)) && (
-              <div>
-                <div className="text-xs text-app-muted mb-1">Tooth status</div>
-                <select className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm" value={newToothStatusId} onChange={(e) => setNewToothStatusId(e.target.value)}>
-                  {(toothStatuses || []).map(ts => (<option key={ts.id} value={ts.id}>{ts.name || ts.description || ts.code}</option>))}
-                </select>
-              </div>
-            )}
-            <div>
-              <div className="text-xs text-app-muted mb-1">Notes</div>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
-            </div>
-          </div>
-        </DialogBody>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpenAdd(false)}>Cancel</Button>
-          <Button onClick={addTreatment} disabled={(!createNew && !selServiceId) || (createNew && (!newServiceName || newServiceCost === '')) || (!selToothId && !newToothNumber)}>
-            Save Treatment
-          </Button>
-        </DialogFooter>
-      </Dialog>
+      {/* Treatment Drawer (replaces old Add Treatment modal) */}
+      <AddTreatment
+        open={openAdd}
+        onClose={() => setOpenAdd(false)}
+        appointmentId={appointment.id}
+        patientId={patientId}
+        staffId={appointment.staff?.id || appointment.staff_id}
+        appointmentNotes={appointment.notes || ''}
+        services={services || []}
+        onSaved={async (created = []) => {
+          await Promise.allSettled([
+            mutateApptTreatments(),
+            swrMutate('treatments'),
+          ]);
+          if ((created || []).length > 0) {
+            const inprog = (statuses || []).find(s => (s.name || '').toLowerCase() === 'in progress' || (s.name || '').toLowerCase() === 'in-progress' || (s.name || '').toLowerCase() === 'inprogress');
+            if (inprog) {
+              try {
+                await api.appointment.update(id, {
+                  appointment_start_time: appointment.appointment_start_time,
+                  duration_minutes: appointment.duration_minutes,
+                  staff_id: appointment.staff?.id || appointment.staff_id,
+                  status_id: inprog.id,
+                  notes: appointment.notes,
+                  reason_for_visit: appointment.reason_for_visit,
+                  patient_id: patientId,
+                });
+              } catch {}
+            }
+            notify({ title: `Added ${created.length} treatment${created.length === 1 ? '' : 's'}` });
+          }
+        }}
+      />
 
       {/* Reschedule Dialog */}
       <Dialog open={openReschedule} onClose={() => setOpenReschedule(false)}>
@@ -470,21 +302,24 @@ function VisitSummary({ appointment, allTeeth }) {
   const when = appointment.appointment_start_time ? new Date(appointment.appointment_start_time) : null;
   const rows = list.map(t => {
     const svc = (services||[]).find(sv => sv.id === t.service_id);
-    let num = t.tooth_number;
-    if (!num) {
-      const tt = (allTeeth||[]).find(z => z.id === t.tooth_id);
-      num = tt?.tooth_number;
-    }
-    let toothName = '';
-    if (num) {
-      toothName = (Number(num) >= 51 && Number(num) <= 85) ? getPrimaryToothName(Number(num)) : getAdultToothName(Number(num));
+    const nums = Array.isArray(t.tooth_numbers) ? t.tooth_numbers : (t.tooth_number ? [t.tooth_number] : []);
+    let toothLabel = '';
+    if ((t.treatment_scope || '').toLowerCase() === 'fullmouth') {
+      toothLabel = 'Full mouth';
+    } else if (nums.length > 1) {
+      toothLabel = nums.join(', ');
+    } else if (nums.length === 1) {
+      const n = Number(nums[0]);
+      toothLabel = n >= 51 && n <= 85 ? getPrimaryToothName(n) : getAdultToothName(n);
+    } else if ((t.treatment_scope || '').toLowerCase() === 'nontooth') {
+      toothLabel = '—';
     }
     return {
       id: t.id,
       service: svc?.name || 'Service',
       cost: Number(svc?.cost || 0),
-      toothNumber: num,
-      toothName,
+      toothNumber: nums.length === 1 ? nums[0] : undefined,
+      toothName: toothLabel,
       notes: t.notes || ''
     };
   });
@@ -553,28 +388,30 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
   const [editing, setEditing] = useState(null);
   const [editServiceId, setEditServiceId] = useState('');
   const [editNotes, setEditNotes] = useState('');
-  const [editToothId, setEditToothId] = useState('');
+  const [editScope, setEditScope] = useState('NonTooth');
+  const [editNumbers, setEditNumbers] = useState([]);
+  // Teeth are defined by treatment_scope/tooth_numbers; we keep edit to service + notes here.
 
   if (!treatments) return <div>Loading…</div>;
   const baseList = (treatments || []).filter(t => t.appointment_id === appointment.id);
   let list = baseList;
   let currentTooth = null;
   if (selectedTooth?.tooth) {
-    const patientId = appointment.patient?.id || appointment.patient_id;
-    currentTooth = (allTeeth || []).find(tt => tt.patient_id === patientId && Number(tt.tooth_number) === Number(selectedTooth.tooth));
-    if (currentTooth) {
-      list = baseList.filter(t => t.tooth_id === currentTooth.id || Number(t.tooth_number||0) === Number(selectedTooth.tooth));
-    }
+    const nSel = Number(selectedTooth.tooth);
+    list = baseList.filter(t => {
+      const nums = Array.isArray(t.tooth_numbers) ? t.tooth_numbers.map(Number) : (t.tooth_number ? [Number(t.tooth_number)] : []);
+      return nums.includes(nSel);
+    });
   }
   if (list.length === 0) return <Empty title="No treatments recorded" subtitle="Treatments linked to this appointment will appear here." />;
 
   const total = list.reduce((sum, t) => sum + Number((services || []).find(s => s.id === t.service_id)?.cost || 0), 0);
   const apptMap = new Map((appointmentsList||[]).map(a => [a.id, a]));
-  const history = (allTeeth && selectedTooth?.tooth) ? (treatments||[])
+  const history = (selectedTooth?.tooth) ? (treatments||[])
     .filter(t => t.patient_id === (appointment.patient?.id || appointment.patient_id))
     .filter(t => {
-      const tooth = (allTeeth||[]).find(tt => tt.id === t.tooth_id);
-      return tooth && Number(tooth.tooth_number) === Number(selectedTooth.tooth);
+      const nums = Array.isArray(t.tooth_numbers) ? t.tooth_numbers.map(Number) : (t.tooth_number ? [Number(t.tooth_number)] : []);
+      return nums.includes(Number(selectedTooth.tooth));
     })
     .map(t => ({
       id: t.id,
@@ -615,15 +452,29 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
           const svc = (services || []).find(s => s.id === t.service_id);
           const cost = Number(svc?.cost || 0);
           const checked = !!selected[t.id];
+          const nums = Array.isArray(t.tooth_numbers) ? t.tooth_numbers : (t.tooth_number ? [t.tooth_number] : []);
+          const scope = (t.treatment_scope || '').toLowerCase();
+          let coverage = '—';
+          if (scope === 'fullmouth') coverage = 'Full mouth';
+          else if (nums.length > 1) coverage = `Teeth: ${nums.join(', ')}`;
+          else if (nums.length === 1) coverage = `Tooth ${nums[0]}`;
           return (
             <div key={t.id} className="p-3 grid grid-cols-[auto_1fr_auto] items-center gap-3">
               <input type="checkbox" checked={checked} onChange={(e) => setSelected(prev => ({ ...prev, [t.id]: e.target.checked }))} />
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate">{svc?.name || `Service ${t.service_id}`} <span className="text-app-muted text-xs">· Rs {cost.toLocaleString()}</span></div>
-                <div className="text-xs text-app-muted truncate">{t.notes || ''}{typeof t.tooth_number === 'number' ? ` · Tooth #${t.tooth_number}` : ''}</div>
+                <div className="text-xs text-app-muted truncate">Coverage: {coverage}{t.notes ? ` · ${t.notes}` : ''}</div>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setEditing(t); setEditServiceId(t.service_id); setEditNotes(t.notes || ''); }}>Edit</Button>
+                <Button size="sm" variant="outline" onClick={() => {
+                  setEditing(t);
+                  setEditServiceId(t.service_id);
+                  setEditNotes(t.notes || '');
+                  const ns = Array.isArray(t.tooth_numbers) ? t.tooth_numbers.map(Number) : (t.tooth_number ? [Number(t.tooth_number)] : []);
+                  const sc = t.treatment_scope || (ns.length > 1 ? 'MultipleTeeth' : (ns.length === 1 ? 'SingleTooth' : 'NonTooth'));
+                  setEditScope(sc);
+                  setEditNumbers(ns);
+                }}>Edit</Button>
                 <Button size="sm" variant="destructive" onClick={async () => { if (confirm('Delete treatment?')) { await api.treatments.delete(t.id); notify({ title: 'Treatment deleted' }); mutate(); } }}>Delete</Button>
               </div>
             </div>
@@ -658,13 +509,29 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
               </select>
             </div>
             <div>
-              <div className="text-xs text-app-muted mb-1">Tooth</div>
-              <select className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm" value={editToothId} onChange={(e) => setEditToothId(e.target.value)}>
-                {(allTeeth || []).filter(t => t.patient_id === (appointment.patient?.id || appointment.patient_id)).map(t => (
-                  <option key={t.id} value={t.id}>Tooth #{t.tooth_number}</option>
+              <div className="text-xs text-app-muted mb-1">Coverage</div>
+              <div className="inline-flex rounded-md border border-app-border bg-app-surface p-1 gap-1">
+                {['NonTooth','SingleTooth','MultipleTeeth','FullMouth'].map(opt => (
+                  <button key={opt} type="button" className={`px-3 py-1.5 text-sm rounded-sm ${editScope===opt?'bg-white shadow-sm':'text-app-muted'}`} onClick={() => setEditScope(opt)}>{opt}</button>
                 ))}
-              </select>
+              </div>
             </div>
+            {(editScope === 'SingleTooth' || editScope === 'MultipleTeeth') && (
+              <div>
+                <div className="text-xs text-app-muted mb-1">Select tooth{editScope==='MultipleTeeth'?' (multiple)':''}</div>
+                <TeethSelector
+                  showPermanent={true}
+                  showPrimary={true}
+                  selectMode={editScope==='MultipleTeeth'?'multiple':'single'}
+                  value={editNumbers}
+                  onChange={(arr) => {
+                    const a = Array.isArray(arr) ? arr.map(Number) : [];
+                    setEditNumbers(editScope==='SingleTooth' && a.length>0 ? [a[0]] : a);
+                  }}
+                />
+                <div className="text-xs text-app-muted mt-2">{editNumbers.length>0 ? `Selected: ${editNumbers.join(', ')}` : 'None selected'}</div>
+              </div>
+            )}
             <div>
               <div className="text-xs text-app-muted mb-1">Notes</div>
               <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
@@ -673,7 +540,19 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-          <Button onClick={async () => { await api.treatments.update(editing.id, { ...editing, service_id: editServiceId, tooth_id: editToothId, notes: editNotes }); setEditing(null); notify({ title: 'Treatment updated' }); mutate(); }}>Save</Button>
+          <Button onClick={async () => {
+            const base = { id: editing.id, appointment_id: appointment.id, patient_id: appointment.patient?.id || appointment.patient_id, staff_id: appointment.staff?.id || appointment.staff_id, service_id: editServiceId, notes: editNotes, treatment_scope: editScope };
+            let payload = base;
+            if (editScope === 'SingleTooth' && editNumbers.length === 1) {
+              payload = { ...base, tooth_number: Number(editNumbers[0]) };
+            } else if (editScope === 'MultipleTeeth' && editNumbers.length > 1) {
+              payload = { ...base, tooth_numbers: editNumbers.map(Number) };
+            }
+            await api.treatments.update(editing.id, payload);
+            setEditing(null);
+            notify({ title: 'Treatment updated' });
+            mutate();
+          }}>Save</Button>
         </DialogFooter>
       </Dialog>
     </div>

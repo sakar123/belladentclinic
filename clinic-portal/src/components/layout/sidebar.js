@@ -3,7 +3,7 @@ import { cn } from "../../lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LayoutDashboard, Users, CalendarDays, CreditCard, FileText, Stethoscope, Settings, UserCog, FlaskConical, LineChart } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, CreditCard, FileText, Stethoscope, Settings, UserCog, LineChart } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -16,7 +16,8 @@ const navItems = [
 const adminNavItems = [
   { href: "/admin/staff", label: "Staff", icon: UserCog },
   { href: "/admin/services", label: "Services", icon: Stethoscope },
-  { href: "/admin/lookups", label: "Lookups", icon: FlaskConical },
+  // Move Lookups under Settings and update icon to Settings
+  { href: "/settings/lookups", label: "Lookups", icon: Settings },
 ]
 
 export default function Sidebar({ className }) {
@@ -28,7 +29,7 @@ export default function Sidebar({ className }) {
       <div className="mb-4 flex items-center justify-between px-2">
         <Link href="/" className={cn("flex items-center gap-2 transition-all", collapsed && "opacity-0 w-0 overflow-hidden")}
           aria-label="BellaDent Portal">
-          <img src="/images/belladent_logo.jpg" alt="BellaDent" className="h-8 w-8 rounded-sm object-cover" />
+          <img src="/images/belladent_logo.jpg" alt="BellaDent" className="h-16 w-16 rounded-sm object-cover" />
           <div className="text-lg font-semibold">BellaDent</div>
         </Link>
         <button

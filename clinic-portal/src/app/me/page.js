@@ -20,9 +20,22 @@ function MePageContent() {
   const [selectedTooth, setSelectedTooth] = useState();
   const [toothStatuses, setToothStatuses] = useState({});
   const [statusMap, setStatusMap] = useState({});
+  const [teethList, setTeethList] = useState([]);
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
+  const normalizeToUniversal = (nRaw) => {
+    const n = Number(nRaw);
+    if (!Number.isFinite(n)) return undefined;
+    if (n <= 32) return n;
+    const q = Math.floor(n / 10);
+    const t = n % 10;
+    if (q === 1) return 9 - t;
+    if (q === 2) return 8 + t;
+    if (q === 3) return 25 - t;
+    if (q === 4) return 24 + t;
+    return undefined;
+  };
 
   const patientId = useMemo(() => {
     return search?.get('patientId') || search?.get('id') || undefined;
@@ -63,11 +76,17 @@ function MePageContent() {
         // teeth + status map for detail panel
         const [teeth, statuses] = await Promise.all([
           http.get(`/api/Teeth`, { params: { patientId } }).catch(() => []),
-          http.get(`/api/ToothStatus`).catch(() => []),
+          http.get(`/api/lookup/tooth-status`).catch(() => []),
         ]);
+        const idToCode = {};
+        (statuses || []).forEach((s) => { idToCode[s.id] = s.code || s.name || s.value; });
         const tmap = {};
-        (teeth || []).forEach((t) => { tmap[t.toothNumber || t.number] = t.statusCode || t.status; });
+        (teeth || []).forEach((t) => {
+          const num = t.toothNumber || t.number || t.tooth_number;
+          tmap[num] = idToCode[t.toothStatusId || t.tooth_status_id] || t.statusCode || t.status;
+        });
         setToothStatuses(tmap);
+        setTeethList(Array.isArray(teeth) ? teeth : []);
         const sm = {};
         (statuses || []).forEach((s) => {
           const key = s.code || s.name || s.value;
@@ -178,6 +197,22 @@ function MePageContent() {
         </CardHeader>
         <CardContent>
           <DentalChart patientId={patientId} selectedTooth={selectedTooth} onSelect={setSelectedTooth} />
+          <div className="mt-3">
+            <Button
+              variant="secondary"
+              disabled={!selectedTooth}
+              onClick={() => {
+                if (!selectedTooth) return;
+                const tooth = (teethList || []).find(t => Number(normalizeToUniversal(t.toothNumber || t.number || t.tooth_number)) === Number(selectedTooth));
+                const ids = tooth?.id ? [tooth.id] : [];
+                if (ids.length === 0) return;
+                const qs = new URLSearchParams({ patientId: patientId, teeth: ids.join(',') });
+                window.location.href = `/appointments/new?${qs.toString()}`;
+              }}
+            >
+              Schedule appointment with selected
+            </Button>
+          </div>
           <div className="mt-4">
             {!selectedTooth && (
               <div className="text-sm text-app-muted">Select a tooth to see details and related history.</div>
@@ -288,7 +323,12 @@ function groupByWeek(apps) {
   return Array.from(map.entries()).map(([week, items]) => ({ week, items }));
 }
 function filterByTooth(items, tooth) {
-  return (items || []).filter((x) => Number(x.toothNumber || x.tooth || x.tooth_id || x.toothId) === Number(tooth));
+  const n = Number(tooth);
+  return (items || []).filter((x) => {
+    const arr = Array.isArray(x.tooth_numbers) ? x.tooth_numbers.map(Number) : [];
+    const single = Number(x.toothNumber || x.tooth || x.tooth_id || x.toothId);
+    return (arr.length > 0 ? arr.includes(n) : single === n);
+  });
 }
 function statusLabel(code, statusMap) {
   if (!code) return 'Healthy';

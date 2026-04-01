@@ -4,11 +4,23 @@ async function fetcher(url, options = {}) {
   const response = await fetch(`${API_BASE_URL}${url}`, options);
   if (!response.ok) {
     const error = new Error('An error occurred while fetching the data.');
-    error.info = await response.json();
+    try {
+      error.info = await response.json();
+    } catch {
+      try {
+        const text = await response.text();
+        error.info = { message: text };
+      } catch {}
+    }
     error.status = response.status;
     throw error;
   }
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    // No JSON body (e.g., 204), return null
+    return null;
+  }
 }
 
 export const api = {
@@ -307,6 +319,23 @@ export const api = {
         body: JSON.stringify(data),
       }),
       delete: (id) => fetcher(`/lookup/tooth-status/${id}`, {
+        method: 'DELETE',
+      }),
+    },
+    specialties: {
+      getAll: () => fetcher('/specialty'),
+      getById: (id) => fetcher(`/specialty/${id}`),
+      create: (data) => fetcher('/specialty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+      update: (id, data) => fetcher(`/specialty/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+      delete: (id) => fetcher(`/specialty/${id}`, {
         method: 'DELETE',
       }),
     },

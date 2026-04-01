@@ -238,15 +238,17 @@ function CreateStaffDialog({ open, onClose, onCreated, initial, roles }) {
         const d = new Date(v.dob);
         return isNaN(d) ? undefined : d.toISOString();
       })();
-      const genderEnum = (() => {
-        const val = (v.gender || '').trim();
-        const lower = val.toLowerCase();
-        if (["male", "m", "0", "male (0)", "man"].includes(lower)) return 0;
-        if (["female", "f", "1", "female (1)", "woman"].includes(lower)) return 1;
-        if (["other", "2"].includes(lower)) return 2;
-        if (!val) return 3;
-        if (["prefernottosay", "prefer not to say", "3"].includes(lower.replace(/\s+/g, ""))) return 3;
-        return 3;
+      const genderToken = (() => {
+        const raw = (v.gender ?? '').toString().trim();
+        if (!raw) return undefined; // omit if empty
+        const norm = raw.replace(/\s+/g, '').toLowerCase();
+        if (["male","m","man"].includes(norm)) return "Male";
+        if (["female","f","woman"].includes(norm)) return "Female";
+        if (["other"].includes(norm)) return "Other";
+        if (["prefernottosay","na","n/a","unspecified"].includes(norm)) return "Prefer not to say";
+        // If already one of the canonical DB values, keep as-is
+        if (["Male","Female","Other","Prefer not to say"].includes(raw)) return raw;
+        return raw;
       })();
       const payload = {
         person: {
@@ -254,7 +256,7 @@ function CreateStaffDialog({ open, onClose, onCreated, initial, roles }) {
           lastName: v.lastName,
           email: v.email,
           phoneNumber: v.phone,
-          gender: genderEnum,
+          gender: genderToken,
           dateOfBirth: dob,
           address: v.address,
         },

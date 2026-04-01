@@ -24,8 +24,11 @@ namespace ClinicApi.Models.Entities
         [Required]
         public Guid service_id { get; set; }
 
+        // New schema: treatments no longer store a single tooth_id.
+        // Scope indicates how teeth linkage applies; actual teeth are in join table treatment_tooth.
         [Required]
-        public Guid tooth_id { get; set; }
+        [StringLength(25)]
+        public string treatment_scope { get; set; } = "SingleTooth"; // NonTooth | SingleTooth | MultipleTeeth | FullMouth
 
         [StringLength(2000)]
         public string? notes { get; set; }
@@ -56,8 +59,7 @@ namespace ClinicApi.Models.Entities
         [InverseProperty("treatment")]
         public virtual ICollection<Document> documents { get; set; } = new List<Document>();
 
-        [ForeignKey("tooth_id")]
-        [InverseProperty(nameof(Tooth.treatments))]
-        public virtual Tooth tooth { get; set; } = null!;
+        // Many-to-many to teeth via treatment_tooth
+        public virtual ICollection<Tooth> teeth { get; set; } = new List<Tooth>();
     }
 }

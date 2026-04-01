@@ -2,6 +2,7 @@ using ClinicApi.Models.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using System.Collections.Generic;
 
 namespace ClinicApi.Data
 {
@@ -56,7 +57,11 @@ namespace ClinicApi.Data
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
                 // Convert all table names to lowercase for PostgreSQL naming convention
-                entityType.SetTableName(entityType.GetTableName()!.ToLower());
+                var tbl = entityType.GetTableName();
+                if (!string.IsNullOrEmpty(tbl))
+                {
+                    entityType.SetTableName(tbl!.ToLower());
+                }
                 
                 // For all entities that inherit from BaseEntity, configure automatic UUID generation
                 // This means every new record will automatically get a unique ID without you having to set it manually
@@ -83,6 +88,11 @@ namespace ClinicApi.Data
 
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
+                // Skip shared-type entities (e.g., many-to-many join tables using Dictionary<string, object>)
+                if (entityType.ClrType == typeof(System.Collections.Generic.Dictionary<string, object>))
+                {
+                    continue;
+                }
                 var entity = modelBuilder.Entity(entityType.ClrType);
                 foreach (var property in entityType.GetProperties())
                 {
@@ -101,6 +111,7 @@ namespace ClinicApi.Data
             modelBuilder.Entity<AppointmentStatus>().ToTable("appointment_status");
             modelBuilder.Entity<ToothStatus>().ToTable("tooth_status");
             modelBuilder.Entity<BillingLineItem>().ToTable("billing_line_item");
+            modelBuilder.Entity<ServiceToothScope>().ToTable("service_tooth_scope");
             modelBuilder.Entity<DocumentType>().ToTable("document_type");
             modelBuilder.Entity<DiscountType>().ToTable("discount_type");
             modelBuilder.Entity<SaleItem>().ToTable("sale_item");
@@ -182,6 +193,35 @@ namespace ClinicApi.Data
                 .WithMany(s => s.treatments)
                 .HasForeignKey(t => t.service_id)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Treatment <-> Tooth many-to-many via join table treatment_tooth
+            modelBuilder.Entity<Treatment>()
+                .HasMany(t => t.teeth)
+                .WithMany(t => t.treatments)
+                .UsingEntity<Dictionary<string, object>>(
+                    "treatment_tooth",
+                    j => j
+                        .HasOne<Tooth>()
+                        .WithMany()
+                        .HasForeignKey("tooth_id")
+                        .OnDelete(DeleteBehavior.Cascade),
+                    j => j
+                        .HasOne<Treatment>()
+                        .WithMany()
+                        .HasForeignKey("treatment_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                );
+
+            // Service -> ServiceToothScope one-to-many (composite key on join table)
+            modelBuilder.Entity<ServiceToothScope>(e =>
+            {
+                e.HasKey(x => new { x.service_id, x.tooth_scope });
+                e.Property(x => x.tooth_scope).HasMaxLength(25);
+                e.HasOne(x => x.service)
+                 .WithMany(s => s.tooth_scopes)
+                 .HasForeignKey(x => x.service_id)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
             
             // === ONE-TO-MANY RELATIONSHIPS WITH CASCADE DELETE ===
             // CASCADE means deleting the parent automatically deletes all child records
@@ -248,6 +288,13 @@ namespace ClinicApi.Data
                 .HasOne(bli => bli.treatment)
                 .WithMany(t => t.billing_line_item)
                 .HasForeignKey(bli => bli.treatment_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // BillingLineItem optionally references a Service (SET NULL)
+            modelBuilder.Entity<BillingLineItem>()
+                .HasOne(bli => bli.service)
+                .WithMany()
+                .HasForeignKey(bli => bli.service_id)
                 .OnDelete(DeleteBehavior.SetNull);
             
             // Payment belongs to a Billing (CASCADE: deleting Billing deletes all its Payments)
@@ -421,6 +468,10 @@ namespace ClinicApi.Data
                 new Role { id = new Guid("4c64b60f-eb58-4c28-b4ee-8d5bf850b3b6"), name = "Admin" },
                 new Role { id = new Guid("c96127a9-12dd-4211-85ed-8079504231ca"), name = "Dentist" },
                 new Role { id = new Guid("1160be54-0d90-425d-aae1-e30491121809"), name = "Receptionist" }
+            );
+
+            modelBuilder.Entity<Specialty>().HasData(
+                new Specialty { id = new Guid("a5f1f0fe-7e51-4b0f-8ccf-3b9e0e24f001"), name = "General Dentistry", description = "General practice" }
             );
 
             modelBuilder.Entity<ToothStatus>().HasData(
@@ -628,12 +679,13 @@ namespace ClinicApi.Data
                     staff = staff,
                     service_id = service.id,
                     service = service,
-                    tooth_id = tooth.id,
-                    tooth = tooth,
+                    treatment_scope = "SingleTooth",
                     notes = "Initial treatment",
                     created_at = now,
                     updated_at = now
                 };
+                // Link tooth via many-to-many
+                treatment.teeth.Add(tooth);
                 Treatment.Add(treatment);
                 SaveChanges();
             }
@@ -674,6 +726,7 @@ namespace ClinicApi.Data
             // 8) BillingLineItem
             if (!BillingLineItem.Any())
             {
+                var firstService = Service.First();
                 BillingLineItem.Add(new BillingLineItem
                 {
                     id = Guid.NewGuid(),
@@ -681,6 +734,9 @@ namespace ClinicApi.Data
                     billing = billing,
                     treatment_id = treatment.id,
                     treatment = treatment,
+                    service_id = firstService.id,
+                    service = firstService,
+                    line_item_type = "Service",
                     description = "Treatment charge",
                     quantity = 1,
                     unit_price = 100m,
@@ -701,7 +757,7 @@ namespace ClinicApi.Data
                     billing = billing,
                     amount = 20m,
                     payment_date = now,
-                    method = "CARD",
+                    method = "Credit Card",
                     transaction_ref = "SEED-REF-1",
                     created_at = now,
                     created_by = "seed"

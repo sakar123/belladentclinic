@@ -147,8 +147,9 @@ CREATE TABLE treatment (
     patient_id UUID NOT NULL REFERENCES patient(id),
     staff_id UUID NOT NULL REFERENCES staff(id),
     service_id UUID NOT NULL REFERENCES service(id),
-    tooth_id UUID NOT NULL REFERENCES tooth(id),
-    tooth_number INT,
+    treatment_scope TEXT NOT NULL,
+    CONSTRAINT chk_treatment_scope
+      CHECK (treatment_scope IN ('NonTooth', 'SingleTooth', 'MultipleTeeth', 'FullMouth')),
     notes TEXT,
 
     -- Auditing
@@ -157,7 +158,6 @@ CREATE TABLE treatment (
     created_by VARCHAR(50),
     updated_by VARCHAR(50)
 );
-
 CREATE TABLE prescription (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     treatment_id UUID NOT NULL REFERENCES treatment(id),
@@ -170,6 +170,22 @@ CREATE TABLE prescription (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(50),
     updated_by VARCHAR(50)
+);
+CREATE TABLE treatment_tooth (
+    treatment_id UUID NOT NULL REFERENCES treatment(id) ON DELETE CASCADE,
+    tooth_id UUID NOT NULL REFERENCES tooth(id),
+    PRIMARY KEY (treatment_id, tooth_id)
+);
+-- ================================================================
+-- SERVICE SCOPE SUPPORT
+-- ================================================================
+
+CREATE TABLE service_tooth_scope (
+    service_id UUID NOT NULL REFERENCES service(id) ON DELETE CASCADE,
+    tooth_scope TEXT NOT NULL,
+    CONSTRAINT chk_service_tooth_scope
+      CHECK (tooth_scope IN ('NonTooth', 'SingleTooth', 'MultipleTeeth', 'FullMouth')),
+    PRIMARY KEY (service_id, tooth_scope)
 );
 
 -- ================================================================
@@ -200,6 +216,16 @@ CREATE TABLE billing_line_item (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     billing_id UUID NOT NULL REFERENCES billing(id) ON DELETE CASCADE,
     treatment_id UUID REFERENCES treatment(id) ON DELETE SET NULL,
+    service_id UUID REFERENCES service(id),
+    line_item_type TEXT NOT NULL DEFAULT 'Service',
+    CONSTRAINT chk_billing_line_item_type
+      CHECK (line_item_type IN ('Service', 'Product', 'Lab', 'Adjustment', 'Other')),
+    CONSTRAINT chk_billing_line_item_service_rules
+      CHECK (
+        (line_item_type = 'Service' AND service_id IS NOT NULL AND treatment_id IS NOT NULL)
+        OR
+        (line_item_type <> 'Service' AND service_id IS NULL AND treatment_id IS NULL)
+      ),
     description TEXT NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
     unit_price NUMERIC(10, 2) NOT NULL,
@@ -321,10 +347,17 @@ CREATE INDEX idx_billings_status ON billing (status);
 -- billing_line_item table
 CREATE INDEX idx_billing_line_items_billing_id ON billing_line_item (billing_id);
 CREATE INDEX idx_billing_line_items_treatment_id ON billing_line_item (treatment_id);
-
+CREATE INDEX idx_billing_line_items_service_id ON billing_line_item (service_id);
+CREATE INDEX idx_billing_line_items_line_item_type ON billing_line_item (line_item_type);
 -- payment table
 CREATE INDEX idx_payments_billing_id ON payment (billing_id);
 
+--treatment_tooth table
+CREATE INDEX idx_treatment_tooth_treatment_id
+    ON treatment_tooth (treatment_id);
+
+CREATE INDEX idx_treatment_tooth_tooth_id
+    ON treatment_tooth (tooth_id);
 -- ================================================================
 -- TRIGGERS: updated_at auto-update
 -- ================================================================

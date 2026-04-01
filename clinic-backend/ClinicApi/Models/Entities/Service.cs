@@ -29,5 +29,8 @@ namespace ClinicApi.Models.Entities
         
         [InverseProperty("service")]
         public virtual ICollection<Treatment> treatments { get; set; } = new List<Treatment>();
+
+        // Declares allowed tooth scopes for this service via service_tooth_scope
+        public virtual ICollection<ServiceToothScope> tooth_scopes { get; set; } = new List<ServiceToothScope>();
     }
 }

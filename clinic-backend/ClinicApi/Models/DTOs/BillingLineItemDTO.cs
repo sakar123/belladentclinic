@@ -11,6 +11,8 @@ namespace ClinicApi.Models.DTOs
         public Guid billing_id { get; set; }
         
         public Guid? treatment_id { get; set; }
+        public Guid? service_id { get; set; }
+        public string? line_item_type { get; set; }
         
         [Required]
         [StringLength(1000)]

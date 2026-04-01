@@ -22,6 +22,8 @@ namespace ClinicApi.Mappers
                 id = entity.id,
                 billing_id = entity.billing_id,
                 treatment_id = entity.treatment_id,
+                service_id = entity.service_id,
+                line_item_type = entity.line_item_type,
                 description = entity.description,
                 quantity = entity.quantity,
                 unit_price = entity.unit_price,
@@ -42,12 +44,15 @@ namespace ClinicApi.Mappers
                 id = dto.id ?? Guid.NewGuid(),
                 billing_id = dto.billing_id,
                 treatment_id = dto.treatment_id,
+                service_id = dto.service_id,
+                line_item_type = string.IsNullOrWhiteSpace(dto.line_item_type) ? "Service" : dto.line_item_type!,
                 description = dto.description,
                 quantity = dto.quantity,
                 unit_price = dto.unit_price,
                 discount_percentage = dto.discount_percentage,
                 billing = null!,
-                treatment = null!
+                treatment = null!,
+                service = null!
             };
         }
     }

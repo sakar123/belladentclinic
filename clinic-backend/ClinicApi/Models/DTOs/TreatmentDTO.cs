@@ -19,11 +19,15 @@ namespace ClinicApi.Models.DTOs
         [Required]
         public Guid service_id { get; set; }
 
-        // Either tooth_id or tooth_number can be provided for create/update.
-        // When tooth_id is not provided, services will try to resolve using (patient_id, tooth_number).
-        public Guid? tooth_id { get; set; }
+        // New schema: support scope + many-tooth linking via treatment_tooth
+        public string? treatment_scope { get; set; } // NonTooth | SingleTooth | MultipleTeeth | FullMouth
 
+        // Backwards compat: accept single tooth fields
+        public Guid? tooth_id { get; set; }
         public int? tooth_number { get; set; }
+        // New: accept multiple teeth
+        public List<Guid>? tooth_ids { get; set; }
+        public List<int>? tooth_numbers { get; set; }
         
         [StringLength(2000)]
         public string notes { get; set; }

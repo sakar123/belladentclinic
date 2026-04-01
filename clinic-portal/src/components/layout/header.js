@@ -26,7 +26,7 @@ export default function Header({ className }) {
             <img
               src="/images/belladent_logo_with_name.jpg"
               alt="BellaDent Clinic"
-              className="h-8 w-auto rounded-sm hidden sm:block"
+              className="h-16 w-auto rounded-sm hidden sm:block"
             />
             <span className="font-semibold text-white truncate sm:hidden">BellaDent</span>
           </Link>

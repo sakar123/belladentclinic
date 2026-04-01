@@ -204,6 +204,20 @@ Environment variables and endpoints:
 How to use this log: Append a new entry on each work session with date, what changed, and any decisions taken. Keep it concise (3–6 lines).
 
 ## Session Log (new entries)
+- 2026-04-01: Dental chart status overlays.
+  - Portal: Updated `DentalChart` to keep healthy teeth plain white and overlay SVG glyphs for statuses (RCT, veneer, bridge, crown, implant, filling, inlay, onlay, braces, fracture, cavity, missing, other). Statuses beyond healthy retain color fill for quick scanning; icons render inside each tooth rectangle without additional libs.
+  - No backend changes; glyph mapping derives from status code strings returned by `/api/ToothStatus`. Legend unchanged.
+  - Staff: Fixed edit issues — added dev API routes for `PUT/DELETE /api/Staff/:id` and updated staff form to send gender as string tokens ("Male", "Female", "Other", "PreferNotToSay") to match API expectations.
+  - Services: Implemented admin edit page at `clinic-portal/src/app/admin/services/[id]/page.js` that loads a service, allows editing name/cost/specialty, and saves via `api.service.update`.
+  - Patients/Teeth UI: Removed bulk "Choose status… / Apply to selected" controls. Kept and duplicated "Schedule appointment with selected" — now appears below the dental chart selector and at the bottom of the teeth panel; also added on `/me` Dental Chart section using currently selected tooth.
+  - Teeth selector: Added marquee (click-drag) multi-select on the SVG chart allowing multiple drags to accumulate selection. Implemented in `src/components/dental/teeth-selector.js` with an overlay rectangle and additive selection.
+
+- 2026-04-01: Treatment Drawer refactor.
+  - Portal: Replaced “Add Treatment” modal with a right-anchored `Add Treatment` side panel using a split layout (form/cart left, teeth selector right). Files: `clinic-portal/src/components/treatments/add-treatment.js` (re-export) and `clinic-portal/src/components/treatments/treatment-drawer.js` (implementation).
+  - Appointment page: removed old modal UI and wired drawer open/close. Bulk save creates services if needed, then posts treatments (per-tooth for specific scope, single for whole mouth). Auto-advances appointment to In Progress on first save.
+  - Cleaned legacy inputs: removed multi-teeth checkbox, existing-tooth dropdown, numeric input, tooth status selector, and “service not listed” checkbox per spec.
+  - Right pane now uses `DentalChart` (multi-select) for selection, with legend hidden in the drawer; keeps statuses and glyph overlays for better context.
+
 - 2026-03-31: Multi-tooth treatment flow.
   - Backend: TreatmentDTO `tooth_id` made optional; create/update now accept `tooth_number` (resolved by patient_id + tooth_number) and error if tooth missing.
   - Portal: Add Treatment dialog supports “Apply to multiple teeth” with comma-separated numbers; creates or reuses teeth and posts one treatment per tooth. Maintains single-tooth flow.

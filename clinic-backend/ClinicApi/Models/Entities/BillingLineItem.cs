@@ -14,6 +14,12 @@ namespace ClinicApi.Models.Entities
         public Guid billing_id { get; set; }
         
         public Guid? treatment_id { get; set; }
+
+        public Guid? service_id { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string line_item_type { get; set; } = "Service"; // Service | Product | Lab | Adjustment | Other
         
         [Required]
         [StringLength(1000)]
@@ -36,8 +42,11 @@ namespace ClinicApi.Models.Entities
         
         [ForeignKey("billing_id")]
         public virtual required Billing billing { get; set; }
-        
+
         [ForeignKey("treatment_id")]
-        public virtual required Treatment treatment { get; set; }
+        public virtual Treatment? treatment { get; set; }
+
+        [ForeignKey("service_id")]
+        public virtual Service? service { get; set; }
     }
 }

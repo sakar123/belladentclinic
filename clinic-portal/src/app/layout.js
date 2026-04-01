@@ -3,7 +3,6 @@ import Sidebar from "../components/layout/sidebar";
 import Header from "../components/layout/header";
 import { cn } from "../lib/utils";
 import Providers from "./providers";
-import Fab from "../components/ui/fab";
 
 export const metadata = {
   title: "Clinic Patient Portal",
@@ -21,7 +20,6 @@ export default function RootLayout({ children }) {
             <main className="row-start-2 p-4 md:p-6 bg-app-surface rounded-t-2xl md:rounded-none shadow-none">
               {children}
             </main>
-            <Fab />
           </div>
         </Providers>
       </body>

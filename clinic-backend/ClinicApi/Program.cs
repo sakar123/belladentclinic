@@ -123,13 +123,21 @@ try
 
     var app = builder.Build();
     
-    //Setup Database
-    if (app.Environment.IsDevelopment())
+    // Setup Database
+    // In environments where the schema is provisioned externally (SQL scripts / Docker), avoid running EF migrations.
+    // EnsureCreated is safe: it no-ops if the schema already exists; otherwise creates minimal schema for dev.
+    using (var scope = app.Services.CreateScope())
     {
-        using (var scope = app.Services.CreateScope())
+        var db = scope.ServiceProvider.GetRequiredService<DentalClinicContext>();
+        try
         {
-            var db = scope.ServiceProvider.GetRequiredService<DentalClinicContext>();
-            db.Database.Migrate();
+            db.Database.EnsureCreated();
+            // Idempotent data seeding for lookups (runs only if empty)
+            db.SeedData();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "EnsureCreated/SeedData failed; proceeding. If using EF migrations, configure them explicitly.");
         }
     }
 

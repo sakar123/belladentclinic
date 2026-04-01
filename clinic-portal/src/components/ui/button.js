@@ -1,6 +1,7 @@
+import * as React from "react";
 import { cn } from "../../lib/utils";
 
-export default function Button({ as: Comp = "button", className, variant = "default", size = "md", ...props }) {
+const Button = React.forwardRef(function Button({ as: Comp = "button", className, variant = "default", size = "md", ...props }, ref) {
   const variants = {
     /* primary now white with subtle border */
     default: "bg-primary text-primary-foreground border border-app-border hover:bg-app-bg",
@@ -20,6 +21,7 @@ export default function Button({ as: Comp = "button", className, variant = "defa
   };
   return (
     <Comp
+      ref={ref}
       className={cn(
         "inline-flex items-center gap-2 rounded-md font-medium ring-focus",
         "disabled:opacity-50 disabled:pointer-events-none",
@@ -30,4 +32,6 @@ export default function Button({ as: Comp = "button", className, variant = "defa
       {...props}
     />
   );
-}
+});
+
+export default Button;

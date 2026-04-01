@@ -23,6 +23,8 @@ export default function PatientDetailsPage() {
   const { data: statuses } = useSWR('appointment-status', () => api.lookup.appointmentStatus.getAll());
   const { data: docTypes } = useSWR('doc-types', () => api.lookup.documentTypes.getAll());
   const { data: billings } = useSWR('patient-billings', () => api.billing.getAll());
+  // Fallback: Load appointments directly and filter by patient if not present on patient
+  const { data: allAppointments } = useSWR('appts-all', () => api.appointment.getAll());
   const [file, setFile] = useState(null);
   const [docType, setDocType] = useState('');
   const [desc, setDesc] = useState('');
@@ -41,8 +43,7 @@ export default function PatientDetailsPage() {
   const tagsType = ((docTypesMini||docTypes||[])).find(d => String(d.name||d.document_type||d.code||'').toLowerCase().includes('tag'));
   const tags = (documents||[]).filter(d => d.patient_id === patient.id && (!!tagsType ? d.document_type_id === tagsType.id : true) && (d.description||'').startsWith('tag:'));
 
-  // Fallback: Load appointments directly and filter by patient if not present on patient
-  const { data: allAppointments } = useSWR('appts-all', () => api.appointment.getAll());
+  // (moved allAppointments hook above to keep hook order stable)
 
   return (
     <div className="space-y-6">
@@ -112,25 +113,30 @@ export default function PatientDetailsPage() {
         </div>
         <TabsContent value="appointments">
           <div className="space-y-2">
-            {((patient.appointments && patient.appointments.length>0) ? patient.appointments : (allAppointments||[]).filter(a => (a.patient?.id || a.patient_id) === patient.id)).map((a) => {
-              const s = a.staff?.person || {}; const t = new Date(a.appointment_start_time);
-              const sid = a.status_id || a.status?.id;
-              const statusName = (statuses || []).find(st => st.id === sid)?.name || a.status?.name || '—';
-              return (
-                <Card key={a.id}>
-                  <CardContent className="p-4 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm text-app-muted flex items-center gap-2"><CalendarDays size={16} /> {t.toLocaleDateString()} {t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                      <div className="text-sm flex items-center gap-2"><UserCog size={16} className="text-app-muted" /> {`${s.first_name || ''} ${s.last_name || ''}`.trim()}</div>
-                    </div>
-                    <div className="shrink-0"><StatusPill text={statusName} /></div>
-                  </CardContent>
-                </Card>
+            {(() => {
+              const appts = (patient.appointments && patient.appointments.length>0)
+                ? patient.appointments
+                : (allAppointments||[]).filter(a => (a.patient?.id || a.patient_id) === patient.id);
+              if (appts.length === 0) return (
+                <div className="text-sm text-app-muted">No appointments.</div>
               );
-            })}
-            {(patient.appointments || []).length === 0 && (
-              <div className="text-sm text-app-muted">No appointments.</div>
-            )}
+              return appts.map((a) => {
+                const s = a.staff?.person || {}; const t = new Date(a.appointment_start_time);
+                const sid = a.status_id || a.status?.id;
+                const statusName = (statuses || []).find(st => st.id === sid)?.name || a.status?.name || '—';
+                return (
+                  <Card key={a.id} className="cursor-pointer" onClick={() => { window.location.href = `/appointments/${a.id}`; }}>
+                    <CardContent className="p-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm text-app-muted flex items-center gap-2"><CalendarDays size={16} /> {t.toLocaleDateString()} {t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        <div className="text-sm flex items-center gap-2"><UserCog size={16} className="text-app-muted" /> {`${s.first_name || ''} ${s.last_name || ''}`.trim()}</div>
+                      </div>
+                      <div className="shrink-0"><StatusPill text={statusName} /></div>
+                    </CardContent>
+                  </Card>
+                );
+              });
+            })()}
           </div>
         </TabsContent>
         <TabsContent value="documents">
@@ -254,7 +260,6 @@ function PatientTeethPanel({ patient }) {
   const { data: allTeeth, mutate } = useSWR('teeth', () => api.teeth.getAll());
   const { data: statuses } = useSWR('tooth-status', () => api.lookup.toothStatus.getAll());
   const [selectedFdi, setSelectedFdi] = useState(new Set()); // selected by FDI numbers
-  const [applyStatusId, setApplyStatusId] = useState('');
 
   if (!allTeeth) return <div>Loading…</div>;
   const fullList = (allTeeth || []).filter(t => t.patient_id === patient.id).sort((a,b) => Number(a.tooth_number||0) - Number(b.tooth_number||0));
@@ -340,6 +345,14 @@ function PatientTeethPanel({ patient }) {
         <Button size="sm" variant="outline" onClick={() => setRegion(regionSets.q4)}>Quadrant 4</Button>
         <span className="ml-auto text-xs text-app-muted">{primaryMode ? 'Primary dentition' : 'Permanent dentition'}{(showPrimary && showPermanent) ? ' (Both)' : ''}</span>
       </div>
+      <div className="mt-2">
+        <Button size="sm" variant="secondary" disabled={selectedFdi.size === 0} onClick={() => {
+          const ids = Array.from(selectedFdi).map(n => (fullList.find(t => Number(t.tooth_number) === Number(n))?.id)).filter(Boolean);
+          if (ids.length === 0) return;
+          const query = new URLSearchParams({ patientId: patient.id, teeth: ids.join(',') });
+          window.location.href = `/appointments/new?${query.toString()}`;
+        }}>Schedule appointment with selected</Button>
+      </div>
 
       <div className="rounded border border-app-border overflow-hidden">
         <div className="grid grid-cols-6 bg-app-bg text-xs font-medium border-b border-app-border">
@@ -366,26 +379,12 @@ function PatientTeethPanel({ patient }) {
       </div>
 
       <div className="flex items-center gap-2">
-        <select className="h-9 rounded-md border border-app-border bg-app-surface px-2 text-sm" value={applyStatusId} onChange={(e) => setApplyStatusId(e.target.value)}>
-          <option value="">Choose status…</option>
-          {(statuses||[]).map(s => (<option key={s.id} value={s.id}>{s.name || s.description || s.code}</option>))}
-        </select>
-        <Button size="sm" onClick={async () => {
-          const ids = Array.from(selectedFdi).map(n => (fullList.find(t => Number(t.tooth_number) === Number(n))?.id)).filter(Boolean);
-          if (!applyStatusId || ids.length === 0) return;
-          for (const id of ids) {
-            const tooth = list.find(z => z.id === id);
-            if (tooth) await api.teeth.update(id, { ...tooth, tooth_status_id: applyStatusId });
-          }
-          notify({ title: `Updated ${ids.length} teeth` });
-          mutate();
-        }}>Apply to selected</Button>
         <Button size="sm" variant="secondary" onClick={() => {
           const ids = Array.from(selectedFdi).map(n => (fullList.find(t => Number(t.tooth_number) === Number(n))?.id)).filter(Boolean);
           if (ids.length === 0) return;
           const query = new URLSearchParams({ patientId: patient.id, teeth: ids.join(',') });
           window.location.href = `/appointments/new?${query.toString()}`;
-        }}>Set appointment with selected</Button>
+        }}>Schedule appointment with selected</Button>
       </div>
     </div>
   );
