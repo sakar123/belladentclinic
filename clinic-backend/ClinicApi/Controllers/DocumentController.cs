@@ -14,10 +14,12 @@ namespace ClinicApi.Controllers
     public class DocumentController : ControllerBase
     {
         private readonly IDocumentService _documentService;
+        private readonly IFileStorageService _fileStorageService;
 
-        public DocumentController(IDocumentService documentService)
+        public DocumentController(IDocumentService documentService, IFileStorageService fileStorageService)
         {
             _documentService = documentService;
+            _fileStorageService = fileStorageService;
         }
 
         [HttpGet]
@@ -63,16 +65,14 @@ namespace ClinicApi.Controllers
             [FromForm] Guid? treatment_id)
         {
             if (file == null || file.Length == 0) return BadRequest("file is required");
-            var uploadsRoot = Path.Combine(AppContext.BaseDirectory, "uploads");
-            var patientFolder = Path.Combine(uploadsRoot, patient_id.ToString());
-            Directory.CreateDirectory(patientFolder);
             var safeFile = Path.GetFileName(file.FileName);
+            if (safeFile.Length > 350) safeFile = safeFile[..350];
             var saveName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid()}_{safeFile}";
-            var fullPath = Path.Combine(patientFolder, saveName);
-            
-            await using (var stream = System.IO.File.Create(fullPath))
+            var s3Key = $"documents/{patient_id}/{saveName}";
+
+            using (var stream = file.OpenReadStream())
             {
-                await file.CopyToAsync(stream);
+                await _fileStorageService.UploadAsync(s3Key, stream, file.ContentType);
             }
 
             var dto = new DocumentDTO
@@ -84,7 +84,7 @@ namespace ClinicApi.Controllers
                 upload_date = DateTime.UtcNow,
                 description = description ?? safeFile,
                 is_sensitive = is_sensitive ?? false,
-                document_path = fullPath
+                document_path = s3Key
             };
             
             try
@@ -96,6 +96,24 @@ namespace ClinicApi.Controllers
             {
                 return BadRequest(ex.Message);
             }
+        }
+
+        [HttpGet("{id}/download-url")]
+        public async Task<IActionResult> GetDownloadUrl(Guid id)
+        {
+            var document = await _documentService.GetDocumentByIdAsync(id);
+            if (document == null)
+                return NotFound();
+
+            if (string.IsNullOrWhiteSpace(document.document_path) ||
+                document.document_path.StartsWith("/") ||
+                document.document_path.Contains("\\"))
+            {
+                return NotFound("This document was stored locally and cannot be downloaded via S3.");
+            }
+
+            var url = await _fileStorageService.GetPresignedUrlAsync(document.document_path);
+            return Ok(new { url });
         }
 
         [HttpPut("{id}")]

@@ -41,6 +41,17 @@ namespace ClinicApi.Data
         public DbSet<Service> Service { get; set; }
         public DbSet<Prescription> Prescription { get; set; }
 
+        // Notification-related DbSets
+        public DbSet<PersonContactMethod> PersonContactMethod { get; set; }
+        public DbSet<NotificationTopic> NotificationTopic { get; set; }
+        public DbSet<PersonNotificationPreference> PersonNotificationPreference { get; set; }
+        public DbSet<NotificationTemplate> NotificationTemplate { get; set; }
+        public DbSet<NotificationCampaign> NotificationCampaign { get; set; }
+        public DbSet<Notification> Notification { get; set; }
+        public DbSet<NotificationRecipient> NotificationRecipient { get; set; }
+        public DbSet<NotificationProviderEvent> NotificationProviderEvent { get; set; }
+        public DbSet<PersonChannelSuppression> PersonChannelSuppression { get; set; }
+
         /// <summary>
         /// This method configures the database schema and relationships between entities.
         /// It's called by Entity Framework when creating the database model.
@@ -115,6 +126,16 @@ namespace ClinicApi.Data
             modelBuilder.Entity<DocumentType>().ToTable("document_type");
             modelBuilder.Entity<DiscountType>().ToTable("discount_type");
             modelBuilder.Entity<SaleItem>().ToTable("sale_item");
+
+            // Notification-related table name overrides
+            modelBuilder.Entity<PersonContactMethod>().ToTable("person_contact_method");
+            modelBuilder.Entity<NotificationTopic>().ToTable("notification_topic");
+            modelBuilder.Entity<PersonNotificationPreference>().ToTable("person_notification_preference");
+            modelBuilder.Entity<NotificationTemplate>().ToTable("notification_template");
+            modelBuilder.Entity<NotificationCampaign>().ToTable("notification_campaign");
+            modelBuilder.Entity<NotificationRecipient>().ToTable("notification_recipient");
+            modelBuilder.Entity<NotificationProviderEvent>().ToTable("notification_provider_event");
+            modelBuilder.Entity<PersonChannelSuppression>().ToTable("person_channel_suppression");
 
             // Map known DATE columns explicitly (schema uses DATE, not TIMESTAMPTZ)
             modelBuilder.Entity<Person>().Property(p => p.date_of_birth).HasColumnType("date");
@@ -445,6 +466,197 @@ namespace ClinicApi.Data
                 }
             }
             
+            // === NOTIFICATION-RELATED RELATIONSHIPS ===
+
+            // PersonContactMethod unique constraint (person_id, channel, contact_value)
+            modelBuilder.Entity<PersonContactMethod>()
+                .HasIndex(e => new { e.person_id, e.channel, e.contact_value })
+                .IsUnique();
+
+            modelBuilder.Entity<PersonContactMethod>()
+                .HasOne(e => e.person)
+                .WithMany(p => p.contact_methods)
+                .HasForeignKey(e => e.person_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // NotificationTopic unique code
+            modelBuilder.Entity<NotificationTopic>()
+                .HasIndex(e => e.code)
+                .IsUnique();
+
+            // PersonNotificationPreference unique constraint (person_id, topic_id, channel)
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .HasIndex(e => new { e.person_id, e.topic_id, e.channel })
+                .IsUnique();
+
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .HasOne(e => e.person)
+                .WithMany(p => p.notification_preferences)
+                .HasForeignKey(e => e.person_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .HasOne(e => e.topic)
+                .WithMany(t => t.preferences)
+                .HasForeignKey(e => e.topic_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // NotificationTemplate unique code
+            modelBuilder.Entity<NotificationTemplate>()
+                .HasIndex(e => e.code)
+                .IsUnique();
+
+            modelBuilder.Entity<NotificationTemplate>()
+                .HasOne(e => e.topic)
+                .WithMany(t => t.templates)
+                .HasForeignKey(e => e.topic_id)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // NotificationCampaign relationships
+            modelBuilder.Entity<NotificationCampaign>()
+                .HasOne(e => e.topic)
+                .WithMany(t => t.campaigns)
+                .HasForeignKey(e => e.topic_id)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<NotificationCampaign>()
+                .HasOne(e => e.template)
+                .WithMany()
+                .HasForeignKey(e => e.template_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Notification relationships
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.topic)
+                .WithMany(t => t.notifications)
+                .HasForeignKey(e => e.topic_id)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.template)
+                .WithMany(t => t.notifications)
+                .HasForeignKey(e => e.template_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.campaign)
+                .WithMany(c => c.notifications)
+                .HasForeignKey(e => e.campaign_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.appointment)
+                .WithMany()
+                .HasForeignKey(e => e.appointment_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.patient)
+                .WithMany()
+                .HasForeignKey(e => e.patient_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.staff)
+                .WithMany()
+                .HasForeignKey(e => e.staff_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // NotificationRecipient unique constraint (notification_id, person_id, recipient_address)
+            modelBuilder.Entity<NotificationRecipient>()
+                .HasIndex(e => new { e.notification_id, e.person_id, e.recipient_address })
+                .IsUnique();
+
+            modelBuilder.Entity<NotificationRecipient>()
+                .HasOne(e => e.notification)
+                .WithMany(n => n.recipients)
+                .HasForeignKey(e => e.notification_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<NotificationRecipient>()
+                .HasOne(e => e.person)
+                .WithMany()
+                .HasForeignKey(e => e.person_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<NotificationRecipient>()
+                .HasOne(e => e.contact_method)
+                .WithMany()
+                .HasForeignKey(e => e.contact_method_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // NotificationProviderEvent relationships
+            modelBuilder.Entity<NotificationProviderEvent>()
+                .HasOne(e => e.notification_recipient)
+                .WithMany(r => r.provider_events)
+                .HasForeignKey(e => e.notification_recipient_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<NotificationProviderEvent>()
+                .Property(e => e.payload)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<NotificationCampaign>()
+                .Property(e => e.filter_criteria_json)
+                .HasColumnType("jsonb");
+
+            // PersonChannelSuppression unique constraint (person_id, channel, contact_value)
+            modelBuilder.Entity<PersonChannelSuppression>()
+                .HasIndex(e => new { e.person_id, e.channel, e.contact_value })
+                .IsUnique();
+
+            modelBuilder.Entity<PersonChannelSuppression>()
+                .HasOne(e => e.person)
+                .WithMany(p => p.channel_suppressions)
+                .HasForeignKey(e => e.person_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Notification default values
+            modelBuilder.Entity<PersonContactMethod>()
+                .Property(e => e.is_primary).HasDefaultValue(false);
+            modelBuilder.Entity<PersonContactMethod>()
+                .Property(e => e.is_verified).HasDefaultValue(false);
+            modelBuilder.Entity<PersonContactMethod>()
+                .Property(e => e.is_active).HasDefaultValue(true);
+
+            modelBuilder.Entity<NotificationTopic>()
+                .Property(e => e.is_active).HasDefaultValue(true);
+            modelBuilder.Entity<NotificationTopic>()
+                .Property(e => e.audience_scope).HasDefaultValue("Any");
+
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .Property(e => e.is_enabled).HasDefaultValue(true);
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .Property(e => e.opt_in_status).HasDefaultValue("Implicit");
+
+            modelBuilder.Entity<NotificationTemplate>()
+                .Property(e => e.is_active).HasDefaultValue(true);
+            modelBuilder.Entity<NotificationTemplate>()
+                .Property(e => e.audience_scope).HasDefaultValue("Any");
+            modelBuilder.Entity<NotificationTemplate>()
+                .Property(e => e.provider).HasDefaultValue("AmazonSES");
+
+            modelBuilder.Entity<NotificationCampaign>()
+                .Property(e => e.audience_scope).HasDefaultValue("Any");
+            modelBuilder.Entity<NotificationCampaign>()
+                .Property(e => e.status).HasDefaultValue("Draft");
+
+            modelBuilder.Entity<Notification>()
+                .Property(e => e.provider).HasDefaultValue("AmazonSES");
+            modelBuilder.Entity<Notification>()
+                .Property(e => e.status).HasDefaultValue("Queued");
+
+            modelBuilder.Entity<NotificationRecipient>()
+                .Property(e => e.recipient_type).HasDefaultValue("Primary");
+            modelBuilder.Entity<NotificationRecipient>()
+                .Property(e => e.delivery_status).HasDefaultValue("Queued");
+
+            modelBuilder.Entity<NotificationProviderEvent>()
+                .Property(e => e.provider).HasDefaultValue("AmazonSES");
+
+            modelBuilder.Entity<PersonChannelSuppression>()
+                .Property(e => e.is_active).HasDefaultValue(true);
+
             // === DATA SEEDING ===
             modelBuilder.Entity<AppointmentStatus>().HasData(
                 new AppointmentStatus { id = new Guid("cf063462-6a13-43d1-ac87-c18d161aa954"), name = "Scheduled" },
@@ -822,6 +1034,155 @@ namespace ClinicApi.Data
                     updated_by = "seed"
                 });
                 SaveChanges();
+            }
+
+            // 13) Notification Topics — the topic catalog
+            if (!NotificationTopic.Any())
+            {
+                var topics = new[]
+                {
+                    new NotificationTopic { id = Guid.NewGuid(), code = "APPOINTMENT_CONFIRMATION", name = "Appointment Confirmation", category = "Transactional", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "APPOINTMENT_UPDATED", name = "Appointment Updated", category = "Transactional", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "APPOINTMENT_CANCELLED", name = "Appointment Cancelled", category = "Transactional", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "APPOINTMENT_REMINDER", name = "Appointment Reminder", category = "Transactional", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "MARKETING_PROMOTION", name = "Marketing Promotion", category = "Marketing", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "MARKETING_COUPON", name = "Marketing Coupon", category = "Marketing", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "BIRTHDAY_GREETING", name = "Birthday Greeting", category = "Greeting", audience_scope = "Any", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "RECALL_CAMPAIGN", name = "Recall Campaign", category = "Marketing", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "STAFF_ALERT", name = "Staff Alert", category = "Operational", audience_scope = "Staff", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "SYSTEM_NOTICE", name = "System Notice", category = "Operational", audience_scope = "Any", created_at = now, updated_at = now, created_by = "seed" },
+                };
+                NotificationTopic.AddRange(topics);
+                SaveChanges();
+            }
+
+            // 14) Notification Templates — seeded per topic for Email channel
+            if (!NotificationTemplate.Any())
+            {
+                var topicMap = NotificationTopic.ToDictionary(t => t.code, t => t.id);
+
+                var templates = new List<NotificationTemplate>();
+
+                if (topicMap.TryGetValue("APPOINTMENT_CONFIRMATION", out var confirmId))
+                {
+                    templates.Add(new NotificationTemplate
+                    {
+                        id = Guid.NewGuid(),
+                        code = "APPOINTMENT_CONFIRMATION_EMAIL",
+                        topic_id = confirmId,
+                        channel = "Email",
+                        audience_scope = "Patient",
+                        provider = "AmazonSES",
+                        subject_template = "Your Appointment is Confirmed - BellaDent Dental Clinic",
+                        body_html = @"<div style=""font-family:Arial,sans-serif;max-width:600px;margin:0 auto"">
+<h2 style=""color:#2c5282"">Appointment Confirmed</h2>
+<p>Dear Patient,</p>
+<p>Your dental appointment has been confirmed with the following details:</p>
+<table style=""border-collapse:collapse;width:100%;margin:16px 0"">
+<tr><td style=""padding:8px;font-weight:bold"">Date:</td><td style=""padding:8px"">{{appointment_date}}</td></tr>
+<tr><td style=""padding:8px;font-weight:bold"">Time:</td><td style=""padding:8px"">{{appointment_time}}</td></tr>
+</table>
+<p>Please arrive 10 minutes early. If you need to reschedule, contact us at your earliest convenience.</p>
+<p style=""margin-top:24px"">Best regards,<br/><strong>BellaDent Dental Clinic</strong></p>
+</div>",
+                        body_text = "Appointment Confirmed\n\nYour dental appointment has been confirmed.\nDate: {{appointment_date}}\nTime: {{appointment_time}}\n\nPlease arrive 10 minutes early.\n\nBellaDent Dental Clinic",
+                        is_active = true,
+                        created_at = now,
+                        updated_at = now,
+                        created_by = "seed"
+                    });
+                }
+
+                if (topicMap.TryGetValue("APPOINTMENT_UPDATED", out var updatedId))
+                {
+                    templates.Add(new NotificationTemplate
+                    {
+                        id = Guid.NewGuid(),
+                        code = "APPOINTMENT_UPDATED_EMAIL",
+                        topic_id = updatedId,
+                        channel = "Email",
+                        audience_scope = "Patient",
+                        provider = "AmazonSES",
+                        subject_template = "Your Appointment Has Been Updated - BellaDent Dental Clinic",
+                        body_html = @"<div style=""font-family:Arial,sans-serif;max-width:600px;margin:0 auto"">
+<h2 style=""color:#2c5282"">Appointment Updated</h2>
+<p>Dear Patient,</p>
+<p>Your appointment has been updated. Here are the new details:</p>
+<table style=""border-collapse:collapse;width:100%;margin:16px 0"">
+<tr><td style=""padding:8px;font-weight:bold"">Date:</td><td style=""padding:8px"">{{appointment_date}}</td></tr>
+<tr><td style=""padding:8px;font-weight:bold"">Time:</td><td style=""padding:8px"">{{appointment_time}}</td></tr>
+</table>
+<p>If you have any questions, please don't hesitate to contact us.</p>
+<p style=""margin-top:24px"">Best regards,<br/><strong>BellaDent Dental Clinic</strong></p>
+</div>",
+                        body_text = "Appointment Updated\n\nYour appointment has been updated.\nDate: {{appointment_date}}\nTime: {{appointment_time}}\n\nBellaDent Dental Clinic",
+                        is_active = true,
+                        created_at = now,
+                        updated_at = now,
+                        created_by = "seed"
+                    });
+                }
+
+                if (topicMap.TryGetValue("APPOINTMENT_CANCELLED", out var cancelledId))
+                {
+                    templates.Add(new NotificationTemplate
+                    {
+                        id = Guid.NewGuid(),
+                        code = "APPOINTMENT_CANCELLED_EMAIL",
+                        topic_id = cancelledId,
+                        channel = "Email",
+                        audience_scope = "Patient",
+                        provider = "AmazonSES",
+                        subject_template = "Your Appointment Has Been Cancelled - BellaDent Dental Clinic",
+                        body_html = @"<div style=""font-family:Arial,sans-serif;max-width:600px;margin:0 auto"">
+<h2 style=""color:#c53030"">Appointment Cancelled</h2>
+<p>Dear Patient,</p>
+<p>Your appointment has been cancelled. If you did not request this cancellation or wish to reschedule, please contact us.</p>
+<p style=""margin-top:24px"">Best regards,<br/><strong>BellaDent Dental Clinic</strong></p>
+</div>",
+                        body_text = "Appointment Cancelled\n\nYour appointment has been cancelled. If you did not request this or wish to reschedule, please contact us.\n\nBellaDent Dental Clinic",
+                        is_active = true,
+                        created_at = now,
+                        updated_at = now,
+                        created_by = "seed"
+                    });
+                }
+
+                if (topicMap.TryGetValue("APPOINTMENT_REMINDER", out var reminderId))
+                {
+                    templates.Add(new NotificationTemplate
+                    {
+                        id = Guid.NewGuid(),
+                        code = "APPOINTMENT_REMINDER_EMAIL",
+                        topic_id = reminderId,
+                        channel = "Email",
+                        audience_scope = "Patient",
+                        provider = "AmazonSES",
+                        subject_template = "Reminder: Your Appointment is Coming Up - BellaDent Dental Clinic",
+                        body_html = @"<div style=""font-family:Arial,sans-serif;max-width:600px;margin:0 auto"">
+<h2 style=""color:#2c5282"">Appointment Reminder</h2>
+<p>Dear Patient,</p>
+<p>This is a reminder about your upcoming appointment:</p>
+<table style=""border-collapse:collapse;width:100%;margin:16px 0"">
+<tr><td style=""padding:8px;font-weight:bold"">Date:</td><td style=""padding:8px"">{{appointment_date}}</td></tr>
+<tr><td style=""padding:8px;font-weight:bold"">Time:</td><td style=""padding:8px"">{{appointment_time}}</td></tr>
+</table>
+<p>Please arrive 10 minutes early. If you need to reschedule, contact us as soon as possible.</p>
+<p style=""margin-top:24px"">Best regards,<br/><strong>BellaDent Dental Clinic</strong></p>
+</div>",
+                        body_text = "Appointment Reminder\n\nYour upcoming appointment:\nDate: {{appointment_date}}\nTime: {{appointment_time}}\n\nPlease arrive 10 minutes early.\n\nBellaDent Dental Clinic",
+                        is_active = true,
+                        created_at = now,
+                        updated_at = now,
+                        created_by = "seed"
+                    });
+                }
+
+                if (templates.Count > 0)
+                {
+                    NotificationTemplate.AddRange(templates);
+                    SaveChanges();
+                }
             }
 
             if (isRelational)

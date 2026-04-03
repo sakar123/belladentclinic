@@ -80,5 +80,41 @@ namespace ClinicApi.Mappers
         // Treatment Mappings
         public static TreatmentDTO ToDto(this Treatment entity, HashSet<object> visited = null) => TreatmentMapper.ToDto(entity, visited ?? new HashSet<object>());
         public static Treatment ToEntity(this TreatmentDTO dto, HashSet<object> visited = null) => TreatmentMapper.ToEntity(dto, visited ?? new HashSet<object>());
+
+        // PersonContactMethod Mappings
+        public static PersonContactMethodDTO ToDto(this PersonContactMethod entity, HashSet<object> visited = null) => PersonContactMethodMapper.ToDto(entity, visited ?? new HashSet<object>());
+        public static PersonContactMethod ToEntity(this PersonContactMethodDTO dto, HashSet<object> visited = null) => PersonContactMethodMapper.ToEntity(dto, visited ?? new HashSet<object>());
+
+        // NotificationTopic Mappings
+        public static NotificationTopicDTO ToDto(this NotificationTopic entity, HashSet<object> visited = null) => NotificationTopicMapper.ToDto(entity, visited ?? new HashSet<object>());
+        public static NotificationTopic ToEntity(this NotificationTopicDTO dto, HashSet<object> visited = null) => NotificationTopicMapper.ToEntity(dto, visited ?? new HashSet<object>());
+
+        // PersonNotificationPreference Mappings
+        public static PersonNotificationPreferenceDTO ToDto(this PersonNotificationPreference entity, HashSet<object> visited = null) => PersonNotificationPreferenceMapper.ToDto(entity, visited ?? new HashSet<object>());
+        public static PersonNotificationPreference ToEntity(this PersonNotificationPreferenceDTO dto, HashSet<object> visited = null) => PersonNotificationPreferenceMapper.ToEntity(dto, visited ?? new HashSet<object>());
+
+        // NotificationTemplate Mappings
+        public static NotificationTemplateDTO ToDto(this NotificationTemplate entity, HashSet<object> visited = null) => NotificationTemplateMapper.ToDto(entity, visited ?? new HashSet<object>());
+        public static NotificationTemplate ToEntity(this NotificationTemplateDTO dto, HashSet<object> visited = null) => NotificationTemplateMapper.ToEntity(dto, visited ?? new HashSet<object>());
+
+        // NotificationCampaign Mappings
+        public static NotificationCampaignDTO ToDto(this NotificationCampaign entity, HashSet<object> visited = null) => NotificationCampaignMapper.ToDto(entity, visited ?? new HashSet<object>());
+        public static NotificationCampaign ToEntity(this NotificationCampaignDTO dto, HashSet<object> visited = null) => NotificationCampaignMapper.ToEntity(dto, visited ?? new HashSet<object>());
+
+        // Notification Mappings
+        public static NotificationDTO ToDto(this Notification entity, HashSet<object> visited = null) => NotificationMapper.ToDto(entity, visited ?? new HashSet<object>());
+        public static Notification ToEntity(this NotificationDTO dto, HashSet<object> visited = null) => NotificationMapper.ToEntity(dto, visited ?? new HashSet<object>());
+
+        // NotificationRecipient Mappings
+        public static NotificationRecipientDTO ToDto(this NotificationRecipient entity, HashSet<object> visited = null) => NotificationRecipientMapper.ToDto(entity, visited ?? new HashSet<object>());
+        public static NotificationRecipient ToEntity(this NotificationRecipientDTO dto, HashSet<object> visited = null) => NotificationRecipientMapper.ToEntity(dto, visited ?? new HashSet<object>());
+
+        // NotificationProviderEvent Mappings
+        public static NotificationProviderEventDTO ToDto(this NotificationProviderEvent entity, HashSet<object> visited = null) => NotificationProviderEventMapper.ToDto(entity, visited ?? new HashSet<object>());
+        public static NotificationProviderEvent ToEntity(this NotificationProviderEventDTO dto, HashSet<object> visited = null) => NotificationProviderEventMapper.ToEntity(dto, visited ?? new HashSet<object>());
+
+        // PersonChannelSuppression Mappings
+        public static PersonChannelSuppressionDTO ToDto(this PersonChannelSuppression entity, HashSet<object> visited = null) => PersonChannelSuppressionMapper.ToDto(entity, visited ?? new HashSet<object>());
+        public static PersonChannelSuppression ToEntity(this PersonChannelSuppressionDTO dto, HashSet<object> visited = null) => PersonChannelSuppressionMapper.ToEntity(dto, visited ?? new HashSet<object>());
     }
 }

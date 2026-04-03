@@ -4,6 +4,7 @@ using ClinicApi.Models.Entities;
 using ClinicApi.Services;
 using ClinicApi.Services.Implementations;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
@@ -30,7 +31,10 @@ namespace ClinicApi.Tests.Unit.Appointments
                 _mockAppointmentRepo.Object,
                 _mockStatusRepo.Object,
                 _mockPatientRepo.Object,
-                _mockStaffRepo.Object
+                _mockStaffRepo.Object,
+                new Mock<IPatientService>().Object,
+                new Mock<ILogger<AppointmentService>>().Object,
+                new Mock<INotificationOrchestrator>().Object
             );
         }
 

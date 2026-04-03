@@ -610,10 +610,18 @@ function AppointmentFiles({ appointment, docTypes, documents, allTeeth, onUpload
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {list.map(d => (
-          <div key={d.id} className="p-2 rounded border border-app-border">
-            <div className="text-xs text-app-muted">{new Date(d.upload_date||Date.now()).toLocaleString()}</div>
-            <div className="text-sm font-medium truncate">{d.description}</div>
-            <div className="text-xs text-app-muted truncate">{d.document_path?.split('/').pop()}</div>
+          <div key={d.id} className="p-2 rounded border border-app-border flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-xs text-app-muted">{new Date(d.upload_date||Date.now()).toLocaleString()}</div>
+              <div className="text-sm font-medium truncate">{d.description}</div>
+              <div className="text-xs text-app-muted truncate">{d.document_path?.split('/').pop()}</div>
+            </div>
+            <Button size="sm" variant="outline" onClick={async () => {
+              try {
+                const { url } = await api.document.getDownloadUrl(d.id);
+                window.open(url, '_blank');
+              } catch { notify({ title: 'Download not available' }); }
+            }}>View</Button>
           </div>
         ))}
         {list.length === 0 && (<div className="text-sm text-app-muted">No files for this visit yet.</div>)}

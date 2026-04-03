@@ -1,4 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+import { http } from "./http";
 
 async function fetcher(url, options = {}) {
   const response = await fetch(`${API_BASE_URL}${url}`, options);
@@ -61,6 +62,7 @@ export const api = {
   document: {
     getAll: () => fetcher('/document'),
     getById: (id) => fetcher(`/document/${id}`),
+    getDownloadUrl: (id) => fetcher(`/document/${id}/download-url`),
     upload: async (formData) => {
       const res = await fetch(`${API_BASE_URL}/document/upload`, { method: 'POST', body: formData });
       if (!res.ok) {
@@ -235,6 +237,18 @@ export const api = {
     delete: (id) => fetcher(`/treatments/${id}`, {
       method: 'DELETE',
     }),
+  },
+  // Notifications & Campaigns (use http client for snake/camel conversion)
+  notifications: {
+    dispatch: (data) => http.post('/api/notifications/dispatch', data),
+  },
+  campaigns: {
+    preview: (data) => http.post('/api/campaigns/preview', data),
+    create: (data) => http.post('/api/campaigns', data),
+    launch: (campaignId) => http.post(`/api/campaigns/${campaignId}/launch`, {}),
+    getById: (campaignId) => http.get(`/api/campaigns/${campaignId}`),
+    stats: (campaignId) => http.get(`/api/campaigns/${campaignId}/stats`),
+    list: () => fetcher('/campaigns'), // falls back to simple fetcher if listing exists
   },
   lookup: {
     appointmentStatus: {

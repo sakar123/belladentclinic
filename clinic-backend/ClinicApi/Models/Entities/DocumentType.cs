@@ -22,10 +22,7 @@ namespace ClinicApi.Models.Entities
         
         [StringLength(200)]
         public string? description { get; set; }
-        
-        public DateTime created_at { get; set; } = DateTime.UtcNow;
-        public DateTime updated_at { get; set; } = DateTime.UtcNow;
-        
+
         [InverseProperty("document_type")]
         public virtual ICollection<Document> documents { get; set; } = new List<Document>();
     }

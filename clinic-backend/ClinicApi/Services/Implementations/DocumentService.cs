@@ -16,19 +16,22 @@ namespace ClinicApi.Services.Implementations
         private readonly IRepository<DocumentType> _documentTypeRepository;
         private readonly IRepository<Tooth> _toothRepository;
         private readonly IRepository<Treatment> _treatmentRepository;
+        private readonly IFileStorageService _fileStorageService;
 
         public DocumentService(
             IRepository<Document> documentRepository,
             IRepository<Patient> patientRepository,
             IRepository<DocumentType> documentTypeRepository,
             IRepository<Tooth> toothRepository,
-            IRepository<Treatment> treatmentRepository)
+            IRepository<Treatment> treatmentRepository,
+            IFileStorageService fileStorageService)
         {
             _documentRepository = documentRepository;
             _patientRepository = patientRepository;
             _documentTypeRepository = documentTypeRepository;
             _toothRepository = toothRepository;
             _treatmentRepository = treatmentRepository;
+            _fileStorageService = fileStorageService;
         }
 
         public async Task<IEnumerable<DocumentDTO>> GetAllDocumentsAsync()
@@ -109,6 +112,11 @@ namespace ClinicApi.Services.Implementations
             var document = await _documentRepository.GetByIdAsync(id);
             if (document == null)
                 return false;
+
+            if (!string.IsNullOrWhiteSpace(document.document_path))
+            {
+                await _fileStorageService.DeleteAsync(document.document_path);
+            }
 
             await _documentRepository.DeleteAsync(document);
             await _documentRepository.SaveChangesAsync();

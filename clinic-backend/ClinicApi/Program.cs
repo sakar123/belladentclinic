@@ -84,9 +84,14 @@ try
         options.ConfigureWarnings(warnings => warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
     });
 
-    // Configure EmailSettings and ClinicSettings
+    // Configure EmailSettings, ClinicSettings, NotificationWorkerSettings, and S3Settings
     builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
     builder.Services.Configure<ClinicSettings>(builder.Configuration.GetSection("ClinicSettings"));
+    builder.Services.Configure<NotificationWorkerSettings>(builder.Configuration.GetSection("NotificationWorker"));
+    builder.Services.Configure<S3Settings>(builder.Configuration.GetSection("S3Settings"));
+
+    // Register file storage
+    builder.Services.AddSingleton<IFileStorageService, S3FileStorageService>();
 
     // Register repositories
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
@@ -106,6 +111,12 @@ try
     builder.Services.AddScoped<ITreatmentService, TreatmentService>();
     builder.Services.AddScoped<IEmailService, EmailService>();
     builder.Services.AddScoped<IGoogleReviewsService, GoogleReviewsService>();
+
+    // Notification system services
+    builder.Services.AddScoped<IAudienceResolver, AudienceResolver>();
+    builder.Services.AddScoped<INotificationOrchestrator, NotificationOrchestrator>();
+    builder.Services.AddScoped<ICampaignManager, CampaignManager>();
+    builder.Services.AddHostedService<NotificationSenderWorker>();
     builder.Services.AddScoped(typeof(ILookupService<,>), typeof(LookupService<,>));
     builder.Services.AddScoped<ILookupService<AppointmentStatus, CreateAppointmentStatusDto>, LookupService<AppointmentStatus, CreateAppointmentStatusDto>>();
     builder.Services.AddScoped<ILookupService<DocumentType, CreateDocumentTypeDto>, LookupService<DocumentType, CreateDocumentTypeDto>>();

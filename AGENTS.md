@@ -204,6 +204,12 @@ Environment variables and endpoints:
 How to use this log: Append a new entry on each work session with date, what changed, and any decisions taken. Keep it concise (3–6 lines).
 
 ## Session Log (new entries)
+- 2026-04-02: Notifications feature (portal).
+  - Portal: Added Notifications hub at `/notifications` with four tabs — Send Reminder (filters appointments by date range, selects recipients, preview + dispatch via backend), Campaign (audience+topic selection, dynamic filters, preview, create & launch), Quick Send (one-off email to a patient/staff with optional JSON payload), and History (lists campaigns and shows delivery stats).
+  - Components: Created reusable `RecipientSelector`, `CampaignPreviewCard`, `DeliveryStatsCard`, `TopicSelector`, and `AudienceFilterForm` under `src/components/notifications` using existing UI primitives.
+  - API: Extended `src/lib/api.js` with `notifications.dispatch`, `campaigns.preview/create/launch/getById/stats/list` (uses `http` for snake/camel conversion on new endpoints).
+  - Navigation: Added "Notifications" to the sidebar.
+  - Notes: History tab lists via `/api/campaigns`; if listing endpoint is unavailable, it gracefully shows empty state. All sends queue to background worker automatically.
 - 2026-04-01: Dental chart status overlays.
   - Portal: Updated `DentalChart` to keep healthy teeth plain white and overlay SVG glyphs for statuses (RCT, veneer, bridge, crown, implant, filling, inlay, onlay, braces, fracture, cavity, missing, other). Statuses beyond healthy retain color fill for quick scanning; icons render inside each tooth rectangle without additional libs.
   - No backend changes; glyph mapping derives from status code strings returned by `/api/ToothStatus`. Legend unchanged.

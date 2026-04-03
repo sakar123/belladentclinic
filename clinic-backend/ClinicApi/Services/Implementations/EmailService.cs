@@ -6,6 +6,7 @@ using Amazon;
 using Amazon.SimpleEmail;
 using Amazon.SimpleEmail.Model;
 using ClinicApi.Models.AppSettings;
+using ClinicApi.Models.DTOs.Notifications;
 using ClinicApi.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -72,6 +73,59 @@ namespace ClinicApi.Services.Implementations
             {
                 _logger.LogError(ex, "Error sending email via SES API to {To}", to);
                 // Do not throw: keep business flow resilient
+            }
+        }
+
+        public async Task<EmailSendResult> TrySendEmailAsync(string to, string subject, string htmlBody, string? textBody = null)
+        {
+            if (!string.IsNullOrWhiteSpace(_emailSettings.SmtpHost))
+            {
+                try
+                {
+                    using var client = new SmtpClient(_emailSettings.SmtpHost!, _emailSettings.SmtpPort > 0 ? _emailSettings.SmtpPort : 587)
+                    {
+                        Credentials = new NetworkCredential(_emailSettings.SmtpUser, _emailSettings.SmtpPass),
+                        EnableSsl = true
+                    };
+                    using var message = new MailMessage(_emailSettings.From!, to, subject, htmlBody)
+                    {
+                        IsBodyHtml = true
+                    };
+                    await client.SendMailAsync(message);
+                    return EmailSendResult.Ok();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "TrySendEmailAsync SMTP failed to {To}", to);
+                    return EmailSendResult.Fail(ex.Message);
+                }
+            }
+
+            try
+            {
+                var region = string.IsNullOrWhiteSpace(_emailSettings.Region) ? "us-east-1" : _emailSettings.Region;
+                using var ses = new AmazonSimpleEmailServiceClient(RegionEndpoint.GetBySystemName(region!));
+                var body = new Body { Html = new Content { Charset = "UTF-8", Data = htmlBody } };
+                if (!string.IsNullOrWhiteSpace(textBody))
+                    body.Text = new Content { Charset = "UTF-8", Data = textBody };
+
+                var sendRequest = new SendEmailRequest
+                {
+                    Source = _emailSettings.From,
+                    Destination = new Destination { ToAddresses = new System.Collections.Generic.List<string> { to } },
+                    Message = new Amazon.SimpleEmail.Model.Message
+                    {
+                        Subject = new Content(subject),
+                        Body = body
+                    }
+                };
+                var response = await ses.SendEmailAsync(sendRequest);
+                return EmailSendResult.Ok(response.MessageId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "TrySendEmailAsync SES API failed to {To}", to);
+                return EmailSendResult.Fail(ex.Message);
             }
         }
     }

@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Mail, Phone, Home, CalendarDays, UserCog } from 'lucide-react';
+import { Mail, Phone, Home, CalendarDays, UserCog, Download } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import Button from '@/components/ui/button';
 import Input from '@/components/ui/input';
@@ -175,6 +175,32 @@ export default function PatientDetailsPage() {
               </div>
             </CardContent>
           </Card>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {(documents || [])
+              .filter(d => d.patient_id === patient.id && !(d.description || '').startsWith('tag:'))
+              .map(d => (
+                <Card key={d.id} className="hover:shadow-sm transition-shadow">
+                  <CardContent className="p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{d.description || 'Document'}</div>
+                      <div className="text-xs text-app-muted">{d.upload_date ? new Date(d.upload_date).toLocaleDateString() : ''}</div>
+                    </div>
+                    <button
+                      className="p-1.5 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors shrink-0"
+                      title="View / Download"
+                      onClick={async () => {
+                        try {
+                          const { url } = await api.document.getDownloadUrl(d.id);
+                          window.open(url, '_blank');
+                        } catch { notify({ title: 'Download not available' }); }
+                      }}
+                    >
+                      <Download size={16} />
+                    </button>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
         </TabsContent>
         <TabsContent value="billing">
           <Card>

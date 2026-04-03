@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -38,5 +39,21 @@ namespace ClinicApi.Models.Entities
         public DateTime updated_at { get; set; } = DateTime.UtcNow;
         public string? created_by { get; set; }
         public string? updated_by { get; set; }
+
+        [InverseProperty("person")]
+        public virtual ICollection<PersonContactMethod> contact_methods { get; set; }
+
+        [InverseProperty("person")]
+        public virtual ICollection<PersonNotificationPreference> notification_preferences { get; set; }
+
+        [InverseProperty("person")]
+        public virtual ICollection<PersonChannelSuppression> channel_suppressions { get; set; }
+
+        public Person()
+        {
+            contact_methods = new HashSet<PersonContactMethod>();
+            notification_preferences = new HashSet<PersonNotificationPreference>();
+            channel_suppressions = new HashSet<PersonChannelSuppression>();
+        }
     }
 }

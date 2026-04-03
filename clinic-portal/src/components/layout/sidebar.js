@@ -3,12 +3,13 @@ import { cn } from "../../lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LayoutDashboard, Users, CalendarDays, CreditCard, FileText, Stethoscope, Settings, UserCog, LineChart } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, CreditCard, FileText, Stethoscope, Settings, UserCog, LineChart, Megaphone } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/patients", label: "Patients", icon: Users },
   { href: "/appointments", label: "Appointments", icon: CalendarDays },
+  { href: "/notifications", label: "Notifications", icon: Megaphone },
   { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/reports", label: "Reports", icon: LineChart },
 ];
