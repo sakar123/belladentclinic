@@ -287,8 +287,6 @@ function PatientTeethPanel({ patient }) {
   const { data: statuses } = useSWR('tooth-status', () => api.lookup.toothStatus.getAll());
   const [selectedFdi, setSelectedFdi] = useState(new Set()); // selected by FDI numbers
 
-  if (!allTeeth) return <div>Loading…</div>;
-  const fullList = (allTeeth || []).filter(t => t.patient_id === patient.id).sort((a,b) => Number(a.tooth_number||0) - Number(b.tooth_number||0));
   const dob = patient.person?.date_of_birth ? new Date(patient.person.date_of_birth) : null;
   const today = new Date();
   const age = dob ? (today.getFullYear() - dob.getFullYear() - ((today.getMonth() < dob.getMonth() || (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())) ? 1 : 0)) : null;
@@ -296,6 +294,9 @@ function PatientTeethPanel({ patient }) {
 
   const [showPermanent, setShowPermanent] = useState(!primaryMode);
   const [showPrimary, setShowPrimary] = useState(primaryMode);
+
+  if (!allTeeth) return <div>Loading…</div>;
+  const fullList = (allTeeth || []).filter(t => t.patient_id === patient.id).sort((a,b) => Number(a.tooth_number||0) - Number(b.tooth_number||0));
   const dentitionPrimary = fullList.length > 0 && Math.max(...fullList.map(t => Number(t.tooth_number||0))) <= 20;
   const list = fullList.filter(t => {
     // Only one dentition exists per patient; honor toggles accordingly
