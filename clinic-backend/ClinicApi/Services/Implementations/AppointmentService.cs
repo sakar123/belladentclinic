@@ -4,10 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using ClinicApi.Data.Repositories;
 using ClinicApi.Models.DTOs;
+using ClinicApi.Models.DTOs.Notifications;
 using ClinicApi.Models.Entities;
 using ClinicApi.Mappers;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Globalization;
@@ -22,9 +22,7 @@ namespace ClinicApi.Services.Implementations
         private readonly IRepository<Staff> _staffRepository;
         private readonly IPatientService _patientService;
         private readonly ILogger<AppointmentService> _logger;
-        private readonly IEmailService _emailService;
-        private readonly Microsoft.Extensions.Options.IOptions<ClinicApi.Models.AppSettings.ClinicSettings> _clinicSettings;
-        private readonly bool _suppressEmails;
+        private readonly INotificationOrchestrator _notificationOrchestrator;
 
         public AppointmentService(
             IRepository<Appointment> appointmentRepository,
@@ -33,9 +31,7 @@ namespace ClinicApi.Services.Implementations
             IRepository<Staff> staffRepository,
             IPatientService patientService,
             ILogger<AppointmentService> logger,
-            IEmailService emailService,
-            Microsoft.Extensions.Options.IOptions<ClinicApi.Models.AppSettings.ClinicSettings> clinicSettings,
-            IConfiguration configuration)
+            INotificationOrchestrator notificationOrchestrator)
         {
             _appointmentRepository = appointmentRepository;
             _statusRepository = statusRepository;
@@ -43,10 +39,7 @@ namespace ClinicApi.Services.Implementations
             _staffRepository = staffRepository;
             _patientService = patientService;
             _logger = logger;
-            _emailService = emailService;
-            _clinicSettings = clinicSettings;
-            var envName = configuration["EnvironmentName"] ?? string.Empty;
-            _suppressEmails = string.Equals(envName, "local", StringComparison.OrdinalIgnoreCase);
+            _notificationOrchestrator = notificationOrchestrator;
         }
 
         public async Task<Appointment> CreateAppointmentFromLandingPageAsync(LandingPageAppointmentRequestDto request)
@@ -159,47 +152,26 @@ namespace ClinicApi.Services.Implementations
 
             _logger.LogInformation("Successfully created new appointment with ID {AppointmentId} for Patient {PatientId}", newAppointment.id, newAppointment.patient_id);
 
-            if (_suppressEmails)
-            {
-                _logger.LogInformation("EnvironmentName=local; skipping email sends for appointment booking (landing page).");
-            }
-            else if (!string.IsNullOrEmpty(patientEntity.Person.email))
-            { 
-                //send email to user
-                _emailService.SendEmailAsync(
-                    patientEntity.Person.email,
-                    "Appointment Confirmation",
-                    $"Your appointment is confirmed for {newAppointment.appointment_start_time.ToShortDateString()} at {newAppointment.appointment_start_time.ToShortTimeString()}."
-                );
-                //send email to clinic
-                var clinicEmail = _clinicSettings.Value?.ClinicEmail;
-                if (!string.IsNullOrWhiteSpace(clinicEmail))
-                {
-                    _logger.LogInformation("Sending clinic notification to {ClinicEmail}", clinicEmail);
-                    var displayName = ($"{patientEntity.Person.first_name} {patientEntity.Person.last_name}").Trim();
-                    var who = string.IsNullOrWhiteSpace(displayName) ? patientEntity.Person.email : displayName;
-                    _emailService.SendEmailAsync(
-                        clinicEmail!,
-                        "Appointment Booked",
-                        $"New appointment booked by {who} for {newAppointment.appointment_start_time.ToShortDateString()} at {newAppointment.appointment_start_time.ToShortTimeString()}."
-                    );
-                }
-                else
-                {
-                    _logger.LogWarning("ClinicSettings.ClinicEmail is not configured. Skipping clinic notification email.");
-                }
-            }
-            else
-            {
-                _logger.LogWarning("Patient {PatientId} has no email address. Skipping email notification.", newAppointment.patient_id);
-            }
+            // Dispatch appointment confirmation via notification system
+            await DispatchAppointmentNotificationAsync(
+                "APPOINTMENT_CONFIRMATION",
+                patientEntity.person_id,
+                newAppointment);
 
             return newAppointment;
         }
 
-        public async Task<IEnumerable<AppointmentDTO>> GetAllAppointmentsAsync()
+        public async Task<IEnumerable<AppointmentDTO>> GetAllAppointmentsAsync(Guid? patientId = null)
         {
-            var appointments = await _appointmentRepository.GetAllAsync();
+            IEnumerable<Appointment> appointments;
+            if (patientId.HasValue)
+            {
+                appointments = await _appointmentRepository.FindAsync(a => a.patient_id == patientId.Value);
+            }
+            else
+            {
+                appointments = await _appointmentRepository.GetAllAsync();
+            }
             return appointments.Select(a => a.ToDto()).ToList();
         }
 
@@ -224,22 +196,11 @@ namespace ClinicApi.Services.Implementations
             await _appointmentRepository.AddAsync(appointment);
             await _appointmentRepository.SaveChangesAsync();
 
-            if (_suppressEmails)
-            {
-                _logger.LogInformation("EnvironmentName=local; skipping email sends for appointment booking.");
-            }
-            else if (!string.IsNullOrEmpty(patient.Person.email))
-            {
-                await _emailService.SendEmailAsync(
-                    patient.Person.email,
-                    "Appointment Confirmation",
-                    $"Your appointment is confirmed for {appointment.appointment_start_time.ToShortDateString()} at {appointment.appointment_start_time.ToShortTimeString()}."
-                );
-            }
-            else
-            {
-                _logger.LogWarning("Patient {PatientId} has no email address. Skipping email notification.", appointment.patient_id);
-            }
+            // Dispatch appointment confirmation via notification system
+            await DispatchAppointmentNotificationAsync(
+                "APPOINTMENT_CONFIRMATION",
+                patient.person_id,
+                appointment);
 
             return appointment.ToDto();
         }
@@ -269,20 +230,17 @@ namespace ClinicApi.Services.Implementations
             await _appointmentRepository.UpdateAsync(existingAppointment);
             await _appointmentRepository.SaveChangesAsync();
 
-            var patient = await _patientRepository.GetAll().Include(p => p.Person).FirstOrDefaultAsync(p => p.id == existingAppointment.patient_id);
-            if (patient != null && !string.IsNullOrEmpty(patient.Person.email))
+            // Dispatch appointment updated notification
+            var patient = await _patientRepository.GetByIdAsync(existingAppointment.patient_id);
+            if (patient != null)
             {
-                await _emailService.SendEmailAsync(
-                    patient.Person.email,
-                    "Appointment Updated",
-                    $"Your appointment has been updated to {existingAppointment.appointment_start_time.ToShortDateString()} at {existingAppointment.appointment_start_time.ToShortTimeString()}."
-                );
+                await DispatchAppointmentNotificationAsync(
+                    "APPOINTMENT_UPDATED",
+                    patient.person_id,
+                    existingAppointment,
+                    $"appt-update-{existingAppointment.id}-{existingAppointment.updated_at.Ticks}");
             }
-            else
-            {
-                _logger.LogWarning("Patient {PatientId} has no email address. Skipping email notification.", existingAppointment.patient_id);
-            }
-            
+
             return existingAppointment.ToDto();
         }
 
@@ -296,20 +254,31 @@ namespace ClinicApi.Services.Implementations
 
             try
             {
+                // Capture info before delete
+                var appointmentId = appointment.id;
+                var patientPersonId = patient?.person_id;
+
                 await _appointmentRepository.DeleteAsync(appointment);
                 await _appointmentRepository.SaveChangesAsync();
 
-                if (patient != null && !string.IsNullOrEmpty(patient.Person.email))
+                // Dispatch cancellation notification
+                if (patientPersonId.HasValue)
                 {
-                    await _emailService.SendEmailAsync(
-                        patient.Person.email,
-                        "Appointment Cancelled",
-                        $"Your appointment for {appointment.appointment_start_time.ToShortDateString()} at {appointment.appointment_start_time.ToShortTimeString()} has been cancelled."
-                    );
-                }
-                else
-                {
-                    _logger.LogWarning("Patient {PatientId} has no email address. Skipping email notification.", appointment.patient_id);
+                    try
+                    {
+                        await _notificationOrchestrator.DispatchAsync(new DispatchNotificationRequest
+                        {
+                            topic_code = "APPOINTMENT_CANCELLED",
+                            channel = "Email",
+                            person_ids = new List<Guid> { patientPersonId.Value },
+                            idempotency_key = $"appt-cancel-{appointmentId}",
+                            initiated_by = "system"
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to dispatch cancellation notification for appointment {AppointmentId}", appointmentId);
+                    }
                 }
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateException)
@@ -317,6 +286,37 @@ namespace ClinicApi.Services.Implementations
                 throw new InvalidOperationException("Cannot delete appointment because there are dependent records (e.g., treatments or documents). Remove or reassign dependent records first.");
             }
             return true;
+        }
+
+        /// <summary>
+        /// Shared helper to dispatch appointment-related notifications through the orchestrator.
+        /// Failures are logged but do not bubble up — appointment operations must not fail due to notification issues.
+        /// </summary>
+        private async Task DispatchAppointmentNotificationAsync(
+            string topicCode, Guid personId, Appointment appointment, string? idempotencyKey = null)
+        {
+            try
+            {
+                await _notificationOrchestrator.DispatchAsync(new DispatchNotificationRequest
+                {
+                    topic_code = topicCode,
+                    channel = "Email",
+                    person_ids = new List<Guid> { personId },
+                    appointment_id = appointment.id,
+                    idempotency_key = idempotencyKey ?? $"appt-confirm-{appointment.id}",
+                    payload = new Dictionary<string, string>
+                    {
+                        ["appointment_date"] = appointment.appointment_start_time.ToString("yyyy-MM-dd"),
+                        ["appointment_time"] = appointment.appointment_start_time.ToString("HH:mm")
+                    },
+                    initiated_by = "system"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to dispatch {TopicCode} notification for appointment {AppointmentId}",
+                    topicCode, appointment.id);
+            }
         }
     }
 }

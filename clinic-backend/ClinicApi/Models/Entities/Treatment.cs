@@ -30,6 +30,15 @@ namespace ClinicApi.Models.Entities
         [StringLength(25)]
         public string treatment_scope { get; set; } = "SingleTooth"; // NonTooth | SingleTooth | MultipleTeeth | FullMouth
 
+        [Required]
+        [StringLength(25)]
+        public string status { get; set; } = "Planned"; // Planned | InProgress | Completed | Cancelled
+
+        [StringLength(10)]
+        public string? surfaces { get; set; }
+
+        public DateTime? completed_at { get; set; }
+
         [StringLength(2000)]
         public string? notes { get; set; }
 

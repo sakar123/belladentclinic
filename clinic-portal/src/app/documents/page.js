@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import Input from '@/components/ui/input';
 import { useMemo, useState } from 'react';
-import { FileText, Image as ImageIcon, Paperclip, User } from 'lucide-react';
+import { FileText, Image as ImageIcon, Paperclip, Download } from 'lucide-react';
 import Empty from '@/components/ui/empty';
 
 function iconFor(doc) {
@@ -33,8 +33,21 @@ function DocCard({ d }) {
             <div className="text-sm text-app-muted truncate">{when}{when ? ' · ' : ''}{name ? `${name}` : ''}</div>
           </div>
         </div>
-        <div className="shrink-0 text-right text-xs text-app-muted">
-          {d.type?.name || d.document_type?.name || ''}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-app-muted">{d.type?.name || d.document_type?.name || ''}</span>
+          <button
+            className="p-1.5 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+            title="View / Download"
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                const { url } = await api.document.getDownloadUrl(d.id);
+                window.open(url, '_blank');
+              } catch { /* presigned URL not available for legacy docs */ }
+            }}
+          >
+            <Download size={16} />
+          </button>
         </div>
       </CardContent>
     </Card>

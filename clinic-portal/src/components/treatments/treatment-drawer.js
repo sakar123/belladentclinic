@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { X, Plus, Trash2, ChevronsUpDown, Check } from "lucide-react";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
+import Dialog, { DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
@@ -17,9 +18,18 @@ import {
   CommandItem,
 } from "@/components/ui/command";
 import DentalChart from "@/components/dental/dental-chart";
+import { SurfaceSelector } from "@/components/dental/surface-selector";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { getAdultToothName, getPrimaryToothName } from "@/components/dental/tooth-data";
+import {
+  getToothRawNumber,
+  inferPermanentNumberingSystem,
+  isLowerTooth,
+  isUpperTooth,
+  normalizeChartTooth,
+  normalizeToChartTooth,
+} from "@/components/dental/tooth-numbering";
 import { cn } from "@/lib/utils";
 
 // TreatmentDrawer: Right-anchored slide-over with split panes
@@ -43,13 +53,19 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
   const [creatingService, setCreatingService] = useState(false);
   const [newServiceName, setNewServiceName] = useState("");
   const [newServiceCost, setNewServiceCost] = useState("");
-  const [scope, setScope] = useState("MOUTH"); // 'MOUTH' | 'TEETH'
+  const [scope, setScope] = useState("TEETH"); // 'MOUTH' | 'TEETH'
   const [selectedTeeth, setSelectedTeeth] = useState([]);
+  // Per-tooth surface selection map: { [toothNumber]: 'MO' }
+  const [surfacesByTooth, setSurfacesByTooth] = useState({});
   const [notes, setNotes] = useState("");
 
   // Draft cart state
-  const [draftTreatments, setDraftTreatments] = useState([]); // [{ key, serviceId?, newService?, serviceName, cost, scope, teeth, notes }]
+  const [draftTreatments, setDraftTreatments] = useState([]); // [{ key, serviceId?, newService?, serviceName, cost, scope, teeth, surfaces, notes }]
   const [saving, setSaving] = useState(false);
+  const [healthyStatusId, setHealthyStatusId] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [patientTeeth, setPatientTeeth] = useState([]);
 
   useEffect(() => {
     if (!open) return;
@@ -70,19 +86,112 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
     })();
   }, [open, propServices]);
 
+  // Load HEALTHY tooth status id once when opening
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const list = await api.lookup.toothStatus.getAll();
+        const healthy = (list || []).find(s => String(s.code || s.name).toUpperCase().includes('HEALTHY'));
+        if (healthy) setHealthyStatusId(healthy.id);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !patientId) return;
+    (async () => {
+      try {
+        const list = await api.teeth.getAll({ patientId });
+        setPatientTeeth(Array.isArray(list) ? list : []);
+      } catch {
+        setPatientTeeth([]);
+      }
+    })();
+  }, [open, patientId]);
+
+  // Load dental history for this patient (recent treatments)
+  useEffect(() => {
+    if (!open || !patientId) return;
+    (async () => {
+      try {
+        const all = await api.treatments.getAll();
+        const list = (all||[]).filter(t => t.patient_id === patientId)
+          .sort((a,b) => new Date(b.completed_at || b.created_at || 0) - new Date(a.completed_at || a.created_at || 0))
+          .slice(0, 20);
+        setHistory(list);
+      } catch {
+        setHistory([]);
+      }
+    })();
+  }, [open, patientId]);
+
+  const patientNumberingSystem = useMemo(() => {
+    return inferPermanentNumberingSystem(patientTeeth.map(getToothRawNumber));
+  }, [patientTeeth]);
+
+  const chartTeeth = useMemo(() => {
+    return patientTeeth
+      .map((tooth) => {
+        const rawNumber = getToothRawNumber(tooth);
+        const normalized = normalizeToChartTooth(rawNumber, patientNumberingSystem);
+        if (!normalized) return null;
+        return {
+          id: tooth.id,
+          sourceNumber: Number(rawNumber),
+          chartKind: normalized.kind,
+          chartNumber: normalized.chartNumber,
+          displayNumber: normalized.displayNumber,
+        };
+      })
+      .filter(Boolean);
+  }, [patientTeeth, patientNumberingSystem]);
+
+  const archSelections = useMemo(() => {
+    const upper = chartTeeth
+      .filter((tooth) => isUpperTooth(tooth.chartKind, tooth.chartNumber))
+      .map((tooth) => tooth.chartNumber);
+    const lower = chartTeeth
+      .filter((tooth) => isLowerTooth(tooth.chartKind, tooth.chartNumber))
+      .map((tooth) => tooth.chartNumber);
+    return {
+      upper: upper.length > 0 ? upper : Array.from({ length: 16 }, (_, i) => i + 1),
+      lower: lower.length > 0 ? lower : Array.from({ length: 16 }, (_, i) => i + 17),
+    };
+  }, [chartTeeth]);
+
+  const resolveBackendToothNumber = (chartNumber) => {
+    const selected = normalizeChartTooth(chartNumber);
+    if (!selected) return Number(chartNumber);
+    const existing = chartTeeth.find((tooth) =>
+      tooth.chartKind === selected.kind &&
+      Number(tooth.chartNumber) === Number(selected.chartNumber)
+    );
+    return Number(existing?.sourceNumber ?? chartNumber);
+  };
+
+  const formatChartTooth = (chartNumber) => {
+    const selected = normalizeChartTooth(chartNumber);
+    return selected?.displayNumber ?? Number(chartNumber);
+  };
+
   // Try to auto-select teeth based on appointment notes if present
   useEffect(() => {
     if (!open) return;
     if (!appointmentNotes) return;
+    if (patientTeeth.length === 0) return;
     // Only auto-pick if user hasn't selected yet
     if (selectedTeeth && selectedTeeth.length > 0) return;
     const parsed = parseTeethFromText(String(appointmentNotes || ''));
     if (parsed.length > 0) {
       setScope('TEETH');
-      setSelectedTeeth(parsed);
+      setSelectedTeeth(parsed
+        .map((n) => normalizeToChartTooth(n, patientNumberingSystem)?.chartNumber)
+        .filter(Boolean));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, appointmentNotes]);
+  }, [open, appointmentNotes, patientNumberingSystem, patientTeeth.length, selectedTeeth]);
 
   function parseTeethFromText(text) {
     try {
@@ -123,6 +232,7 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
     setNewServiceCost("");
     setScope("MOUTH");
     setSelectedTeeth([]);
+    setSurfacesByTooth({});
     setNotes("");
   }
 
@@ -139,6 +249,8 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
           cost: Number(newServiceCost) || 0,
           scope,
           teeth: scope === 'TEETH' ? [...selectedTeeth] : [],
+          surfaces: scope === 'TEETH' && selectedTeeth.length === 1 ? (surfacesByTooth?.[selectedTeeth[0]] || '') : '',
+          surfaceMap: { ...surfacesByTooth },
           notes: notes?.trim() || "",
         }
       ]);
@@ -153,6 +265,8 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
           cost: Number(svc?.cost || 0),
           scope,
           teeth: scope === 'TEETH' ? [...selectedTeeth] : [],
+          surfaces: scope === 'TEETH' && selectedTeeth.length === 1 ? (surfacesByTooth?.[selectedTeeth[0]] || '') : '',
+          surfaceMap: { ...surfacesByTooth },
           notes: notes?.trim() || "",
         }
       ]);
@@ -161,13 +275,26 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
   }
 
   async function ensureToothExistsForPatient(patientId, toothNumber) {
-    // Try create; if it already exists, API may 409 — ignore.
+    // Try to create tooth with a default HEALTHY status; ignore if already exists (409)
     try {
-      const isPrimary = Number(toothNumber) >= 51 && Number(toothNumber) <= 85;
-      const name = isPrimary ? getPrimaryToothName(Number(toothNumber)) : getAdultToothName(Number(toothNumber));
-      await api.teeth.create({ patient_id: patientId, tooth_number: Number(toothNumber), tooth_name: name });
+      const normalized = normalizeToChartTooth(toothNumber, patientNumberingSystem);
+      const name = normalized?.kind === "primary"
+        ? getPrimaryToothName(normalized.chartNumber)
+        : getAdultToothName(normalized?.chartNumber ?? Number(toothNumber));
+      let statusId = healthyStatusId;
+      if (!statusId) {
+        try {
+          const list = await api.lookup.toothStatus.getAll();
+          const healthy = (list || []).find(s => String(s.code || s.name).toUpperCase().includes('HEALTHY'));
+          statusId = healthy?.id;
+          if (healthy) setHealthyStatusId(healthy.id);
+        } catch {}
+      }
+      const payload = { patient_id: patientId, tooth_number: Number(toothNumber), tooth_name: name };
+      if (statusId) payload.tooth_status_id = statusId;
+      await api.teeth.create(payload);
     } catch (e) {
-      // Ignore if duplicate/exists; continue.
+      // Ignore if duplicate/exists or other non-fatal errors; treatment creation may still resolve tooth_number.
     }
   }
 
@@ -195,25 +322,55 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
         const serviceId = d.serviceId || createdServiceIds.get(`${d.newService.name}|${Number(d.newService.cost || 0)}`);
         if (!serviceId) continue;
         let treatment_scope = 'NonTooth';
+        // Normalize surfaces: map anterior 'I'→'O' and 'F'→'B'
+        const normalizeSurfaces = (s) => (s || '').toUpperCase().replaceAll('I','O').replaceAll('F','B');
         let payload = {
           appointment_id: appointmentId,
           patient_id: patientId,
           staff_id: staffId,
           service_id: serviceId,
           notes: d.notes || '',
+          surfaces: normalizeSurfaces((d.surfaces || '').trim()) || undefined,
         };
         if (d.scope === 'MOUTH') {
           treatment_scope = 'FullMouth';
         } else {
-          const arr = Array.isArray(d.teeth) ? d.teeth.map(n => Number(n)) : [];
-          if (arr.length === 1) {
+          const chartArr = Array.isArray(d.teeth) ? d.teeth.map(n => Number(n)).filter(Number.isFinite) : [];
+          const backendArr = chartArr.map(resolveBackendToothNumber);
+          const draftSurfaceMap = d.surfaceMap || {};
+          const surfaceForChartTooth = (chartTooth) => (draftSurfaceMap?.[chartTooth] || surfacesByTooth?.[chartTooth] || '').toUpperCase();
+          if (chartArr.length === 1) {
             treatment_scope = 'SingleTooth';
-            await ensureToothExistsForPatient(patientId, arr[0]);
-            payload = { ...payload, tooth_number: arr[0] };
-          } else if (arr.length > 1) {
-            treatment_scope = 'MultipleTeeth';
-            for (const n of arr) await ensureToothExistsForPatient(patientId, n);
-            payload = { ...payload, tooth_numbers: arr };
+            await ensureToothExistsForPatient(patientId, backendArr[0]);
+            const surf = surfaceForChartTooth(chartArr[0]);
+            payload = { ...payload, tooth_number: backendArr[0], surfaces: normalizeSurfaces(surf) || undefined };
+          } else if (chartArr.length > 1) {
+            // If surfaces vary by tooth, split into per-tooth treatments; else use MultiTeeth with common surfaces
+            for (const n of backendArr) await ensureToothExistsForPatient(patientId, n);
+            const set = new Set(chartArr.map(n => normalizeSurfaces(surfaceForChartTooth(n))));
+            // Remove empties
+            const filtered = Array.from(set).filter(Boolean);
+            if (filtered.length <= 1) {
+              treatment_scope = 'MultipleTeeth';
+              // surface_map for per-tooth differentiation (optional)
+              const surface_map = Object.fromEntries(chartArr
+                .map((chartTooth, idx) => [backendArr[idx], surfaceForChartTooth(chartTooth).split('').filter(Boolean)])
+                .filter(([,v]) => v.length > 0)
+              );
+              payload = { ...payload, tooth_numbers: backendArr, surfaces: filtered[0] || undefined, surface_map: Object.keys(surface_map).length ? surface_map : undefined };
+            } else {
+              // Save one SingleTooth treatment per tooth with its own surfaces
+              for (let i = 0; i < chartArr.length; i += 1) {
+                const perToothPayload = {
+                  ...payload,
+                  treatment_scope: 'SingleTooth',
+                  tooth_number: backendArr[i],
+                  surfaces: normalizeSurfaces(surfaceForChartTooth(chartArr[i])) || undefined,
+                };
+                await api.treatments.create(perToothPayload);
+              }
+              continue; // skip default create below, already created
+            }
           } else {
             treatment_scope = 'NonTooth';
           }
@@ -311,7 +468,7 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
                             }}
                           >
                             <Plus className="mr-2 h-4 w-4" />
-                            Create "{serviceSearch.trim()}"
+                            Create &quot;{serviceSearch.trim()}&quot;
                           </CommandItem>
                         )}
                       </CommandGroup>
@@ -341,10 +498,25 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
                 </div>
               </div>
 
+              {scope === 'TEETH' && (
+                <div className="mt-4">
+                  {selectedTeeth.length === 1 ? (
+                    <SurfaceSelector
+                      value={(surfacesByTooth?.[selectedTeeth[0]] || '').toUpperCase()}
+                      onChange={(val) => setSurfacesByTooth(prev => ({ ...prev, [selectedTeeth[0]]: String(val || '').toUpperCase() }))}
+                    />
+                  ) : (
+                    <div className="text-xs text-app-muted">
+                      Select a single tooth to use the quick surface picker, or click directly on teeth in the chart to set per‑tooth surfaces.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Notes */}
               <div>
                 <div className="text-xs text-app-muted mb-1">Notes (optional)</div>
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add any notes" />
+                <textarea className="w-full min-h-24 h-28 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add any notes" />
               </div>
 
               {/* Primary action */}
@@ -365,13 +537,43 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
                     <li key={d.key} className="flex items-center gap-3 justify-between p-2 border border-app-border rounded-sm bg-app-bg">
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{d.serviceName} {d.cost ? `— Rs ${Number(d.cost).toLocaleString()}` : ''}</div>
-                        <div className="text-xs text-app-muted truncate">{d.scope === 'MOUTH' ? 'Whole Mouth' : `Teeth: ${(d.teeth || []).join(', ')}`}{d.notes ? ` • ${d.notes}` : ''}</div>
+                        <div className="text-xs text-app-muted truncate">{d.scope === 'MOUTH' ? 'Whole Mouth' : `Teeth: ${(d.teeth || []).map(formatChartTooth).join(', ')}`}{d.notes ? ` • ${d.notes}` : ''}</div>
                       </div>
                       <button className="p-2 rounded hover:bg-white" onClick={() => setDraftTreatments(prev => prev.filter(x => x.key !== d.key))} aria-label="Remove">
                         <Trash2 className="size-4 text-red-500" />
                       </button>
                     </li>
                   ))}
+                </ul>
+              </div>
+
+              {/* Dental History */}
+              <div className="pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-app-muted font-medium">Dental History (recent)</div>
+                  {history.length > 5 && (
+                    <button className="text-[10px] text-blue-600 hover:underline px-1" onClick={() => setHistoryModalOpen(true)}>View All</button>
+                  )}
+                </div>
+                {history.length === 0 && (
+                  <div className="text-xs text-app-muted">No prior treatments.</div>
+                )}
+                <ul className="space-y-3 max-h-56 overflow-auto pr-1">
+                  {history.slice(0, 5).map(h => {
+                    const docName = h.staff?.person ? `${h.staff.person.first_name || ''} ${h.staff.person.last_name || ''}`.trim() : (h.staff_name || h.provider_name || 'Staff');
+                    return (
+                      <li key={h.id} className="text-xs flex flex-col gap-0.5 border-b border-app-border pb-2 last:border-0">
+                        <div className="font-medium text-app-foreground">
+                          {h.service_name || h.service?.name || 'Treatment'}
+                          <span className="font-normal text-app-muted mx-1">·</span>
+                          <span className="font-normal text-app-muted">{h.completed_at || h.created_at ? new Date(h.completed_at || h.created_at).toLocaleDateString() : ''}</span>
+                          <span className="font-normal text-app-muted mx-1">·</span>
+                          <span className="font-normal text-app-muted">{docName}</span>
+                        </div>
+                        {h.notes && <div className="text-app-muted whitespace-pre-wrap leading-normal mt-0.5">{h.notes}</div>}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             </div>
@@ -388,7 +590,16 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
           <div className="md:col-span-3 h-full relative">
             <div className={cn("absolute inset-0 p-4 overflow-y-auto", scope === 'MOUTH' && 'pointer-events-none opacity-40')}
                  aria-disabled={scope === 'MOUTH'}>
-              <div className="text-xs text-app-muted mb-2">Select teeth</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-app-muted">Select teeth</div>
+                {scope === 'TEETH' && (
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => setSelectedTeeth(archSelections.upper)}>Maxillary Arch</Button>
+                    <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => setSelectedTeeth(archSelections.lower)}>Mandibular Arch</Button>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setSelectedTeeth([])}>Clear</Button>
+                  </div>
+                )}
+              </div>
               <DentalChart
                 patientId={patientId}
                 selectedTeeth={selectedTeeth}
@@ -396,9 +607,21 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
                 selectMode="multiple"
                 showLegend={false}
                 className="w-full"
+                interactiveSurfaces={scope === 'TEETH'}
+                selectedSurfacesMap={Object.fromEntries(Object.entries(surfacesByTooth).map(([k,v]) => [Number(k), (v||'').toUpperCase().split('')]))}
+                onSurfaceClick={(tooth, s) => {
+                  setSurfacesByTooth(prev => {
+                    const cur = (prev?.[tooth] || '').toUpperCase();
+                    const has = cur.includes(s);
+                    const next = has ? cur.replace(s, '') : (cur + s);
+                    return { ...prev, [tooth]: next };
+                  });
+                }}
               />
               {scope === 'TEETH' && selectedTeeth.length > 0 && (
-                <div className="mt-3 text-xs text-app-muted">Selected: {selectedTeeth.join(', ')}</div>
+                <div className="mt-3 text-xs text-app-muted">Selected: {selectedTeeth.map(formatChartTooth).join(', ')}
+                  {selectedTeeth.length === 1 && (surfacesByTooth?.[selectedTeeth[0]] ? ` — Surfaces: ${surfacesByTooth[selectedTeeth[0]].toUpperCase()}` : '')}
+                </div>
               )}
               {scope === 'MOUTH' && (
                 <div className="mt-3 text-xs text-app-muted">Whole Mouth selected — chart disabled.</div>
@@ -414,6 +637,40 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
           </div>
         </div>
       </div>
+      {/* Full Dental History Modal */}
+      <Dialog open={historyModalOpen} onClose={() => setHistoryModalOpen(false)}>
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Patient Dental History</DialogTitle>
+            <button className="p-1 rounded hover:bg-app-bg" onClick={() => setHistoryModalOpen(false)} aria-label="Close history">
+              <X className="size-4" />
+            </button>
+          </div>
+        </DialogHeader>
+        <DialogBody>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            {history.map(h => {
+              const docName = h.staff?.person ? `${h.staff.person.first_name || ''} ${h.staff.person.last_name || ''}`.trim() : (h.staff_name || h.provider_name || 'Staff');
+              return (
+                <div key={h.id} className="text-sm flex flex-col gap-1 border-b border-app-border pb-4 last:border-0">
+                  <div className="font-medium text-app-foreground">
+                    {h.service_name || h.service?.name || 'Treatment'}
+                  </div>
+                  <div className="text-xs text-app-muted flex items-center gap-2">
+                    <span>{h.completed_at || h.created_at ? new Date(h.completed_at || h.created_at).toLocaleDateString() : ''}</span>
+                    <span>·</span>
+                    <span>{docName}</span>
+                  </div>
+                  {h.notes && <div className="text-app-foreground whitespace-pre-wrap leading-relaxed mt-1 text-sm bg-app-surface p-3 rounded border border-app-border">{h.notes}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setHistoryModalOpen(false)}>Close</Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

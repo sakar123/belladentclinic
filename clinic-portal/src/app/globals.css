@@ -153,3 +153,24 @@ html, body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Print styles: hide chrome and make invoice content full width */
+@media print {
+  /* Hide sidebar, header/nav, and any explicit no-print controls */
+  aside, header, nav, .no-print {
+    display: none !important;
+  }
+  /* Expand main content area */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+  /* Containers should not constrain width */
+  .container-max {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}

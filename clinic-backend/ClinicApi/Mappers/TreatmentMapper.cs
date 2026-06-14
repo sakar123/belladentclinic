@@ -26,13 +26,21 @@ namespace ClinicApi.Mappers
                 staff_id = entity.staff_id,
                 service_id = entity.service_id,
                 treatment_scope = entity.treatment_scope,
+                status = entity.status,
+                completed_at = entity.completed_at,
+                created_at = entity.created_at,
+                updated_at = entity.updated_at,
                 // Back-compat single fields: take the first tooth if any
                 tooth_id = entity.teeth.FirstOrDefault()?.id,
                 tooth_number = entity.teeth.FirstOrDefault()?.tooth_number,
                 // New multi-tooth fields
                 tooth_ids = entity.teeth.Select(t => t.id).ToList(),
                 tooth_numbers = entity.teeth.Select(t => t.tooth_number).ToList(),
-                notes = entity.notes
+                notes = entity.notes,
+                service_name = entity.service?.name,
+                resulting_tooth_status_code = entity.service?.resulting_tooth_status?.code,
+                visual_cue_code = entity.service?.visual_cue_code,
+                surfaces = entity.surfaces
             };
         }
 
@@ -52,12 +60,15 @@ namespace ClinicApi.Mappers
                 staff_id = dto.staff_id,
                 service_id = dto.service_id,
                 treatment_scope = dto.treatment_scope ?? "SingleTooth",
+                status = dto.status ?? "Planned",
+                completed_at = dto.completed_at,
                 // Set required navigation properties to null or appropriate values if available
                 appointment = null,
                 patient = null,
                 staff = null,
                 service = null,
                 notes = dto.notes,
+                surfaces = dto.surfaces,
                 prescriptions = new List<Prescription>(),
                 billing_line_item = new List<BillingLineItem>(),
                 documents = new List<Document>(),

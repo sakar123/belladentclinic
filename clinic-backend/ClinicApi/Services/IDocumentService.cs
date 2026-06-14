@@ -7,7 +7,7 @@ namespace ClinicApi.Services
 {
     public interface IDocumentService
     {
-        Task<IEnumerable<DocumentDTO>> GetAllDocumentsAsync();
+        Task<IEnumerable<DocumentDTO>> GetAllDocumentsAsync(Guid? patientId = null);
         Task<DocumentDTO> GetDocumentByIdAsync(Guid id);
         Task<DocumentDTO> CreateDocumentAsync(DocumentDTO documentDto);
         Task<DocumentDTO> UpdateDocumentAsync(Guid id, DocumentDTO documentDto);

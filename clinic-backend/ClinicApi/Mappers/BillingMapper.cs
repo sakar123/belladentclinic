@@ -1,6 +1,7 @@
 using ClinicApi.Models.DTOs;
 using ClinicApi.Models.Entities;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ClinicApi.Mappers
 {
@@ -25,7 +26,15 @@ namespace ClinicApi.Mappers
                 due_date = entity.due_date,
                 total_amount = entity.total_amount,
                 amount_paid = entity.amount_paid,
-                status = entity.status
+                status = entity.status,
+                notes = entity.notes,
+                patient_name = entity.patient?.Person != null ? $"{entity.patient.Person.first_name} {entity.patient.Person.last_name}".Trim() : null,
+                patient_email = entity.patient?.Person?.email,
+                patient_phone = entity.patient?.Person?.phone_number,
+                line_items = entity.billing_line_Item != null ?
+                    new List<BillingLineItemDTO>(entity.billing_line_Item.Select(li => BillingLineItemMapper.ToDto(li, visited))) : null,
+                payments = entity.payment != null ?
+                    new List<PaymentDTO>(entity.payment.Select(p => PaymentMapper.ToDto(p, visited))) : null
             };
         }
 
@@ -46,6 +55,7 @@ namespace ClinicApi.Mappers
                 total_amount = dto.total_amount,
                 amount_paid = dto.amount_paid,
                 status = dto.status,
+                notes = dto.notes,
                 billing_line_Item = new List<BillingLineItem>(),
                 payment = new List<Payment>(),
                 patient = null // TODO: Set this to the appropriate Patient object if available

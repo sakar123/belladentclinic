@@ -49,7 +49,7 @@ export default function LookupTable({ lookupType }) {
   if (error) return <div>Failed to load data.</div>;
   if (!data) return <div>Loading...</div>;
 
-  const columns = Object.keys(data[0] || {});
+  const columns = Object.keys(data[0] || {}).filter(col => col !== 'id');
 
   return (
     <div>

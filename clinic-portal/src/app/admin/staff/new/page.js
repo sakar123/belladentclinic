@@ -94,7 +94,16 @@ export default function NewStaffPage() {
           </div>
           <div>
             <Label htmlFor="gender">Gender</Label>
-            <Input id="gender" value={gender} onChange={(e) => setGender(e.target.value)} />
+            <Select value={gender} onValueChange={setGender}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select gender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Male">Male</SelectItem>
+                <SelectItem value="Female">Female</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-6">

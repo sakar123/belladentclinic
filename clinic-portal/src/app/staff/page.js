@@ -10,6 +10,7 @@ import { useToast } from "../../components/ui/toast";
 // Auth disabled for dev: no imports or gating
 import Combobox from "../../components/ui/combobox";
 import { normalizeStaff } from "../../lib/normalizers";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 
 export default function StaffPage() {
   const [staff, setStaff] = useState([]);
@@ -311,7 +312,16 @@ function CreateStaffDialog({ open, onClose, onCreated, initial, roles }) {
               {errors.licenseNumber && <div className="mt-1 text-xs text-red-600">{errors.licenseNumber}</div>}
             </Field>
             <Field label="Gender">
-              <Input placeholder="Male/Female/Other" value={v.gender} onChange={(e) => setV({ ...v, gender: e.target.value })} />
+              <Select value={v.gender} onValueChange={(val) => setV({ ...v, gender: val })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Date of birth">
               <Input type="date" value={v.dob} onChange={(e) => setV({ ...v, dob: e.target.value })} />

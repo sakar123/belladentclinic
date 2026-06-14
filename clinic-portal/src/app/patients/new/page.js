@@ -7,6 +7,7 @@ import Input from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function NewPatientPage() {
   const router = useRouter();
@@ -80,7 +81,16 @@ export default function NewPatientPage() {
           </div>
           <div>
             <Label htmlFor="gender">Gender</Label>
-            <Input id="gender" value={gender} onChange={(e) => setGender(e.target.value)} />
+            <Select value={gender} onValueChange={setGender}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select gender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Male">Male</SelectItem>
+                <SelectItem value="Female">Female</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-6">

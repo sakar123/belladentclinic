@@ -26,5 +26,15 @@ namespace ClinicApi.Models.DTOs
         
         [Required]
         public string status { get; set; }
+
+        [StringLength(2000)]
+        public string? notes { get; set; }
+
+        // Read-only enrichments (populated when navs are included)
+        public string? patient_name { get; set; }
+        public string? patient_email { get; set; }
+        public string? patient_phone { get; set; }
+        public List<BillingLineItemDTO>? line_items { get; set; }
+        public List<PaymentDTO>? payments { get; set; }
     }
 }

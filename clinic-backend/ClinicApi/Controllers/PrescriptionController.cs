@@ -4,11 +4,13 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "SupportOrAbove")]
     public class PrescriptionController : ControllerBase
     {
         private readonly IPrescriptionService _prescriptionService;
@@ -35,6 +37,7 @@ namespace ClinicApi.Controllers
             return Ok(prescription);
         }
 
+        [Authorize(Policy = "ClinicalOrAbove")]
         [HttpPost]
         public async Task<ActionResult<PrescriptionDTO>> CreatePrescription(PrescriptionDTO prescriptionDto)
         {
@@ -49,6 +52,7 @@ namespace ClinicApi.Controllers
             }
         }
 
+        [Authorize(Policy = "ClinicalOrAbove")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdatePrescription(Guid id, PrescriptionDTO prescriptionDto)
         {
@@ -63,6 +67,7 @@ namespace ClinicApi.Controllers
             }
         }
 
+        [Authorize(Policy = "ClinicalOrAbove")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePrescription(Guid id)
         {

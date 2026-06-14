@@ -1,30 +1,27 @@
-BEGIN;
+-- Truncate all tables in the current database (public schema), restarting identities and cascading to dependent tables.
+-- This preserves the schema and only deletes data.
 
--- 1. Delete from tables with no or least dependencies (or deepest in the dependency chain)
-DELETE FROM sale_item;
-DELETE FROM payment;
-DELETE FROM billing_line_item;
-DELETE FROM prescription;
-DELETE FROM treatment;
-DELETE FROM document;
-DELETE FROM tooth;
+DO $$
+DECLARE
+    stmt text;
+BEGIN
+    SELECT 'TRUNCATE TABLE '
+           || string_agg(format('%I.%I', schemaname, tablename), ', ')
+           || ' RESTART IDENTITY CASCADE'
+    INTO stmt
+    FROM pg_tables
+    WHERE schemaname = 'public'
+      AND tablename NOT LIKE 'pg_%'
+      AND tablename NOT LIKE 'sql_%'
+      AND tablename <> '__efmigrationshistory';
 
--- 2. Delete from intermediate tables
-DELETE FROM billing;
-DELETE FROM appointment;
-DELETE FROM patient;
-DELETE FROM staff;
+    IF stmt IS NOT NULL THEN
+        RAISE NOTICE 'Executing: %', stmt;
+        EXECUTE stmt;
+    ELSE
+        RAISE NOTICE 'No user tables found to truncate.';
+    END IF;
+END;
+$$;
 
--- 3. Delete from lookup/core tables (least dependent)
-DELETE FROM role;
-DELETE FROM service;
-DELETE FROM specialty;
-DELETE FROM appointment_status;
 
-DELETE FROM document_type;
-DELETE FROM tooth_status;
-DELETE FROM discount_type;
-DELETE FROM person; -- Person is usually the root of many relationships
-
--- Commit the transaction if all deletions were successful
-COMMIT;

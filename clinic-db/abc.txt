@@ -1,0 +1,75 @@
+Problem
+On the Appointment Details page, the "Create Billing for Selected" button allows creating multiple invoices/bills for the same treatment. There is no check to see if a billing/invoice already exists for a treatment. This leads to duplicate invoices and incorrect financial records.
+Fix: Prevent Duplicate Billing Per Treatment
+1. Backend: Track Billing Status Per Treatment
+
+Each treatment record should have a field (or a relationship) that tracks whether billing has already been created:
+
+Option A: Add a billing_id foreign key column on the treatments table. When a bill is created for a treatment, store the associated invoice ID. If billing_id IS NOT NULL, the treatment is already billed.
+Option B: Add a billed boolean flag on the treatments table. Set to true when billing is created.
+Option A is preferred because it maintains the direct link to the invoice.
+
+
+
+2. Backend: Validate Before Creating Billing
+
+In the Create Billing API endpoint, before creating a new invoice for selected treatments:
+
+  For each selected treatment_id:
+    Check if treatment already has a billing_id / invoice linked
+    If YES → reject with error: "Treatment '{name}' already has an invoice (Invoice #{invoice_number}). Cannot create duplicate billing."
+    If NO → proceed
+
+Return a 400 error with a clear message listing which treatments are already billed.
+
+3. Frontend: Disable Selection of Already-Billed Treatments
+
+When rendering the treatment list with checkboxes:
+
+If a treatment already has billing created, show it with:
+
+✅ A "Billed" badge/tag (green) next to the treatment name
+🔗 A link to the existing invoice (e.g., "View Invoice #1234")
+☐ The checkbox should be disabled (greyed out, not selectable)
+
+
+If a treatment has no billing yet:
+
+☐ Checkbox is enabled and selectable as normal
+
+
+
+
+
+4. Frontend: Update "Create Billing for Selected" Button State
+
+If all treatments in the appointment are already billed:
+
+Hide or disable the "Create Billing for Selected" button entirely
+Show a message: "All treatments have been billed." with links to view the invoices.
+
+
+If some are billed and some aren't:
+
+Only allow selecting the un-billed treatments
+The button remains active for the un-billed ones
+
+
+
+5. After Billing is Created
+
+Once billing is successfully created for selected treatments:
+
+Update each treatment's billing_id with the new invoice ID
+Refresh the treatment list to show the "Billed" badge
+Disable the checkboxes for those treatments
+Optionally show a success toast: "Invoice #1234 created for 2 treatments." with a link to the invoice
+
+
+
+6. Edge Case: Deleted Invoices
+
+If an invoice linked to a treatment is deleted, clear the treatment's billing_id back to null so it becomes billable again.
+
+Also Fix: Duplicate Navbar at Bottom
+The screenshot still shows the BELLA DENT navbar duplicated at the bottom of the page. This global layout bug persists — ensure the navbar renders only once at the top. Check the root layout component for duplicate rendering.

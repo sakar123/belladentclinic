@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function Header({ className }) {
-  const { user, logout } = useAuth();
+  const { user, logout, login } = useAuth();
   const router = useRouter();
   const [term, setTerm] = useState("");
 
@@ -66,8 +66,12 @@ export default function Header({ className }) {
               <Button variant="ghost" className="text-white/90 hover:bg-white/10" onClick={logout}>Log out</Button>
             </div>
           ) : (
-            <Button asChild variant="ghost" className="text-white/90 hover:bg-white/10">
-              <Link href="/login">Log in</Link>
+            <Button
+              variant="ghost"
+              className="text-white/90 hover:bg-white/10"
+              onClick={() => login('/')}
+            >
+              Log in
             </Button>
           )}
         </div>

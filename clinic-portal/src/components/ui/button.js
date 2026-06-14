@@ -4,7 +4,7 @@ import { cn } from "../../lib/utils";
 const Button = React.forwardRef(function Button({ as: Comp = "button", className, variant = "default", size = "md", ...props }, ref) {
   const variants = {
     /* primary now white with subtle border */
-    default: "bg-primary text-primary-foreground border border-app-border hover:bg-app-bg",
+    default: "bg-primary text-primary-foreground border border-app-border hover:bg-teal-600",
     /* blue secondary */
     secondary: "bg-secondary text-white hover:opacity-90",
     /* pink accent/tertiary */

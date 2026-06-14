@@ -4,10 +4,12 @@ using System.Threading.Tasks;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AdminOnly")]
     public class StaffController : ControllerBase
     {
         private readonly IStaffService _staffService;

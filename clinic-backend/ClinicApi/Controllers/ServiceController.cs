@@ -4,11 +4,13 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AllStaff")]
     public class ServiceController : ControllerBase
     {
         private readonly IServiceService _serviceService;
@@ -35,6 +37,7 @@ namespace ClinicApi.Controllers
             return Ok(service);
         }
 
+        [Authorize(Policy = "AdminOnly")]
         [HttpPost]
         public async Task<ActionResult<ServiceDTO>> CreateService(ServiceDTO serviceDto)
         {
@@ -49,6 +52,7 @@ namespace ClinicApi.Controllers
             }
         }
 
+        [Authorize(Policy = "AdminOnly")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateService(Guid id, ServiceDTO serviceDto)
         {
@@ -63,6 +67,7 @@ namespace ClinicApi.Controllers
             }
         }
 
+        [Authorize(Policy = "AdminOnly")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteService(Guid id)
         {

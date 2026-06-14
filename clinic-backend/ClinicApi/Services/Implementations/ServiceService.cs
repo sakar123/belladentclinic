@@ -2,6 +2,7 @@ using ClinicApi.Data.Repositories;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Models.Entities;
 using ClinicApi.Mappers;
+using Microsoft.EntityFrameworkCore;
 
 namespace ClinicApi.Services.Implementations
 {
@@ -20,7 +21,10 @@ namespace ClinicApi.Services.Implementations
 
         public async Task<IEnumerable<ServiceDTO>> GetAllServicesAsync()
         {
-            var services = await _serviceRepository.GetAllAsync();
+            var services = await _serviceRepository
+                .GetAll()
+                .Include(s => s.resulting_tooth_status)
+                .ToListAsync();
             var visited = new HashSet<object>();
 
             return services.Select(s => ServiceMapper.ToDto(s, visited)).ToList();
@@ -28,7 +32,10 @@ namespace ClinicApi.Services.Implementations
 
         public async Task<ServiceDTO> GetServiceByIdAsync(Guid id)
         {
-            var service = await _serviceRepository.GetByIdAsync(id);
+            var service = await _serviceRepository
+                .GetAll()
+                .Include(s => s.resulting_tooth_status)
+                .FirstOrDefaultAsync(s => s.id == id);
             var visited = new HashSet<object>();
 
             return ServiceMapper.ToDto(service, visited);
