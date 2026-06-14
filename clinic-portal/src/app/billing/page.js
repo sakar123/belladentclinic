@@ -5,11 +5,12 @@ import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import Input from '@/components/ui/input';
 import { useMemo, useState } from 'react';
-import { CreditCard, CalendarDays, User, AlertTriangle } from 'lucide-react';
+import { CreditCard, CalendarDays, User, AlertTriangle, Bell } from 'lucide-react';
 import Empty from '@/components/ui/empty';
 import Button from '@/components/ui/button';
 import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
+import { useRouter } from 'next/navigation';
 
 function money(n) {
   if (n === undefined || n === null) return '—';
@@ -34,8 +35,8 @@ function BillingCard({ b, patients }) {
   const name = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Patient';
   const due = b.due_date ? new Date(b.due_date) : null;
   const daysLeft = due ? Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
-  const overdue = daysLeft !== null && daysLeft < 0;
   const remaining = Math.max(0, Number(b.total_amount||0) - Number(b.amount_paid||0));
+  const overdue = daysLeft !== null && daysLeft < 0 && remaining > 0;
   const fullyPaid = remaining <= 0;
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -65,6 +66,7 @@ function BillingCard({ b, patients }) {
 }
 
 export default function BillingPage() {
+  const router = useRouter();
   const { data: billings, error, mutate } = useSWR('billings', () => api.billing.getAll());
   const { data: patients } = useSWR('patients-mini', () => api.patient.getAll());
   const [q, setQ] = useState('');
@@ -72,6 +74,9 @@ export default function BillingPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [payTarget, setPayTarget] = useState(null);
   const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('');
+  const [payRef, setPayRef] = useState('');
+  const [payNotes, setPayNotes] = useState('');
   const [newOpen, setNewOpen] = useState(false);
   const [newPatientId, setNewPatientId] = useState('');
   const [newAmount, setNewAmount] = useState('');
@@ -170,15 +175,40 @@ export default function BillingPage() {
           const fullyPaid = remaining <= 0;
           return (
             <div key={b.id} className="space-y-2">
-              <BillingCard b={b} patients={patients || []} />
+              <div className="cursor-pointer" onClick={() => router.push(`/billing/${b.id}`)}>
+                <BillingCard b={b} patients={patients || []} />
+              </div>
               {!fullyPaid && (
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={() => { setPayTarget(b); setPayAmount(''); setPayOpen(true); }}>Add Payment</Button>
+                  <Button size="sm" onClick={() => { setPayTarget(b); setPayAmount(''); setPayMethod(''); setPayRef(''); setPayNotes(''); setPayOpen(true); }}>Add Payment</Button>
                   <Button size="sm" variant="outline" onClick={async () => {
                     await api.billing.update(b.id, { ...b, amount_paid: b.total_amount, status: 'Paid' });
                     notify({ title: 'Marked as paid' });
                     mutate();
                   }}>Mark Paid</Button>
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    const remaining = Math.max(0, Number(b.total_amount||0) - Number(b.amount_paid||0));
+                    if (remaining <= 0) return;
+                    const ok = confirm(`Send payment reminder for Rs ${remaining.toLocaleString()}?`);
+                    if (!ok) return;
+                    try {
+                      const patient = (patients||[]).find(px => px.id === (b.patient?.id || b.patient_id));
+                      await api.notifications.dispatch({
+                        topicCode: 'BILLING_INVOICE',
+                        channel: 'Email',
+                        personIds: [patient?.person?.id].filter(Boolean),
+                        payload: {
+                          patient_name: `${patient?.person?.first_name || patient?.person?.firstName || ''} ${patient?.person?.last_name || patient?.person?.lastName || ''}`.trim(),
+                          total_amount: String(b.total_amount || ''),
+                          due_date: '',
+                        },
+                        initiatedBy: 'portal',
+                      });
+                      notify({ title: 'Reminder sent' });
+                    } catch (e) {
+                      notify({ title: 'Failed to send reminder', description: String(e?.message || e) });
+                    }
+                  }} title="Send reminder"><Bell size={16} /></Button>
                 </div>
               )}
               <div className="flex items-center gap-2">
@@ -205,22 +235,48 @@ export default function BillingPage() {
             <div>Paid: <span className="font-medium">{money(payTarget?.amount_paid)}</span></div>
             <div>Remaining: <span className="font-medium">{money(Math.max(0, (Number(payTarget?.total_amount||0) - Number(payTarget?.amount_paid||0))))}</span></div>
           </div>
-          <div className="mt-3">
-            <div className="text-xs text-app-muted mb-1">Payment amount (Rs)</div>
-            <Input type="number" min="0" step="1" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+          <div className="mt-3 space-y-3">
+            <div>
+              <div className="text-xs text-app-muted mb-1">Amount (Rs) *</div>
+              <Input type="number" min="0.01" step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+            </div>
+            <div>
+              <div className="text-xs text-app-muted mb-1">Payment Method *</div>
+              <select className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
+                <option value="">Select method…</option>
+                <option value="Cash">Cash</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Insurance">Insurance</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Mobile-Pay">Mobile-Pay</option>
+              </select>
+            </div>
+            <div>
+              <div className="text-xs text-app-muted mb-1">Transaction Reference</div>
+              <Input value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="e.g., TXN123456" />
+            </div>
+            <div>
+              <div className="text-xs text-app-muted mb-1">Notes</div>
+              <textarea className="w-full h-20 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm" value={payNotes} onChange={(e) => setPayNotes(e.target.value)} placeholder="e.g., Insurance claim submitted" />
+            </div>
           </div>
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" onClick={() => setPayOpen(false)}>Cancel</Button>
-          <Button onClick={async () => {
+          <Button disabled={!payAmount || !payMethod} onClick={async () => {
             const amt = Math.max(0, Number(payAmount || 0));
-            const newPaid = Math.min(Number(payTarget.amount_paid || 0) + amt, Number(payTarget.total_amount || 0));
-            const newStatus = newPaid >= Number(payTarget.total_amount || 0) ? 'Paid' : 'Partial';
-            await api.billing.update(payTarget.id, { ...payTarget, amount_paid: newPaid, status: newStatus });
-            setPayOpen(false); setPayTarget(null); setPayAmount('');
-            notify({ title: 'Payment recorded', description: `Rs ${amt.toLocaleString()}` });
+            await api.billing.addPayment(payTarget.id, {
+              billing_id: payTarget.id,
+              amount: amt,
+              method: payMethod,
+              transaction_ref: payRef || null,
+              notes: payNotes || null,
+              created_by: 'staff',
+            });
+            setPayOpen(false); setPayTarget(null); setPayAmount(''); setPayMethod(''); setPayRef(''); setPayNotes('');
+            notify({ title: 'Payment recorded', description: `Rs ${amt.toLocaleString()} via ${payMethod}` });
             mutate();
-          }}>Save</Button>
+          }}>Record Payment</Button>
         </DialogFooter>
       </Dialog>
 

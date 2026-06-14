@@ -27,7 +27,11 @@ namespace ClinicApi.Mappers
                 description = entity.description,
                 quantity = entity.quantity,
                 unit_price = entity.unit_price,
-                discount_percentage = entity.discount_percentage
+                discount_percentage = entity.discount_percentage,
+                service_name = entity.service?.name,
+                treatment_notes = entity.treatment?.notes,
+                staff_name = entity.treatment?.staff != null ? $"{entity.treatment.staff.person?.first_name} {entity.treatment.staff.person?.last_name}".Trim() : null,
+                appointment_id = entity.treatment?.appointment_id
             };
         }
 

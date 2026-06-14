@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { Table, Thead, Tbody, Tr, Th, Td } from "../ui/table";
 import Button from "../ui/button";
 
-export default function RecipientSelector({ rows, selectedIds, setSelectedIds, onSelectAll, onClearAll }) {
+export default function RecipientSelector({ rows, selectedIds, setSelectedIds, onSelectAll, onClearAll, loading = false, emptyMessage = "No recipients" }) {
   const allIds = useMemo(() => rows.map(r => r.personId).filter(Boolean), [rows]);
   const allSelected = useMemo(() => allIds.length > 0 && allIds.every(id => selectedIds.has(id)), [allIds, selectedIds]);
 
@@ -39,7 +39,17 @@ export default function RecipientSelector({ rows, selectedIds, setSelectedIds, o
             </Tr>
           </Thead>
           <Tbody>
-            {rows.map((r) => (
+            {loading && (
+              <Tr>
+                <Td colSpan={4} className="text-center py-6 text-sm text-app-muted">Loading recipients…</Td>
+              </Tr>
+            )}
+            {!loading && rows.length === 0 && (
+              <Tr>
+                <Td colSpan={4} className="text-center py-6 text-sm text-app-muted">{emptyMessage}</Td>
+              </Tr>
+            )}
+            {!loading && rows.map((r) => (
               <Tr key={`${r.personId}-${r.context || ''}`}>
                 <Td className="w-10">
                   <input
@@ -59,4 +69,3 @@ export default function RecipientSelector({ rows, selectedIds, setSelectedIds, o
     </div>
   );
 }
-

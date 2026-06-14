@@ -6,11 +6,13 @@ using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
 using Microsoft.AspNetCore.Http;
 using System.IO;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AllStaff")]
     public class DocumentController : ControllerBase
     {
         private readonly IDocumentService _documentService;
@@ -23,9 +25,9 @@ namespace ClinicApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<DocumentDTO>>> GetDocuments()
+        public async Task<ActionResult<IEnumerable<DocumentDTO>>> GetDocuments([FromQuery] Guid? patientId)
         {
-            var documents = await _documentService.GetAllDocumentsAsync();
+            var documents = await _documentService.GetAllDocumentsAsync(patientId);
             return Ok(documents);
         }
 
@@ -39,6 +41,7 @@ namespace ClinicApi.Controllers
             return Ok(document);
         }
 
+        [Authorize(Policy = "SupportOrAbove")]
         [HttpPost]
         public async Task<ActionResult<DocumentDTO>> CreateDocument(DocumentDTO documentDto)
         {
@@ -53,6 +56,7 @@ namespace ClinicApi.Controllers
             }
         }
 
+        [Authorize(Policy = "SupportOrAbove")]
         [HttpPost("upload")]
         [RequestSizeLimit(50_000_000)] // ~50MB
         public async Task<ActionResult<DocumentDTO>> UploadDocument(
@@ -116,6 +120,7 @@ namespace ClinicApi.Controllers
             return Ok(new { url });
         }
 
+        [Authorize(Policy = "SupportOrAbove")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateDocument(Guid id, DocumentDTO documentDto)
         {
@@ -130,6 +135,7 @@ namespace ClinicApi.Controllers
             }
         }
 
+        [Authorize(Policy = "ClinicalOrAbove")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteDocument(Guid id)
         {

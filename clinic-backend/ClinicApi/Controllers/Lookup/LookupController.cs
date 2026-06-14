@@ -5,6 +5,7 @@ using AutoMapper;
 using ClinicApi.Models.DTOs.Lookup;
 using ClinicApi.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClinicApi.Controllers.Lookup
 {
@@ -44,6 +45,7 @@ namespace ClinicApi.Controllers.Lookup
             return Ok(dto);
         }
 
+        [Authorize(Policy = "AdminOnly")]
         [HttpPost]
         public async Task<ActionResult<TDto>> Create(TCreateDto createDto)
         {
@@ -52,6 +54,7 @@ namespace ClinicApi.Controllers.Lookup
             return CreatedAtAction(nameof(GetById), new { id = (dto as dynamic).id }, dto);
         }
 
+        [Authorize(Policy = "AdminOnly")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, TCreateDto createDto)
         {
@@ -63,6 +66,7 @@ namespace ClinicApi.Controllers.Lookup
             return NoContent();
         }
 
+        [Authorize(Policy = "AdminOnly")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {

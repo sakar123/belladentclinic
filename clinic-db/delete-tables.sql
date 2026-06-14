@@ -26,9 +26,16 @@ DO $$
 DECLARE
     r RECORD;
 BEGIN
-    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+    -- Drop all user tables in public schema except EF Core migrations history
+    FOR r IN (
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename NOT LIKE 'pg_%'
+          AND tablename NOT LIKE 'sql_%'
+          AND tablename <> '__efmigrationshistory'
+    ) LOOP
         EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
     END LOOP;
 END;
 $$;
-

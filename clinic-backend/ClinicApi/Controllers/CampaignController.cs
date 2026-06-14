@@ -4,11 +4,13 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using ClinicApi.Models.DTOs.Notifications;
 using ClinicApi.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/campaigns")]
+    [Authorize(Policy = "AdminOnly")]
     public class CampaignController : ControllerBase
     {
         private readonly ICampaignManager _campaignManager;

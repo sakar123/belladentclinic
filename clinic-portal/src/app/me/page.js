@@ -9,6 +9,12 @@ import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../
 import { http } from "../../lib/http";
 import { normalizePatient } from "../../lib/normalizers";
 import { CalendarDays, Clock, Pill } from "lucide-react";
+import {
+  getToothRawNumber,
+  inferPermanentNumberingSystem,
+  normalizeChartTooth,
+  normalizeToChartTooth,
+} from "../../components/dental/tooth-numbering";
 
 function MePageContent() {
   const router = useRouter();
@@ -24,22 +30,14 @@ function MePageContent() {
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
-  const normalizeToUniversal = (nRaw) => {
-    const n = Number(nRaw);
-    if (!Number.isFinite(n)) return undefined;
-    if (n <= 32) return n;
-    const q = Math.floor(n / 10);
-    const t = n % 10;
-    if (q === 1) return 9 - t;
-    if (q === 2) return 8 + t;
-    if (q === 3) return 25 - t;
-    if (q === 4) return 24 + t;
-    return undefined;
-  };
 
   const patientId = useMemo(() => {
     return search?.get('patientId') || search?.get('id') || undefined;
   }, [search]);
+
+  const patientNumberingSystem = useMemo(() => {
+    return inferPermanentNumberingSystem(teethList.map(getToothRawNumber));
+  }, [teethList]);
 
   useEffect(() => {
     if (!patientId) return;
@@ -80,16 +78,20 @@ function MePageContent() {
         ]);
         const idToCode = {};
         (statuses || []).forEach((s) => { idToCode[s.id] = s.code || s.name || s.value; });
+        const numberingSystem = inferPermanentNumberingSystem((teeth || []).map(getToothRawNumber));
         const tmap = {};
         (teeth || []).forEach((t) => {
-          const num = t.toothNumber || t.number || t.tooth_number;
-          tmap[num] = idToCode[t.toothStatusId || t.tooth_status_id] || t.statusCode || t.status;
+          const num = normalizeToChartTooth(getToothRawNumber(t), numberingSystem)?.chartNumber;
+          if (num) {
+            tmap[num] = idToCode[t.toothStatusId || t.tooth_status_id] || t.statusCode || t.status;
+          }
         });
         setToothStatuses(tmap);
         setTeethList(Array.isArray(teeth) ? teeth : []);
         const sm = {};
         (statuses || []).forEach((s) => {
-          const key = s.code || s.name || s.value;
+          const key = String(s.code || s.name || s.value || '').toUpperCase();
+          if (!key) return;
           sm[key] = { label: s.name || s.description || key, color: s.color };
         });
         setStatusMap(sm);
@@ -203,7 +205,12 @@ function MePageContent() {
               disabled={!selectedTooth}
               onClick={() => {
                 if (!selectedTooth) return;
-                const tooth = (teethList || []).find(t => Number(normalizeToUniversal(t.toothNumber || t.number || t.tooth_number)) === Number(selectedTooth));
+                const selected = normalizeChartTooth(selectedTooth);
+                const tooth = (teethList || []).find(t => {
+                  const normalized = normalizeToChartTooth(getToothRawNumber(t), patientNumberingSystem);
+                  return normalized?.kind === selected?.kind &&
+                    Number(normalized?.chartNumber) === Number(selected?.chartNumber);
+                });
                 const ids = tooth?.id ? [tooth.id] : [];
                 if (ids.length === 0) return;
                 const qs = new URLSearchParams({ patientId: patientId, teeth: ids.join(',') });
@@ -220,32 +227,32 @@ function MePageContent() {
             {selectedTooth && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">Tooth #{selectedTooth}</div>
+                  <div className="text-sm font-medium">Tooth #{normalizeChartTooth(selectedTooth)?.displayNumber ?? selectedTooth}</div>
                   <div className="text-xs text-app-muted">{statusLabel(toothStatuses[selectedTooth], statusMap)}</div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   <div>
                     <div className="text-xs text-app-muted mb-1">Treatments</div>
                     <div className="space-y-1">
-                      {filterByTooth(treatments, selectedTooth).slice(0,3).map((t) => (
+                      {filterByTooth(treatments, selectedTooth, patientNumberingSystem).slice(0,3).map((t) => (
                         <div key={t.id} className="rounded border border-app-border px-2 py-1 text-xs">
                           <div className="font-medium truncate">{t.name || t.procedure || `Treatment ${t.id}`}</div>
                           <div className="text-app-muted">{new Date(t.date || t.createdAt || t.created_at || Date.now()).toLocaleDateString()}</div>
                         </div>
                       ))}
-                      {filterByTooth(treatments, selectedTooth).length === 0 && <div className="text-xs text-app-muted">None</div>}
+                      {filterByTooth(treatments, selectedTooth, patientNumberingSystem).length === 0 && <div className="text-xs text-app-muted">None</div>}
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-app-muted mb-1">Prescriptions</div>
                     <div className="space-y-1">
-                      {filterByTooth(prescriptions, selectedTooth).slice(0,3).map((p) => (
+                      {filterByTooth(prescriptions, selectedTooth, patientNumberingSystem).slice(0,3).map((p) => (
                         <div key={p.id} className="rounded border border-app-border px-2 py-1 text-xs">
                           <div className="font-medium truncate">{p.medication || p.name || `Prescription ${p.id}`}</div>
                           <div className="text-app-muted truncate">{p.dosage || p.instructions || ''}</div>
                         </div>
                       ))}
-                      {filterByTooth(prescriptions, selectedTooth).length === 0 && <div className="text-xs text-app-muted">None</div>}
+                      {filterByTooth(prescriptions, selectedTooth, patientNumberingSystem).length === 0 && <div className="text-xs text-app-muted">None</div>}
                     </div>
                   </div>
                 </div>
@@ -322,12 +329,18 @@ function groupByWeek(apps) {
   }
   return Array.from(map.entries()).map(([week, items]) => ({ week, items }));
 }
-function filterByTooth(items, tooth) {
-  const n = Number(tooth);
+function filterByTooth(items, tooth, numberingSystem = "universal") {
+  const selected = normalizeChartTooth(tooth);
+  if (!selected) return [];
   return (items || []).filter((x) => {
-    const arr = Array.isArray(x.tooth_numbers) ? x.tooth_numbers.map(Number) : [];
-    const single = Number(x.toothNumber || x.tooth || x.tooth_id || x.toothId);
-    return (arr.length > 0 ? arr.includes(n) : single === n);
+    const rawNumbers = Array.isArray(x.tooth_numbers)
+      ? x.tooth_numbers
+      : (x.toothNumber || x.tooth_number || x.tooth ? [x.toothNumber || x.tooth_number || x.tooth] : []);
+    return rawNumbers.some((raw) => {
+      const normalized = normalizeToChartTooth(raw, numberingSystem);
+      return normalized?.kind === selected.kind &&
+        Number(normalized?.chartNumber) === Number(selected.chartNumber);
+    });
   });
 }
 function statusLabel(code, statusMap) {

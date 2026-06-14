@@ -9,6 +9,7 @@ export default function TeethSelector({
   showPermanent = true,
   showPrimary = false,
   selectMode = 'multiple',
+  toothStatuses = {}, // NEW: status map { number: code }
   className,
 }) {
   // Universal numbering
@@ -36,9 +37,11 @@ export default function TeethSelector({
             key={n}
             number={n}
             selected={selectedSet.has(n)}
+            status={toothStatuses[n] || 'HEALTHY'}
             onClick={() => toggle(n)}
             compact={true}
             scale={0.15}
+            showTooltip={false}
           />
         ))}
       </div>

@@ -4,26 +4,32 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { LayoutDashboard, Users, CalendarDays, CreditCard, FileText, Stethoscope, Settings, UserCog, LineChart, Megaphone } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { isAdmin, hasAccess } from "@/lib/auth";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/patients", label: "Patients", icon: Users },
-  { href: "/appointments", label: "Appointments", icon: CalendarDays },
-  { href: "/notifications", label: "Notifications", icon: Megaphone },
-  { href: "/billing", label: "Billing", icon: CreditCard },
-  { href: "/reports", label: "Reports", icon: LineChart },
+  { href: "/patients", label: "Patients", icon: Users, tier: "AllStaff" },
+  { href: "/appointments", label: "Appointments", icon: CalendarDays, tier: "AllStaff" },
+  { href: "/notifications", label: "Notifications", icon: Megaphone, tier: "AllStaff" },
+  { href: "/billing", label: "Billing", icon: CreditCard, tier: "AllStaff" },
+  { href: "/reports", label: "Reports", icon: LineChart, tier: "ClinicalOrAbove" },
 ];
 
 const adminNavItems = [
-  { href: "/admin/staff", label: "Staff", icon: UserCog },
-  { href: "/admin/services", label: "Services", icon: Stethoscope },
-  // Move Lookups under Settings and update icon to Settings
-  { href: "/settings/lookups", label: "Lookups", icon: Settings },
+  { href: "/admin/staff", label: "Staff", icon: UserCog, tier: "AdminOnly" },
+  { href: "/admin/services", label: "Services", icon: Stethoscope, tier: "AdminOnly" },
+  { href: "/settings/lookups", label: "Lookups", icon: Settings, tier: "AdminOnly" },
 ]
 
 export default function Sidebar({ className }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
+
+  const filteredNavItems = navItems.filter(item => !item.tier || hasAccess(user, item.tier));
+  const filteredAdminNavItems = adminNavItems.filter(item => hasAccess(user, item.tier));
+
   return (
     <aside className={cn("h-full border-r border-app-border bg-app-surface p-4", className)}>
       {/* Brand */}
@@ -41,46 +47,57 @@ export default function Sidebar({ className }) {
           {collapsed ? <span className="text-xs">›</span> : <span className="text-xs">‹</span>}
         </button>
       </div>
-      <div className={cn("px-2 text-xs text-app-muted mb-2", collapsed && "opacity-0 w-0 overflow-hidden")}>Patient Portal</div>
-      <nav className="space-y-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
-                active ? "bg-teal-600/10 text-teal-700 ring-1 ring-teal-600/30" : "hover:bg-app-bg text-app-foreground"
-              )}
-            >
-              <Icon size={18} />
-              <span className={cn("transition-all", collapsed && "opacity-0 w-0 overflow-hidden")}>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-      <div className={cn("px-2 text-xs text-app-muted my-2", collapsed && "opacity-0 w-0 overflow-hidden")}>Admin</div>
-      <nav className="space-y-1">
-        {adminNavItems.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
-                active ? "bg-teal-600/10 text-teal-700 ring-1 ring-teal-600/30" : "hover:bg-app-bg text-app-foreground"
-              )}
-            >
-              <Icon size={18} />
-              <span className={cn("transition-all", collapsed && "opacity-0 w-0 overflow-hidden")}>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      
+      {filteredNavItems.length > 0 && (
+        <>
+          <div className={cn("px-2 text-xs text-app-muted mb-2", collapsed && "opacity-0 w-0 overflow-hidden")}>Clinic Portal</div>
+          <nav className="space-y-1">
+            {filteredNavItems.map((item) => {
+              const Icon = item.icon;
+              const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
+                    active ? "bg-teal-600/10 text-teal-700 ring-1 ring-teal-600/30" : "hover:bg-app-bg text-app-foreground"
+                  )}
+                >
+                  <Icon size={18} />
+                  <span className={cn("transition-all", collapsed && "opacity-0 w-0 overflow-hidden")}>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </>
+      )}
+
+      {filteredAdminNavItems.length > 0 && (
+        <>
+          <div className={cn("px-2 text-xs text-app-muted my-2", collapsed && "opacity-0 w-0 overflow-hidden")}>Admin</div>
+          <nav className="space-y-1">
+            {filteredAdminNavItems.map((item) => {
+              const Icon = item.icon;
+              const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
+                    active ? "bg-teal-600/10 text-teal-700 ring-1 ring-teal-600/30" : "hover:bg-app-bg text-app-foreground"
+                  )}
+                >
+                  <Icon size={18} />
+                  <span className={cn("transition-all", collapsed && "opacity-0 w-0 overflow-hidden")}>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </>
+      )}
+
       <div className="mt-6 pt-4 border-t border-app-border">
         <Link
           href="/settings"

@@ -12,11 +12,21 @@ import { useToast } from '@/components/ui/toast';
 import RecipientSelector from '@/components/notifications/recipient-selector';
 import CampaignPreviewCard from '@/components/notifications/campaign-preview-card';
 import DeliveryStatsCard from '@/components/notifications/delivery-stats-card';
-import TopicSelector, { TOPICS } from '@/components/notifications/topic-selector';
+import TopicSelector from '@/components/notifications/topic-selector';
 import AudienceFilterForm from '@/components/notifications/audience-filter-form';
 
 function formatDT(dt) {
   try { return new Date(dt).toLocaleString(); } catch { return dt; }
+}
+
+function toLocalInputValue(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const year = d.getFullYear();
+  const month = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const hours = pad(d.getHours());
+  const minutes = pad(d.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 export default function NotificationsPage() {
@@ -45,46 +55,60 @@ export default function NotificationsPage() {
 
 function SendReminderTab() {
   const { notify } = useToast();
-  const { data: appointments } = useSWR('appointments-all', () => http.get('/api/Appointment'));
-  const { data: patients } = useSWR('patients-all', () => http.get('/api/Patient'));
+  const { data: appointments } = useSWR('appointments-all', () => http.get('/Appointment'));
+  const { data: patients } = useSWR('patients-all', () => http.get('/Patient'));
+  const { data: statuses } = useSWR('appointment-status-all', () => api.lookup.appointmentStatus.getAll());
 
-  const [start, setStart] = useState(() => new Date().toISOString().slice(0,16));
-  const [end, setEnd] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate()+3); return d.toISOString().slice(0,16);
-  });
+  // Use local-formatted defaults for datetime-local
+  const [start, setStart] = useState(() => toLocalInputValue(new Date()));
+  const [end, setEnd] = useState(() => { const d = new Date(); d.setDate(d.getDate()+3); return toLocalInputValue(d); });
+  // Debounced effective range
+  const [effStart, setEffStart] = useState(start);
+  const [effEnd, setEffEnd] = useState(end);
+  const [loadingRows, setLoadingRows] = useState(false);
+  useEffect(() => {
+    setLoadingRows(true);
+    const t = setTimeout(() => { setEffStart(start); setEffEnd(end); setLoadingRows(false); }, 500);
+    return () => clearTimeout(t);
+  }, [start, end]);
   const [selected, setSelected] = useState(new Set());
 
   const rows = useMemo(() => {
     if (!appointments || !patients) return [];
-    const startDt = new Date(start);
-    const endDt = new Date(end);
-    const pmap = new Map(patients.map(p => [p.id || p.patient_id, p]));
+    const startDt = new Date(effStart);
+    const endDt = new Date(effEnd);
+    const pmap = new Map((patients || []).map(p => [p.id || p.patient_id || p.patientId, p]));
+    const allowed = new Set((statuses || [])
+      .filter(s => (s.name || '').toLowerCase().includes('scheduled') || (s.name || '').toLowerCase().includes('confirm'))
+      .map(s => s.id));
     return (appointments || [])
       .filter(a => {
         const when = new Date(a.appointment_start_time || a.appointmentStartTime);
-        const statusName = (a.status?.name || '').toLowerCase();
-        const goodStatus = statusName.includes('scheduled') || statusName.includes('confirm');
-        return goodStatus && when >= startDt && when <= endDt;
+        const statusId = a.status_id || a.statusId;
+        const statusOk = statusId ? allowed.has(statusId) : ((a.status?.name || '').toLowerCase().includes('scheduled') || (a.status?.name || '').toLowerCase().includes('confirm'));
+        return statusOk && when >= startDt && when <= endDt;
       })
       .map(a => {
-        const p = pmap.get(a.patient_id || a.patient?.id) || {};
+        const patientId = a.patient_id || a.patientId || a.patient?.id;
+        const p = pmap.get(patientId) || {};
         const person = p.person || {};
         const name = `${person.first_name || person.firstName || ''} ${person.last_name || person.lastName || ''}`.trim();
         const email = person.email || '';
         const when = new Date(a.appointment_start_time || a.appointmentStartTime);
+        const reason = a.reason_for_visit || a.reasonForVisit || 'Appointment';
         return {
           appointmentId: a.id,
           personId: person.id,
           name,
           email,
-          context: `${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          context: `${reason} — ${when.toLocaleDateString()} at ${when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
           payload: {
             appointmentDate: when.toISOString().slice(0,10),
             appointmentTime: when.toTimeString().slice(0,5),
           }
         };
       });
-  }, [appointments, patients, start, end]);
+  }, [appointments, patients, statuses, effStart, effEnd]);
 
   const onSelectAll = () => setSelected(new Set(rows.map(r => r.personId).filter(Boolean)));
   const onClearAll = () => setSelected(new Set());
@@ -94,7 +118,7 @@ function SendReminderTab() {
       const res = await api.campaigns.preview({
         audienceType: 'Patient',
         channel: 'Email',
-        topicCode: 'APPOINTMENT_REMINDER',
+        topicCode: 'APPT_REMINDER',
         filters: {
           hasEmail: true,
           hasUpcomingAppointment: true,
@@ -112,7 +136,7 @@ function SendReminderTab() {
     try {
       const chosen = rows.filter(r => selected.has(r.personId));
       const body = {
-        topicCode: 'APPOINTMENT_REMINDER',
+        topicCode: 'APPT_REMINDER',
         channel: 'Email',
         personIds: chosen.map(r => r.personId),
         // scheduledFor: undefined,
@@ -144,7 +168,15 @@ function SendReminderTab() {
               <Input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
             </div>
           </div>
-          <RecipientSelector rows={rows} selectedIds={selected} setSelectedIds={setSelected} onSelectAll={onSelectAll} onClearAll={onClearAll} />
+          <RecipientSelector
+            rows={rows}
+            selectedIds={selected}
+            setSelectedIds={setSelected}
+            onSelectAll={onSelectAll}
+            onClearAll={onClearAll}
+            loading={!appointments || !patients || loadingRows}
+            emptyMessage="No appointments found in this date range with Scheduled or Confirmed status."
+          />
           <div className="mt-4 flex items-center justify-end gap-2">
             <Button variant="outline" onClick={preview}>Preview</Button>
             <Button onClick={send} disabled={selected.size === 0}>Send Reminders</Button>
@@ -173,7 +205,7 @@ function CampaignTab() {
   const { data: specialties } = useSWR('specialties-all', () => api.lookup.specialties.getAll());
 
   const [audience, setAudience] = useState('Patient');
-  const [topicCode, setTopicCode] = useState('MARKETING_PROMOTION');
+  const [topicCode, setTopicCode] = useState('');
   const [filters, setFilters] = useState({ hasEmail: true });
   const [previewRes, setPreviewRes] = useState(null);
   const [campaignName, setCampaignName] = useState('New Campaign');
@@ -271,11 +303,11 @@ function CampaignTab() {
 
 function QuickSendTab() {
   const { notify } = useToast();
-  const { data: patients } = useSWR('patients-all', () => http.get('/api/Patient'));
-  const { data: staff } = useSWR('staff-all', () => http.get('/api/Staff'));
+  const { data: patients } = useSWR('patients-all', () => http.get('/Patient'));
+  const { data: staff } = useSWR('staff-all', () => http.get('/Staff'));
   const [audience, setAudience] = useState('Patient');
   const [personId, setPersonId] = useState('');
-  const [topicCode, setTopicCode] = useState('SYSTEM_NOTICE');
+  const [topicCode, setTopicCode] = useState('');
   const [payloadText, setPayloadText] = useState('');
 
   const options = useMemo(() => {
@@ -398,4 +430,3 @@ function HistoryTab() {
     </div>
   );
 }
-

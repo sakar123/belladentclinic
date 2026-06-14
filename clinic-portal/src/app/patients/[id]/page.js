@@ -10,10 +10,21 @@ import { Mail, Phone, Home, CalendarDays, UserCog, Download } from 'lucide-react
 import { StatusPill } from '@/components/ui/status-pill';
 import Button from '@/components/ui/button';
 import Input from '@/components/ui/input';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useToast } from '@/components/ui/toast';
 import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import TeethSelector from '@/components/dental/teeth-selector';
+import DentalChart from '@/components/dental/dental-chart';
+import PerioGrid from '@/components/dental/perio-grid';
+import { SurfaceSelector } from '@/components/dental/surface-selector';
+import {
+  getToothQuadrant,
+  getToothDisplayNumber,
+  inferPermanentNumberingSystem,
+  isLowerTooth,
+  isUpperTooth,
+  normalizeToChartTooth,
+} from '@/components/dental/tooth-numbering';
+import { Table, Thead, Tbody, Tr, Th, Td } from '@/components/ui/table';
 
 export default function PatientDetailsPage() {
   const params = useParams();
@@ -25,6 +36,10 @@ export default function PatientDetailsPage() {
   const { data: billings } = useSWR('patient-billings', () => api.billing.getAll());
   // Fallback: Load appointments directly and filter by patient if not present on patient
   const { data: allAppointments } = useSWR('appts-all', () => api.appointment.getAll());
+  // Treatments, staff, services for Treatments tab
+  const { data: allTreatments, mutate: mutateTreatments } = useSWR('treatments', () => api.treatments.getAll());
+  const { data: services } = useSWR('services', () => api.service.getAll());
+  const { data: staff } = useSWR('staff-all', () => api.staff.getAll());
   const [file, setFile] = useState(null);
   const [docType, setDocType] = useState('');
   const [desc, setDesc] = useState('');
@@ -33,6 +48,10 @@ export default function PatientDetailsPage() {
   const { data: documents } = useSWR('patient-docs', () => api.document.getAll());
   const { data: docTypesMini } = useSWR('doc-types-mini', () => api.lookup.documentTypes.getAll());
   const [newTag, setNewTag] = useState('');
+  // Add Treatment dialog state
+  const [addOpen, setAddOpen] = useState(false);
+  const todayLocal = (() => { const d = new Date(); const pad = (n)=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; })();
+  const [add, setAdd] = useState({ when: todayLocal, serviceId: '', toothNumber: '', staffId: '', status: 'Planned', notes: '', surfaces: '' });
 
   if (error) return <div className="text-red-600">Failed to load patient details.</div>;
   if (!patient) return <div>Loading...</div>;
@@ -74,7 +93,12 @@ export default function PatientDetailsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Profile</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Profile</CardTitle>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" asChild><a href={`/appointments/new?patientId=${patient.id}`}>Quick Appointment</a></Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -211,7 +235,156 @@ export default function PatientDetailsPage() {
           </Card>
         </TabsContent>
         <TabsContent value="treatments">
-          <div className="text-sm text-app-muted">No treatments.</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm text-app-muted">Patient treatments</div>
+            <Button size="sm" onClick={() => { setAdd({ when: todayLocal, serviceId: '', toothNumber: '', staffId: '', status: 'Planned', notes: '', surfaces: '' }); setAddOpen(true); }}>+ Add Treatment</Button>
+          </div>
+          <div className="rounded-md border border-app-border overflow-hidden">
+            <Table>
+              <Thead>
+                <Tr>
+                  <Th>Date</Th>
+                  <Th>Treatment</Th>
+                  <Th>Tooth/Area</Th>
+                  <Th>Dentist/Provider</Th>
+                  <Th>Status</Th>
+                  <Th>Notes</Th>
+                  <Th className="text-right">Cost</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {(() => {
+                  const rows = (allTreatments || []).filter(t => t.patient_id === patient.id);
+                  if (rows.length === 0) return (
+                    <Tr><Td colSpan={7} className="text-center py-6 text-sm text-app-muted">No treatments recorded for this patient.</Td></Tr>
+                  );
+                  return rows
+                    .sort((a,b) => new Date(b.completed_at || b.created_at || 0) - new Date(a.completed_at || a.created_at || 0))
+                    .map(t => {
+                      const date = new Date(t.completed_at || t.created_at || new Date());
+                      const svcName = t.service_name || (services||[]).find(s => s.id === t.service_id)?.name || '—';
+                      const svcCost = Number((services||[]).find(s => s.id === t.service_id)?.cost || 0);
+                      const provider = (staff||[]).find(s => s.id === t.staff_id)?.person || {};
+                      const providerName = `${provider.first_name || ''} ${provider.last_name || ''}`.trim() || '—';
+                      const status = t.status || 'Planned';
+                      const tooths = (t.tooth_numbers && t.tooth_numbers.length > 0) ? t.tooth_numbers
+                        : (t.tooth_number ? [t.tooth_number] : []);
+                      const area = tooths.length > 0 ? `#${tooths.join(', #')}` : (t.treatment_scope && t.treatment_scope.toUpperCase().includes('MOUTH') ? 'Full Mouth' : 'General');
+                      return (
+                        <Tr key={t.id}>
+                          <Td>{date.toLocaleDateString()}</Td>
+                          <Td>{svcName}</Td>
+                          <Td>{area}</Td>
+                          <Td>{providerName}</Td>
+                          <Td>{status}</Td>
+                          <Td className="truncate max-w-[220px]">{t.notes || '—'}</Td>
+                          <Td className="text-right">{svcCost ? `Rs ${svcCost.toLocaleString()}` : '—'}</Td>
+                        </Tr>
+                      );
+                    });
+                })()}
+              </Tbody>
+            </Table>
+          </div>
+
+          {/* Add Treatment Modal */}
+          <Dialog open={addOpen} onClose={() => setAddOpen(false)}>
+            <DialogHeader><DialogTitle>Add Treatment</DialogTitle></DialogHeader>
+            <DialogBody>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-app-muted mb-1">Date & Time</div>
+                  <Input type="datetime-local" value={add.when} onChange={(e) => setAdd(prev => ({ ...prev, when: e.target.value }))} />
+                </div>
+                <div>
+                  <div className="text-xs text-app-muted mb-1">Provider</div>
+                  <select className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm" value={add.staffId} onChange={(e)=> setAdd(prev => ({ ...prev, staffId: e.target.value }))}>
+                    <option value="">Select…</option>
+                    {(staff||[]).map(s => {
+                      const p = s.person || {}; const name = `${p.first_name||''} ${p.last_name||''}`.trim();
+                      return <option key={s.id} value={s.id}>{name || s.id}</option>;
+                    })}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-xs text-app-muted mb-1">Treatment Type</div>
+                  <select className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm" value={add.serviceId} onChange={(e)=> setAdd(prev => ({ ...prev, serviceId: e.target.value }))}>
+                    <option value="">Select…</option>
+                    {(services||[]).map(s => (
+                      <option key={s.id} value={s.id}>{s.name} — Rs {Number(s.cost||0).toLocaleString()}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-xs text-app-muted mb-1">Tooth number (optional)</div>
+                  <Input placeholder="# e.g., 14" value={add.toothNumber} onChange={(e)=> setAdd(prev => ({ ...prev, toothNumber: e.target.value.replace(/[^0-9,]/g,'') }))} />
+                </div>
+                {add.serviceId && (services||[]).find(s => String(s.id) === String(add.serviceId))?.visual_cue_code === 'FILLING' && (
+                  <div className="md:col-span-2">
+                    <SurfaceSelector value={add.surfaces} onChange={(s) => setAdd(prev => ({ ...prev, surfaces: s }))} />
+                  </div>
+                )}
+                <div>
+                  <div className="text-xs text-app-muted mb-1">Status</div>
+                  <select className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm" value={add.status} onChange={(e)=> setAdd(prev => ({ ...prev, status: e.target.value }))}>
+                    {['Planned','In Progress','Completed'].map(x => (<option key={x} value={x}>{x}</option>))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <div className="text-xs text-app-muted mb-1">Notes</div>
+                  <textarea className="w-full h-24 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm" value={add.notes} onChange={(e)=> setAdd(prev => ({ ...prev, notes: e.target.value }))} />
+                </div>
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+              <Button disabled={!add.serviceId || !add.staffId} onClick={async () => {
+                try {
+                  // Create appointment for this treatment
+                  const target = new Date(add.when);
+                  // Pick an appropriate appointment status (In Progress > Scheduled > first)
+                  const stName = (n) => (n||'').toLowerCase();
+                  const inProg = (statuses||[]).find(s => stName(s.name).includes('progress'))?.id;
+                  const sched = (statuses||[]).find(s => stName(s.name).includes('sched'))?.id;
+                  const statusId = inProg || sched || (statuses||[])[0]?.id;
+                  const svcName = (services||[]).find(s => String(s.id)===String(add.serviceId))?.name || 'Treatment';
+                  const appt = await api.appointment.create({
+                    patient_id: patient.id,
+                    staff_id: add.staffId,
+                    status_id: statusId,
+                    appointment_start_time: target.toISOString(),
+                    duration_minutes: 30,
+                    reason_for_visit: `Treatment: ${svcName}`,
+                    notes: add.notes || ''
+                  });
+                  // Create treatment
+                  const payload = {
+                    appointment_id: appt.id || appt.Id,
+                    patient_id: patient.id,
+                    staff_id: add.staffId,
+                    service_id: add.serviceId,
+                    notes: add.notes || '',
+                    surfaces: add.surfaces || ''
+                  };
+                  const tn = String(add.toothNumber||'').trim();
+                  if (tn) {
+                    const arr = tn.split(',').map(x => Number(x.trim())).filter(n => Number.isFinite(n));
+                    if (arr.length === 1) payload.tooth_number = arr[0];
+                    if (arr.length > 1) payload.tooth_numbers = arr;
+                  }
+                  const created = await api.treatments.create(payload);
+                  if (add.status === 'Completed' && created?.id) {
+                    await api.treatments.complete(created.id);
+                  }
+                  setAddOpen(false);
+                  notify({ title: 'Treatment added' });
+                  mutateTreatments();
+                } catch (e) {
+                  notify({ title: 'Failed to add treatment', description: e?.info?.message || e?.message || 'Please try again.' });
+                }
+              }}>Save</Button>
+            </DialogFooter>
+          </Dialog>
         </TabsContent>
         <TabsContent value="prescriptions">
           <div className="text-sm text-app-muted">No prescriptions.</div>
@@ -283,8 +456,11 @@ function PatientBillingList({ patientId }) {
 
 function PatientTeethPanel({ patient }) {
   const { notify } = useToast();
-  const { data: allTeeth, mutate } = useSWR('teeth', () => api.teeth.getAll());
+  const { data: allTeeth, mutate } = useSWR(patient ? `teeth-${patient.id}` : null, () => api.teeth.getAll({ patientId: patient.id }));
   const { data: statuses } = useSWR('tooth-status', () => api.lookup.toothStatus.getAll());
+  const { data: treatments } = useSWR(patient ? `treatments-${patient.id}` : null, () => api.treatments.getAll({ patientId: patient.id }));
+  const { data: documents } = useSWR(patient ? `documents-${patient.id}` : null, () => api.document.getAll({ patientId: patient.id }));
+  const { data: services } = useSWR('services', () => api.service.getAll());
   const [selectedFdi, setSelectedFdi] = useState(new Set()); // selected by FDI numbers
 
   const dob = patient.person?.date_of_birth ? new Date(patient.person.date_of_birth) : null;
@@ -295,72 +471,202 @@ function PatientTeethPanel({ patient }) {
   const [showPermanent, setShowPermanent] = useState(!primaryMode);
   const [showPrimary, setShowPrimary] = useState(primaryMode);
 
-  if (!allTeeth) return <div>Loading…</div>;
-  const fullList = (allTeeth || []).filter(t => t.patient_id === patient.id).sort((a,b) => Number(a.tooth_number||0) - Number(b.tooth_number||0));
-  const dentitionPrimary = fullList.length > 0 && Math.max(...fullList.map(t => Number(t.tooth_number||0))) <= 20;
-  const list = fullList.filter(t => {
-    // Only one dentition exists per patient; honor toggles accordingly
-    if (dentitionPrimary) return showPrimary; // show all or none
-    return showPermanent; // permanent set
-  });
+  const fullList = useMemo(() => {
+    return (allTeeth || [])
+      .filter(t => t.patient_id === patient.id)
+      .sort((a,b) => Number(a.tooth_number||0) - Number(b.tooth_number||0));
+  }, [allTeeth, patient.id]);
 
-  const regionSets = dentitionPrimary ? {
-    // Primary universal: 1–5 UR, 6–10 UL, 11–15 LL, 16–20 LR
-    full: list.map(t => Number(t.tooth_number)),
-    upperArch: list.filter(t => { const n=Number(t.tooth_number); return n>=1 && n<=10; }).map(t=>Number(t.tooth_number)),
-    lowerArch: list.filter(t => { const n=Number(t.tooth_number); return n>=11 && n<=20; }).map(t=>Number(t.tooth_number)),
-    q1: list.filter(t => { const n=Number(t.tooth_number); return n>=1 && n<=5; }).map(t=>Number(t.tooth_number)),
-    q2: list.filter(t => { const n=Number(t.tooth_number); return n>=6 && n<=10; }).map(t=>Number(t.tooth_number)),
-    q3: list.filter(t => { const n=Number(t.tooth_number); return n>=11 && n<=15; }).map(t=>Number(t.tooth_number)),
-    q4: list.filter(t => { const n=Number(t.tooth_number); return n>=16 && n<=20; }).map(t=>Number(t.tooth_number)),
-  } : {
-    // Permanent universal: 1–8 UR, 9–16 UL, 17–24 LL, 25–32 LR; arches: 1–16 upper, 17–32 lower
-    full: list.map(t => Number(t.tooth_number)),
-    upperArch: list.filter(t => { const n=Number(t.tooth_number); return n>=1 && n<=16; }).map(t=>Number(t.tooth_number)),
-    lowerArch: list.filter(t => { const n=Number(t.tooth_number); return n>=17 && n<=32; }).map(t=>Number(t.tooth_number)),
-    q1: list.filter(t => { const n=Number(t.tooth_number); return n>=1 && n<=8; }).map(t=>Number(t.tooth_number)),
-    q2: list.filter(t => { const n=Number(t.tooth_number); return n>=9 && n<=16; }).map(t=>Number(t.tooth_number)),
-    q3: list.filter(t => { const n=Number(t.tooth_number); return n>=17 && n<=24; }).map(t=>Number(t.tooth_number)),
-    q4: list.filter(t => { const n=Number(t.tooth_number); return n>=25 && n<=32; }).map(t=>Number(t.tooth_number)),
-  };
+  const numberingSystem = useMemo(() => {
+    return inferPermanentNumberingSystem(fullList.map(t => t.tooth_number));
+  }, [fullList]);
+
+  const mapped = useMemo(() => {
+    return fullList.map(t => {
+      const normalized = normalizeToChartTooth(t.tooth_number, numberingSystem);
+      return {
+        ...t,
+        chartKind: normalized?.kind,
+        chartNumber: normalized?.chartNumber,
+        displayNumber: normalized?.displayNumber,
+      };
+    });
+  }, [fullList, numberingSystem]);
+
+  const hasPermanent = mapped.some(t => t.chartKind === 'permanent');
+  const hasPrimary = mapped.some(t => t.chartKind === 'primary');
+
+  useEffect(() => {
+    if (!allTeeth) return;
+    if (hasPrimary && !hasPermanent) {
+      setShowPrimary(true);
+      setShowPermanent(false);
+    } else if (hasPermanent && !hasPrimary) {
+      setShowPermanent(true);
+      setShowPrimary(false);
+    } else if (hasPermanent && hasPrimary) {
+      setShowPermanent(true);
+      setShowPrimary(true);
+    }
+  }, [allTeeth, hasPermanent, hasPrimary]);
+
+  const list = useMemo(() => mapped.filter(t =>
+    (t.chartKind === 'permanent' && showPermanent) ||
+    (t.chartKind === 'primary' && showPrimary)
+  ), [mapped, showPermanent, showPrimary]);
+
+  const regionSets = useMemo(() => ({
+    full: list.map(t => t.chartNumber).filter(Boolean),
+    upperArch: list.filter(t => isUpperTooth(t.chartKind, t.chartNumber)).map(t => t.chartNumber),
+    lowerArch: list.filter(t => isLowerTooth(t.chartKind, t.chartNumber)).map(t => t.chartNumber),
+    q1: list.filter(t => getToothQuadrant(t.chartKind, t.chartNumber) === 'q1').map(t => t.chartNumber),
+    q2: list.filter(t => getToothQuadrant(t.chartKind, t.chartNumber) === 'q2').map(t => t.chartNumber),
+    q3: list.filter(t => getToothQuadrant(t.chartKind, t.chartNumber) === 'q3').map(t => t.chartNumber),
+    q4: list.filter(t => getToothQuadrant(t.chartKind, t.chartNumber) === 'q4').map(t => t.chartNumber),
+  }), [list]);
 
   const toggle = (id) => {
-    // map id to FDI number
-    const t = fullList.find(z => z.id === id);
-    if (!t) return;
-    const n = Number(t.tooth_number);
+    const t = mapped.find(z => z.id === id);
+    if (!t || !t.chartNumber) return;
+    const n = Number(t.chartNumber);
     setSelectedFdi(prev => { const next = new Set(prev); if (next.has(n)) next.delete(n); else next.add(n); return next; });
   };
   const setRegion = (numbers) => setSelectedFdi(new Set(numbers));
 
-  // Build color map by status for nice UI
-  const colorized = {};
-  for (const t of fullList) {
-    const n = Number(t.tooth_number);
-    colorized[n] = colorForStatus((statuses||[]).find(s => s.id === t.tooth_status_id)?.code || (statuses||[]).find(s => s.id === t.tooth_status_id)?.name || 'HEALTHY');
-  }
+  const selectedChartNumbers = useMemo(() => Array.from(selectedFdi).map(Number), [selectedFdi]);
+  
+  // Build history entries
+  const historyEntries = useMemo(() => {
+    if (!treatments) return [];
+    const formatRawNumbers = (numbers) => {
+      const labels = (numbers || [])
+        .map(n => getToothDisplayNumber(n, numberingSystem))
+        .filter(Boolean)
+        .map(n => `#${n}`);
+      return labels.length > 0 ? labels.join(', ') : 'Full Mouth';
+    };
+    let tList = treatments.filter(t => t.patient_id === patient.id);
+    if (selectedChartNumbers.length > 0) {
+      tList = tList.filter(t => {
+        const tn = t.tooth_numbers || (t.tooth_number ? [t.tooth_number] : []);
+        const normalizedNumbers = tn
+          .map(n => normalizeToChartTooth(n, numberingSystem)?.chartNumber)
+          .filter(Boolean);
+        return selectedChartNumbers.some(num => normalizedNumbers.includes(num)) || t.treatment_scope?.toUpperCase().includes('MOUTH');
+      });
+    }
+    
+    let dList = (documents || []).filter(d => d.patient_id === patient.id);
+    if (selectedChartNumbers.length > 0) {
+      // Find specific tooth IDs for selected universal numbers
+      const selectedIds = mapped.filter(t => selectedChartNumbers.includes(Number(t.chartNumber))).map(t => t.id);
+      dList = dList.filter(d => d.tooth_id && selectedIds.includes(d.tooth_id));
+    }
+
+    const unified = [
+      ...tList.map(t => ({
+        id: t.id,
+        date: t.completed_at || t.created_at,
+        type: 'Treatment',
+        title: t.service_name || (services||[]).find(s => s.id === t.service_id)?.name || 'Treatment',
+        status: t.status,
+        notes: t.notes || '',
+        teeth: formatRawNumbers(t.tooth_numbers || (t.tooth_number ? [t.tooth_number] : [])),
+        surfaces: t.surfaces || ''
+      })),
+      ...dList.map(d => ({
+        id: d.id,
+        date: d.upload_date || d.created_at,
+        type: 'Document',
+        title: d.document_type_code || d.description || 'Image',
+        status: 'Uploaded',
+        notes: d.description || '',
+        teeth: mapped.find(t => t.id === d.tooth_id)?.displayNumber || '',
+        surfaces: ''
+      }))
+    ];
+    return unified.sort((a,b) => new Date(b.date) - new Date(a.date));
+  }, [treatments, documents, selectedChartNumbers, patient.id, services, mapped, numberingSystem]);
+
+  // UI toggle for showing/hiding the dental history list
+  const [historyOpen, setHistoryOpen] = useState(true);
+
+  // Latest periodontal data for this patient
+  const [perioInitial, setPerioInitial] = useState({ pd: {}, gm: {}, cal: {}, bop: {}, mobility: {}, furcation: {} });
+  useEffect(() => {
+    (async () => {
+      try {
+        const latest = await api.perio.getLatest(patient.id);
+        const pd = {}; const gm = {}; const cal = {}; const bop = {};
+        const mobility = {}; const furcation = {};
+        for (const m of (latest?.measurements || [])) {
+          const t = Number(normalizeToChartTooth(m.tooth_number, numberingSystem)?.chartNumber);
+          if (!Number.isFinite(t)) continue;
+          pd[t] = pd[t] || {}; gm[t] = gm[t] || {}; cal[t] = cal[t] || {}; bop[t] = bop[t] || {};
+          pd[t][m.site_index] = m.pocket_depth;
+          gm[t][m.site_index] = m.gingival_margin;
+          cal[t][m.site_index] = m.clinical_attachment_level;
+          bop[t][m.site_index] = !!m.bleeding_on_probing;
+          mobility[t] = Math.max(mobility[t] || 0, m.mobility || 0);
+          furcation[t] = Math.max(furcation[t] || 0, m.furcation || 0);
+        }
+        setPerioInitial({ pd, gm, cal, bop, mobility, furcation });
+      } catch {
+        setPerioInitial({ pd: {}, gm: {}, cal: {}, bop: {}, mobility: {}, furcation: {} });
+      }
+    })();
+  }, [patient.id, numberingSystem]);
+
+  if (!allTeeth) return <div>Loading…</div>;
 
   return (
     <div className="space-y-3">
-      {/* Visual selector */}
-      <div className="rounded border border-app-border p-3">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm font-medium">Dental Chart</div>
-          <div className="flex items-center gap-4 text-sm">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showPermanent} onChange={(e)=>setShowPermanent(e.target.checked)} /> Permanent</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showPrimary} onChange={(e)=>setShowPrimary(e.target.checked)} /> Primary</label>
+      {/* Visual selector using shared DentalChart */}
+      <DentalChart
+        patientId={patient.id}
+        selectMode="multiple"
+        selectedTeeth={Array.from(selectedFdi)}
+        onSelectionChange={(next) => setSelectedFdi(new Set((next||[]).map(Number)))}
+        showDetailsInMultiple
+        className="min-h-[640px]"
+      />
+      {(hasPermanent || hasPrimary) && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="inline-flex rounded-md border border-app-border bg-white p-1 text-xs shadow-sm">
+            <button
+              type="button"
+              disabled={!hasPermanent}
+              onClick={() => {
+                if (!hasPermanent) return;
+                setShowPermanent(prev => {
+                  const next = !prev;
+                  if (!next && !showPrimary) setShowPrimary(true);
+                  return next;
+                });
+              }}
+              className={`rounded px-3 py-1.5 font-medium transition-colors ${showPermanent ? 'bg-teal-600 text-white shadow-sm' : 'text-app-muted hover:bg-slate-50'} ${!hasPermanent ? 'cursor-not-allowed opacity-40' : ''}`}
+            >
+              Permanent
+            </button>
+            <button
+              type="button"
+              disabled={!hasPrimary}
+              onClick={() => {
+                if (!hasPrimary) return;
+                setShowPrimary(prev => {
+                  const next = !prev;
+                  if (!next && !showPermanent) setShowPermanent(true);
+                  return next;
+                });
+              }}
+              className={`rounded px-3 py-1.5 font-medium transition-colors ${showPrimary ? 'bg-sky-600 text-white shadow-sm' : 'text-app-muted hover:bg-slate-50'} ${!hasPrimary ? 'cursor-not-allowed opacity-40' : ''}`}
+            >
+              Primary
+            </button>
           </div>
+          <span className="text-xs text-app-muted">{showPrimary && showPermanent ? 'Mixed dentition' : showPrimary ? 'Primary dentition' : 'Permanent dentition'}</span>
         </div>
-        <TeethSelector
-          showPermanent={showPermanent}
-          showPrimary={showPrimary}
-          selectMode="multiple"
-          value={Array.from(selectedFdi)}
-          colorized={colorized}
-          onChange={(next) => setSelectedFdi(new Set((next||[]).map(Number)))}
-        />
-      </div>
-      <div className="flex items-center gap-4 text-sm"></div>
+      )}
       <div className="flex items-center flex-wrap gap-2">
         <span className="text-xs text-app-muted">Quick select:</span>
         <Button size="sm" variant="outline" onClick={() => setRegion(regionSets.full)}>All</Button>
@@ -370,58 +676,125 @@ function PatientTeethPanel({ patient }) {
         <Button size="sm" variant="outline" onClick={() => setRegion(regionSets.q2)}>Quadrant 2</Button>
         <Button size="sm" variant="outline" onClick={() => setRegion(regionSets.q3)}>Quadrant 3</Button>
         <Button size="sm" variant="outline" onClick={() => setRegion(regionSets.q4)}>Quadrant 4</Button>
-        <span className="ml-auto text-xs text-app-muted">{primaryMode ? 'Primary dentition' : 'Permanent dentition'}{(showPrimary && showPermanent) ? ' (Both)' : ''}</span>
       </div>
       <div className="mt-2">
         <Button size="sm" variant="secondary" disabled={selectedFdi.size === 0} onClick={() => {
-          const ids = Array.from(selectedFdi).map(n => (fullList.find(t => Number(t.tooth_number) === Number(n))?.id)).filter(Boolean);
+          const ids = Array.from(selectedFdi).map(n => (mapped.find(t => Number(t.chartNumber) === Number(n))?.id)).filter(Boolean);
           if (ids.length === 0) return;
           const query = new URLSearchParams({ patientId: patient.id, teeth: ids.join(',') });
           window.location.href = `/appointments/new?${query.toString()}`;
         }}>Schedule appointment with selected</Button>
       </div>
 
-      <div className="rounded border border-app-border overflow-hidden">
-        <div className="grid grid-cols-6 bg-app-bg text-xs font-medium border-b border-app-border">
-          <div className="p-2">#</div>
-          <div className="p-2 col-span-2">Name</div>
-          <div className="p-2">Status</div>
-          <div className="p-2 col-span-2">Actions</div>
+      <div className="flex items-center justify-between mt-2">
+        <div className="text-sm font-semibold">Dental History</div>
+        <div className="flex items-center gap-2">
+          {historyOpen ? (
+            <Button size="xs" variant="outline" onClick={() => setHistoryOpen(false)}>Close</Button>
+          ) : (
+            <Button size="xs" variant="outline" onClick={() => setHistoryOpen(true)}>Show</Button>
+          )}
         </div>
-        {list.map(t => (
-          <div key={t.id} className="grid grid-cols-6 items-center text-sm border-b border-app-border">
-            <div className="p-2 flex items-center gap-2">
-              <input type="checkbox" checked={selectedFdi.has(Number(t.tooth_number))} onChange={() => toggle(t.id)} />
-              <span>{t.tooth_number}</span>
-            </div>
-            <div className="p-2 col-span-2 truncate">{t.tooth_name || ''}</div>
-            <div className="p-2">
-              <select className="h-9 rounded-md border border-app-border bg-app-surface px-2 text-sm" defaultValue={t.tooth_status_id} onChange={async (e) => { await api.teeth.update(t.id, { ...t, tooth_status_id: e.target.value }); notify({ title: 'Tooth status updated' }); mutate(); }}>
-                {(statuses||[]).map(s => (<option key={s.id} value={s.id}>{s.name || s.description || s.code}</option>))}
-              </select>
-            </div>
-            <div className="p-2 col-span-2"></div>
-          </div>
-        ))}
       </div>
+      {historyOpen && (
+      <div className="rounded border border-app-border overflow-hidden">
+        <div className="grid grid-cols-5 bg-app-bg text-xs font-medium border-b border-app-border">
+          <div className="p-2">Date</div>
+          <div className="p-2">Type</div>
+          <div className="p-2">Description</div>
+          <div className="p-2">Teeth / Surfaces</div>
+          <div className="p-2">Status</div>
+        </div>
+        {historyEntries.length === 0 ? (
+          <div className="p-4 text-sm text-center text-app-muted">No history found for the selected teeth.</div>
+        ) : (
+          historyEntries.map(h => (
+            <div key={`${h.type}-${h.id}`} className="grid grid-cols-5 items-center text-sm border-b border-app-border">
+              <div className="p-2 truncate">{new Date(h.date).toLocaleDateString()}</div>
+              <div className="p-2 truncate">
+                <span className={`px-2 py-0.5 rounded text-[10px] ${h.type === 'Treatment' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                  {h.type}
+                </span>
+              </div>
+              <div className="p-2 truncate" title={h.notes}>
+                <div className="font-medium">{h.title}</div>
+                {h.notes && <div className="text-[10px] text-app-muted truncate">{h.notes}</div>}
+              </div>
+              <div className="p-2 truncate">
+                {h.teeth} {h.surfaces ? `(${h.surfaces})` : ''}
+              </div>
+              <div className="p-2 truncate">
+                <span className={`px-2 py-0.5 rounded text-[10px] ${h.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'}`}>
+                  {h.status}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      )}
 
-      <div className="flex items-center gap-2">
-        <Button size="sm" variant="secondary" onClick={() => {
-          const ids = Array.from(selectedFdi).map(n => (fullList.find(t => Number(t.tooth_number) === Number(n))?.id)).filter(Boolean);
-          if (ids.length === 0) return;
-          const query = new URLSearchParams({ patientId: patient.id, teeth: ids.join(',') });
-          window.location.href = `/appointments/new?${query.toString()}`;
-        }}>Schedule appointment with selected</Button>
+      {/* Removed duplicate 'Schedule appointment with selected' button (keep the one near quick select) */}
+
+      {/* Periodontal Charting */}
+      <div className="rounded border border-app-border p-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-semibold">Periodontal Chart</div>
+        </div>
+        <PerioGrid
+          patientId={patient.id}
+          initialData={perioInitial}
+          onSave={async ({ pd, gm, cal, bop, mobility, furcation }) => {
+            // Flatten to measurements list
+            const measurements = [];
+            const teeth = new Set([
+              ...Object.keys(pd || {}).map(Number),
+              ...Object.keys(gm || {}).map(Number),
+              ...Object.keys(cal || {}).map(Number),
+              ...Object.keys(bop || {}).map(Number),
+              ...Object.keys(mobility || {}).map(Number),
+              ...Object.keys(furcation || {}).map(Number),
+            ].filter(Boolean));
+            for (const t of teeth) {
+              for (let s = 0; s < 6; s++) {
+                const pocket = Number(pd?.[t]?.[s] || 0);
+                const gmVal = Number(gm?.[t]?.[s] || 0);
+                const calVal = Number(cal?.[t]?.[s] || 0);
+                const recession = Math.max(0, gmVal);
+                const finalCal = (!isNaN(calVal) && calVal > 0) ? calVal : (pocket + recession);
+                const bopVal = Boolean(bop?.[t]?.[s]);
+                const mobVal = Number(mobility?.[t] || 0);
+                const furcVal = Number(furcation?.[t]?.[s] ?? furcation?.[t] ?? 0);
+                // Only push a site if any data present
+                const hasAny = (pocket || gmVal || finalCal || bopVal || mobVal || furcVal);
+                if (!hasAny) continue;
+                measurements.push({
+                  tooth_number: Number(t),
+                  site_index: s,
+                  pocket_depth: pocket,
+                  clinical_attachment_level: finalCal,
+                  gingival_margin: gmVal,
+                  recession,
+                  bleeding_on_probing: bopVal,
+                  mobility: mobVal,
+                  furcation: furcVal,
+                });
+              }
+            }
+            // Resolve a staff_id to attribute this exam. Pick the first active staff.
+            let staffId;
+            try {
+              const staffList = await api.staff.getAll();
+              staffId = (staffList || [])[0]?.id;
+            } catch {}
+            if (!staffId) {
+              alert('No staff found to attribute the periodontal exam. Please create staff first.');
+              return;
+            }
+            await api.perio.create({ patient_id: patient.id, staff_id: staffId, smoker: false, bone_loss: 0, measurements });
+          }}
+        />
       </div>
     </div>
   );
-}
-
-function colorForStatus(codeRaw) {
-  const code = String(codeRaw || '').toLowerCase();
-  if (code.includes('healthy')) return '#ffffff';
-  if (code.includes('fill')) return '#9ca3af';
-  if (code.includes('miss')) return '#f3f4f6';
-  if (code.includes('decay') || code.includes('caries') || code.includes('attention')) return '#fecaca';
-  return '#ffffff';
 }

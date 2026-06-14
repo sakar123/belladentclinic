@@ -9,11 +9,17 @@ import { CalendarDays, Clock, User, UserCog, StickyNote, Plus } from 'lucide-rea
 import { StatusPill } from '@/components/ui/status-pill';
 import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Input from '@/components/ui/input';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Empty from '@/components/ui/empty';
 import { useToast } from '@/components/ui/toast';
-import TeethSelector from '@/components/dental/teeth-selector';
+import DentalChart from '@/components/dental/dental-chart';
 import { getAdultToothName, getPrimaryToothName } from '@/components/dental/tooth-data';
+import {
+  getToothRawNumber,
+  inferPermanentNumberingSystem,
+  normalizeChartTooth,
+  normalizeToChartTooth,
+} from '@/components/dental/tooth-numbering';
 import AddTreatment from '@/components/treatments/add-treatment';
 
 export default function AppointmentDetailsPage() {
@@ -39,13 +45,20 @@ export default function AppointmentDetailsPage() {
   const [openAdd, setOpenAdd] = useState(false);
   // Inline tooth selection (for the summary/inline selector below)
   const [selectedToothInline, setSelectedToothInline] = useState({ mode: 'adult', tooth: null });
-  const selectedFDIInline = selectedToothInline?.tooth ? [Number(selectedToothInline.tooth)] : [];
   // Reschedule dialog
   const [openReschedule, setOpenReschedule] = useState(false);
   const [newStaffId, setNewStaffId] = useState(appointment?.staff?.id || appointment?.staff_id || '');
   const [newStatusId, setNewStatusId] = useState(appointment?.status?.id || appointment?.status_id || '');
   const [newStartISO, setNewStartISO] = useState(appointment?.appointment_start_time?.slice(0,16) || '');
   const [newDuration, setNewDuration] = useState(appointment?.duration_minutes || 30);
+  // Notes editor (must be declared before early returns to keep hook order stable)
+  const [notesDraft, setNotesDraft] = useState('');
+  useEffect(() => {
+    // Keep local notes in sync even while loading
+    if (appointment && typeof appointment.notes !== 'undefined') {
+      setNotesDraft(appointment.notes || '');
+    }
+  }, [appointment?.notes]);
 
   const handleCancel = async () => {
     const hasTreatments = (apptTreatments || []).some(t => t.appointment_id === appointment.id);
@@ -88,9 +101,9 @@ export default function AppointmentDetailsPage() {
   const s = appointment.staff?.person || staff?.find(x => x.id === (appointment.staff?.id || appointment.staff_id))?.person || {};
   const t = new Date(appointment.appointment_start_time);
 
+
   // tooth selection helpers (for inline chart below)
   const patientId = appointment.patient?.id || appointment.patient_id;
-  const patientTeeth = (allTeeth || []).filter(t => t.patient_id === patientId);
   // (legacy add-treatment modal state removed)
 
   // (legacy addTreatment modal removed in favor of TreatmentDrawer)
@@ -105,7 +118,9 @@ export default function AppointmentDetailsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Appointment</h1>
           <div className="text-sm text-app-muted">ID: {appointment.id}</div>
           <div className="mt-1 flex items-center gap-2 text-sm">
-            <StatusPill text={statusName} />
+            <button className="rounded px-1 hover:bg-app-bg" title="Change status" onClick={() => setOpenReschedule(true)}>
+              <StatusPill text={statusName} />
+            </button>
             <span className="text-app-muted">Patient:</span> <span className="font-medium">{`${p.first_name || ''} ${p.last_name || ''}`.trim() || '—'}</span>
             <span className="text-app-muted">Staff:</span> <span className="font-medium">{`${s.first_name || ''} ${s.last_name || ''}`.trim() || '—'}</span>
           </div>
@@ -113,6 +128,20 @@ export default function AppointmentDetailsPage() {
         <div className="flex items-center gap-2">
           <Button onClick={() => setOpenReschedule(true)}>Reschedule</Button>
           <Button variant="secondary" onClick={() => setOpenAdd(true)}><Plus size={16} /> Add Treatment</Button>
+          <Button onClick={async () => {
+            const inProg = (statuses || []).find(s => (s.name || '').toLowerCase().includes('in progress'));
+            if (!inProg) return;
+            await api.appointment.update(id, {
+              appointment_start_time: appointment.appointment_start_time,
+              duration_minutes: appointment.duration_minutes,
+              staff_id: appointment.staff?.id || appointment.staff_id,
+              status_id: inProg.id,
+              notes: appointment.notes,
+              reason_for_visit: appointment.reason_for_visit,
+              patient_id: appointment.patient?.id || appointment.patient_id,
+            });
+            notify({ title: 'Appointment started' });
+          }}>Begin Treatment</Button>
           <Button
             variant="outline"
             disabled={!((apptTreatments||[]).some(t => t.appointment_id === appointment.id))}
@@ -161,6 +190,47 @@ export default function AppointmentDetailsPage() {
         </CardContent>
       </Card>
 
+      {/* Quick Notes (appointment notes) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Notes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <textarea
+              className="w-full min-h-28 rounded-md border border-app-border bg-app-surface px-3 py-2 text-sm"
+              placeholder="Add visit notes that will be saved on this appointment"
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={async () => {
+                  await api.appointment.update(id, {
+                    appointment_start_time: appointment.appointment_start_time,
+                    duration_minutes: appointment.duration_minutes,
+                    staff_id: appointment.staff?.id || appointment.staff_id,
+                    status_id: appointment.status?.id || appointment.status_id,
+                    notes: notesDraft,
+                    reason_for_visit: appointment.reason_for_visit,
+                    patient_id: appointment.patient?.id || appointment.patient_id,
+                  });
+                  notify({ title: 'Notes saved' });
+                  swrMutate(`appointments/${id}`);
+                }}
+                disabled={(notesDraft || '') === (appointment.notes || '')}
+              >
+                Save Notes
+              </Button>
+              {(notesDraft || '') !== (appointment.notes || '') && (
+                <Button size="sm" variant="outline" onClick={() => setNotesDraft(appointment.notes || '')}>Discard</Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Visit Summary</CardTitle>
@@ -186,18 +256,17 @@ export default function AppointmentDetailsPage() {
         <CardContent>
           <div className="mb-4">
             <div className="text-xs text-app-muted mb-1">Select tooth (inline)</div>
-            <TeethSelector
-              showPermanent={true}
-              showPrimary={true}
-              selectMode="single"
-              value={selectedFDIInline}
-              onChange={(arr) => {
-                const n = Array.isArray(arr) && arr.length>0 ? arr[0] : null;
-                setSelectedToothInline(prev => ({ ...prev, tooth: n }));
-              }}
-            />
+            <div className="rounded border border-app-border p-2">
+              <DentalChart
+                patientId={appointment.patient?.id || appointment.patient_id}
+                selectMode="single"
+                selectedTooth={selectedToothInline.tooth ? Number(selectedToothInline.tooth) : undefined}
+                onSelect={(n) => setSelectedToothInline(prev => ({ ...prev, tooth: n }))}
+                showLegend={false}
+              />
+            </div>
             {selectedToothInline.tooth && (
-              <div className="mt-2 text-xs">Selected: {Number(selectedToothInline.tooth) >= 51 ? getPrimaryToothName(Number(selectedToothInline.tooth)) : getAdultToothName(Number(selectedToothInline.tooth))}</div>
+              <div className="mt-2 text-xs">Selected: {formatChartToothName(selectedToothInline.tooth)}</div>
             )}
           </div>
           <ServicesForAppointment appointment={appointment} selectedTooth={selectedToothInline} allTeeth={allTeeth || []} toothStatuses={toothStatuses || []} appointmentsList={allAppointments || []} />
@@ -290,6 +359,30 @@ export default function AppointmentDetailsPage() {
   );
 }
 
+function formatChartToothNumber(chartNumber) {
+  return normalizeChartTooth(chartNumber)?.displayNumber ?? Number(chartNumber);
+}
+
+function formatChartToothName(chartNumber) {
+  const normalized = normalizeChartTooth(chartNumber);
+  if (!normalized) return `Tooth ${chartNumber}`;
+  return normalized.kind === 'primary'
+    ? getPrimaryToothName(normalized.chartNumber)
+    : getAdultToothName(normalized.chartNumber);
+}
+
+function formatRawToothNumber(rawNumber, numberingSystem) {
+  return normalizeToChartTooth(rawNumber, numberingSystem)?.displayNumber ?? Number(rawNumber);
+}
+
+function formatRawToothName(rawNumber, numberingSystem) {
+  const normalized = normalizeToChartTooth(rawNumber, numberingSystem);
+  if (!normalized) return `Tooth ${rawNumber}`;
+  return normalized.kind === 'primary'
+    ? getPrimaryToothName(normalized.chartNumber)
+    : getAdultToothName(normalized.chartNumber);
+}
+
 function VisitSummary({ appointment, allTeeth }) {
   const { data: treatments } = useSWR('treatments', () => api.treatments.getAll());
   const { data: services } = useSWR('services', () => api.service.getAll());
@@ -297,6 +390,9 @@ function VisitSummary({ appointment, allTeeth }) {
   const { data: patients } = useSWR('patients-mini', () => api.patient.getAll());
   if (!treatments || !services) return <div>Loading…</div>;
   const list = (treatments || []).filter(t => t.appointment_id === appointment.id);
+  const patientId = appointment.patient?.id || appointment.patient_id;
+  const patientTeeth = (allTeeth || []).filter(t => t.patient_id === patientId);
+  const numberingSystem = inferPermanentNumberingSystem(patientTeeth.map(getToothRawNumber));
   const p = appointment.patient?.person || (patients||[]).find(x => x.id === (appointment.patient?.id || appointment.patient_id))?.person || {};
   const s = appointment.staff?.person || (staff||[]).find(x => x.id === (appointment.staff?.id || appointment.staff_id))?.person || {};
   const when = appointment.appointment_start_time ? new Date(appointment.appointment_start_time) : null;
@@ -307,10 +403,9 @@ function VisitSummary({ appointment, allTeeth }) {
     if ((t.treatment_scope || '').toLowerCase() === 'fullmouth') {
       toothLabel = 'Full mouth';
     } else if (nums.length > 1) {
-      toothLabel = nums.join(', ');
+      toothLabel = nums.map((n) => `#${formatRawToothNumber(n, numberingSystem)}`).join(', ');
     } else if (nums.length === 1) {
-      const n = Number(nums[0]);
-      toothLabel = n >= 51 && n <= 85 ? getPrimaryToothName(n) : getAdultToothName(n);
+      toothLabel = formatRawToothName(nums[0], numberingSystem);
     } else if ((t.treatment_scope || '').toLowerCase() === 'nontooth') {
       toothLabel = '—';
     }
@@ -393,14 +488,29 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
   // Teeth are defined by treatment_scope/tooth_numbers; we keep edit to service + notes here.
 
   if (!treatments) return <div>Loading…</div>;
+  const patientId = appointment.patient?.id || appointment.patient_id;
+  const patientTeeth = (allTeeth || []).filter(t => t.patient_id === patientId);
+  const numberingSystem = inferPermanentNumberingSystem(patientTeeth.map(getToothRawNumber));
+  const rawToChartNumber = (rawNumber) => normalizeToChartTooth(rawNumber, numberingSystem)?.chartNumber;
+  const chartToBackendToothNumber = (chartNumber) => {
+    const selected = normalizeChartTooth(chartNumber);
+    if (!selected) return Number(chartNumber);
+    const existing = patientTeeth.find((tooth) => {
+      const normalized = normalizeToChartTooth(getToothRawNumber(tooth), numberingSystem);
+      return normalized?.kind === selected.kind &&
+        Number(normalized?.chartNumber) === Number(selected.chartNumber);
+    });
+    return Number(getToothRawNumber(existing) ?? chartNumber);
+  };
   const baseList = (treatments || []).filter(t => t.appointment_id === appointment.id);
   let list = baseList;
   let currentTooth = null;
   if (selectedTooth?.tooth) {
     const nSel = Number(selectedTooth.tooth);
+    currentTooth = patientTeeth.find((tooth) => Number(rawToChartNumber(getToothRawNumber(tooth))) === nSel) || null;
     list = baseList.filter(t => {
       const nums = Array.isArray(t.tooth_numbers) ? t.tooth_numbers.map(Number) : (t.tooth_number ? [Number(t.tooth_number)] : []);
-      return nums.includes(nSel);
+      return nums.some((n) => Number(rawToChartNumber(n)) === nSel);
     });
   }
   if (list.length === 0) return <Empty title="No treatments recorded" subtitle="Treatments linked to this appointment will appear here." />;
@@ -411,7 +521,7 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
     .filter(t => t.patient_id === (appointment.patient?.id || appointment.patient_id))
     .filter(t => {
       const nums = Array.isArray(t.tooth_numbers) ? t.tooth_numbers.map(Number) : (t.tooth_number ? [Number(t.tooth_number)] : []);
-      return nums.includes(Number(selectedTooth.tooth));
+      return nums.some((n) => Number(rawToChartNumber(n)) === Number(selectedTooth.tooth));
     })
     .map(t => ({
       id: t.id,
@@ -442,10 +552,47 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
             const sum = list.filter(t => ids.includes(String(t.id))).reduce((s,t) => s + Number((services||[]).find(sv => sv.id === t.service_id)?.cost || 0), 0);
             const today = new Date();
             const due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 30);
-            await api.billing.create({ patient_id: appointment.patient?.id || appointment.patient_id, issue_date: today.toISOString(), due_date: due.toISOString(), total_amount: sum, amount_paid: 0, status: 'Open' });
+            const created = await api.billing.create({ patient_id: appointment.patient?.id || appointment.patient_id, issue_date: today.toISOString(), due_date: due.toISOString(), total_amount: sum, amount_paid: 0, status: 'Open' });
             notify({ title: 'Billing created', description: `Rs ${sum.toLocaleString()}` });
+            if (created?.id) {
+              // Add selected treatments as line items
+              try {
+                const selTreatments = list.filter(t => ids.includes(String(t.id)));
+                for (const t of selTreatments) {
+                  const svc = (services || []).find(sv => sv.id === t.service_id);
+                  const unit = Number(svc?.cost || 0);
+                  const surfaces = String(t.surfaces || '').toUpperCase();
+                  const desc = `${svc?.name || 'Service'}${surfaces ? ` (${surfaces})` : ''}`;
+                  await api.billing.addLineItem(created.id, {
+                    billing_id: created.id,
+                    treatment_id: t.id,
+                    service_id: t.service_id,
+                    line_item_type: 'Service',
+                    description: desc,
+                    quantity: 1,
+                    unit_price: unit,
+                    discount_percentage: 0,
+                  });
+                }
+                // Recalculate to sync totals with line items
+                await api.billing.recalculate(created.id);
+              } catch (e) {
+                // eslint-disable-next-line no-console
+                console.error('Failed adding line items for billing', e);
+              }
+              const href = `/billing/${created.id}`;
+              // Use router if available; fallback to full navigation to avoid ReferenceError in edge cases
+              if (typeof router !== 'undefined' && router?.push) {
+                router.push(href);
+              } else {
+                window.location.href = href;
+              }
+            }
           }}>Create Billing for Selected</Button>
         </div>
+      </div>
+      <div className="mt-2">
+        <a href={`/billing?patient=${appointment.patient?.id || appointment.patient_id}`} className="text-sm text-sky-700 hover:underline">View Patient Bills →</a>
       </div>
       <div className="divide-y divide-app-border rounded border border-app-border">
         {list.map((t) => {
@@ -456,8 +603,8 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
           const scope = (t.treatment_scope || '').toLowerCase();
           let coverage = '—';
           if (scope === 'fullmouth') coverage = 'Full mouth';
-          else if (nums.length > 1) coverage = `Teeth: ${nums.join(', ')}`;
-          else if (nums.length === 1) coverage = `Tooth ${nums[0]}`;
+          else if (nums.length > 1) coverage = `Teeth: ${nums.map((n) => formatRawToothNumber(n, numberingSystem)).join(', ')}`;
+          else if (nums.length === 1) coverage = `Tooth ${formatRawToothNumber(nums[0], numberingSystem)}`;
           return (
             <div key={t.id} className="p-3 grid grid-cols-[auto_1fr_auto] items-center gap-3">
               <input type="checkbox" checked={checked} onChange={(e) => setSelected(prev => ({ ...prev, [t.id]: e.target.checked }))} />
@@ -473,7 +620,7 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
                   const ns = Array.isArray(t.tooth_numbers) ? t.tooth_numbers.map(Number) : (t.tooth_number ? [Number(t.tooth_number)] : []);
                   const sc = t.treatment_scope || (ns.length > 1 ? 'MultipleTeeth' : (ns.length === 1 ? 'SingleTooth' : 'NonTooth'));
                   setEditScope(sc);
-                  setEditNumbers(ns);
+                  setEditNumbers(ns.map(rawToChartNumber).filter(Boolean));
                 }}>Edit</Button>
                 <Button size="sm" variant="destructive" onClick={async () => { if (confirm('Delete treatment?')) { await api.treatments.delete(t.id); notify({ title: 'Treatment deleted' }); mutate(); } }}>Delete</Button>
               </div>
@@ -519,17 +666,19 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
             {(editScope === 'SingleTooth' || editScope === 'MultipleTeeth') && (
               <div>
                 <div className="text-xs text-app-muted mb-1">Select tooth{editScope==='MultipleTeeth'?' (multiple)':''}</div>
-                <TeethSelector
-                  showPermanent={true}
-                  showPrimary={true}
-                  selectMode={editScope==='MultipleTeeth'?'multiple':'single'}
-                  value={editNumbers}
-                  onChange={(arr) => {
-                    const a = Array.isArray(arr) ? arr.map(Number) : [];
-                    setEditNumbers(editScope==='SingleTooth' && a.length>0 ? [a[0]] : a);
-                  }}
-                />
-                <div className="text-xs text-app-muted mt-2">{editNumbers.length>0 ? `Selected: ${editNumbers.join(', ')}` : 'None selected'}</div>
+                <div className="rounded border border-app-border p-2">
+                  <DentalChart
+                    patientId={appointment.patient?.id || appointment.patient_id}
+                    selectMode={editScope==='MultipleTeeth'?'multiple':'single'}
+                    selectedTeeth={editNumbers}
+                    onSelectionChange={(arr) => {
+                      const a = Array.isArray(arr) ? arr.map(Number) : [];
+                      setEditNumbers(editScope==='SingleTooth' && a.length>0 ? [a[0]] : a);
+                    }}
+                    showLegend={false}
+                  />
+                </div>
+                <div className="text-xs text-app-muted mt-2">{editNumbers.length>0 ? `Selected: ${editNumbers.map(formatChartToothNumber).join(', ')}` : 'None selected'}</div>
               </div>
             )}
             <div>
@@ -544,9 +693,9 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
             const base = { id: editing.id, appointment_id: appointment.id, patient_id: appointment.patient?.id || appointment.patient_id, staff_id: appointment.staff?.id || appointment.staff_id, service_id: editServiceId, notes: editNotes, treatment_scope: editScope };
             let payload = base;
             if (editScope === 'SingleTooth' && editNumbers.length === 1) {
-              payload = { ...base, tooth_number: Number(editNumbers[0]) };
+              payload = { ...base, tooth_number: chartToBackendToothNumber(editNumbers[0]) };
             } else if (editScope === 'MultipleTeeth' && editNumbers.length > 1) {
-              payload = { ...base, tooth_numbers: editNumbers.map(Number) };
+              payload = { ...base, tooth_numbers: editNumbers.map(chartToBackendToothNumber) };
             }
             await api.treatments.update(editing.id, payload);
             setEditing(null);

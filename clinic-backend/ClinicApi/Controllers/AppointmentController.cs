@@ -4,11 +4,13 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AllStaff")]
     public class AppointmentController : ControllerBase
     {
         private readonly IAppointmentService _appointmentService;
@@ -19,9 +21,9 @@ namespace ClinicApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<AppointmentDTO>>> GetAppointments()
+        public async Task<ActionResult<IEnumerable<AppointmentDTO>>> GetAppointments([FromQuery] Guid? patientId)
         {
-            var appointments = await _appointmentService.GetAllAppointmentsAsync();
+            var appointments = await _appointmentService.GetAllAppointmentsAsync(patientId);
             return Ok(appointments);
         }
 
@@ -63,6 +65,7 @@ namespace ClinicApi.Controllers
             }
         }
 
+        [Authorize(Policy = "ClinicalOrAbove")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAppointment(Guid id)
         {

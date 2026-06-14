@@ -39,7 +39,13 @@ namespace ClinicApi.Data
         public DbSet<SaleItem> SaleItem { get; set; }
         public DbSet<Treatment> Treatment { get; set; }
         public DbSet<Service> Service { get; set; }
+        public DbSet<SurfacePricingTier> SurfacePricingTier { get; set; }
         public DbSet<Prescription> Prescription { get; set; }
+
+        // Dental Odontogram and Perio DbSets
+        public DbSet<TreatmentToothSurface> TreatmentToothSurface { get; set; }
+        public DbSet<PerioStatus> PerioStatus { get; set; }
+        public DbSet<PerioMeasurement> PerioMeasurement { get; set; }
 
         // Notification-related DbSets
         public DbSet<PersonContactMethod> PersonContactMethod { get; set; }
@@ -214,6 +220,18 @@ namespace ClinicApi.Data
                 .WithMany(s => s.treatments)
                 .HasForeignKey(t => t.service_id)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Service optionally results in a ToothStatus when completed
+            modelBuilder.Entity<Service>()
+                .HasOne(s => s.resulting_tooth_status)
+                .WithMany()
+                .HasForeignKey(s => s.resulting_tooth_status_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Treatment status default
+            modelBuilder.Entity<Treatment>()
+                .Property(t => t.status)
+                .HasDefaultValue("Planned");
 
             // Treatment <-> Tooth many-to-many via join table treatment_tooth
             modelBuilder.Entity<Treatment>()
@@ -410,6 +428,10 @@ namespace ClinicApi.Data
             modelBuilder.Entity<Service>()
                 .Property(s => s.cost)
                 .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<SurfacePricingTier>()
+                .Property(p => p.multiplier)
+                .HasColumnType("decimal(5,2)");
             
             // === DEFAULT VALUES ===
             // These values are automatically set when creating new records if not specified

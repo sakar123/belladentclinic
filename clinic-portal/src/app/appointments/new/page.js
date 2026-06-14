@@ -62,11 +62,12 @@ export default function NewAppointmentPage() {
       const prefix = items.length > 0 ? `Teeth selected: ${items.length} • ${items.join(', ')}` : `Teeth selected: ${selectedFdi.size}`;
       finalNotes = finalNotes ? `${prefix} | ${finalNotes}` : prefix;
     }
+    const isoStart = startTime ? new Date(startTime).toISOString() : null;
     await api.appointment.create({
       patient_id: patientId,
       staff_id: staffId,
       status_id: statusId,
-      appointment_start_time: startTime,
+      appointment_start_time: isoStart,
       duration_minutes: duration,
       reason_for_visit: reason,
       notes: finalNotes,
@@ -79,6 +80,28 @@ export default function NewAppointmentPage() {
   const prePatient = search?.get('patientId') || '';
   const preTeeth = search?.get('teeth') || '';
   const selectedTeeth = preTeeth ? preTeeth.split(',').filter(Boolean) : [];
+  
+  // Pre-fill date/time from query: ?date=YYYY-MM-DD&time=HH:mm or ?start=YYYY-MM-DDTHH:mm
+  useEffect(() => {
+    const qStart = search?.get('start');
+    const qDate = search?.get('date');
+    const qTime = search?.get('time');
+    if (!startTime) {
+      if (qStart) {
+        try {
+          const d = new Date(qStart);
+          const pad = (n) => String(n).padStart(2, '0');
+          const local = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          setStartTime(local);
+          return;
+        } catch {}
+      }
+      if (qDate) {
+        const time = (qTime && /^\d{2}:\d{2}$/.test(qTime)) ? qTime : '09:00';
+        setStartTime(`${qDate}T${time}`);
+      }
+    }
+  }, [search, startTime]);
   
   // Initialize from query once with human-friendly tooth summary
   useEffect(() => {

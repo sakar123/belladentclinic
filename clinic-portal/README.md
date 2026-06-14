@@ -32,15 +32,28 @@ Until then, client-side filtering is safe for small/medium datasets but may be i
 
 ## Auth0 Setup (Staff & Patient Login)
 
-This app uses Auth0 for authentication via the App Router SDK. Configure these env vars in `.env.local`:
+This app uses Auth0 in client components. Configure these env vars in `.env.local`:
 
 - AUTH0_SECRET — random string (e.g., `openssl rand -hex 32`)
 - AUTH0_BASE_URL — e.g., `http://localhost:3000`
 - AUTH0_ISSUER_BASE_URL — your Auth0 domain, e.g., `https://YOUR_TENANT.eu.auth0.com`
 - AUTH0_CLIENT_ID — from the Auth0 application
 - AUTH0_CLIENT_SECRET — from the Auth0 application
+- NEXT_PUBLIC_AUTH0_DOMAIN — Auth0 tenant host only, e.g., `YOUR_TENANT.us.auth0.com`
+- NEXT_PUBLIC_AUTH0_CLIENT_ID — from the Auth0 application
+- NEXT_PUBLIC_AUTH0_AUDIENCE — required when calling the protected clinic API from the SPA; for this repo use `https://api.belladentclinic.com/api/`
 
-Routes are mounted at `/api/auth/[auth0]` and a simple login UI exists at `/login` with two buttons that pass `connection=Staff-Database` and `connection=Patients-Database`. Update those connection names in `src/app/login/page.js` to match your Auth0 Database Connections or remove the `connection` param if you use Universal Login with multiple connections.
+Important: browser code cannot read plain `AUTH0_*` variables. Anything used by `src/app/providers.js` or other client components must be exposed as `NEXT_PUBLIC_*`.
+
+The `/login` route immediately redirects to Auth0 Universal Login. If you want to force a specific database connection, set `NEXT_PUBLIC_AUTH0_CONNECTION`; otherwise omit it and let Universal Login choose.
+
+For clinic staff local login, set `NEXT_PUBLIC_AUTH0_CONNECTION=Staff-Database` so Auth0 authenticates against the staff database connection instead of the default connection picker.
+
+For local development with real Auth0-backed API calls:
+- Set `NEXT_PUBLIC_AUTH0_AUDIENCE` to `https://api.belladentclinic.com/api/`
+- Set `NEXT_PUBLIC_API_BASE_URL` to the real backend origin, e.g. `https://localhost:5112/api`
+- Keep backend `Auth0.Enabled=true` with the same `Domain` and `Audience` in local config
+- Restart `npm run dev` after changing `.env.local`
 
 Protecting staff-only pages: `src/middleware.js` currently protects `/comms` using Auth0 middleware. Add more paths to `config.matcher` as needed.
 

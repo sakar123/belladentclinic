@@ -26,6 +26,9 @@ namespace ClinicApi.Models.Entities
         [StringLength(255)]
         public string? transaction_ref { get; set; }
         
+        [StringLength(2000)]
+        public string? notes { get; set; }
+        
         [Required]
         public DateTime created_at { get; set; } = DateTime.UtcNow;
         public required string created_by { get; set; }

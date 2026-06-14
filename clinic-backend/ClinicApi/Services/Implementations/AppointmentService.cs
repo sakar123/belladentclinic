@@ -161,9 +161,17 @@ namespace ClinicApi.Services.Implementations
             return newAppointment;
         }
 
-        public async Task<IEnumerable<AppointmentDTO>> GetAllAppointmentsAsync()
+        public async Task<IEnumerable<AppointmentDTO>> GetAllAppointmentsAsync(Guid? patientId = null)
         {
-            var appointments = await _appointmentRepository.GetAllAsync();
+            IEnumerable<Appointment> appointments;
+            if (patientId.HasValue)
+            {
+                appointments = await _appointmentRepository.FindAsync(a => a.patient_id == patientId.Value);
+            }
+            else
+            {
+                appointments = await _appointmentRepository.GetAllAsync();
+            }
             return appointments.Select(a => a.ToDto()).ToList();
         }
 

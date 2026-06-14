@@ -28,5 +28,11 @@ namespace ClinicApi.Models.DTOs
         
         [Range(0, 100)]
         public decimal discount_percentage { get; set; }
+
+        // Read-only enrichments
+        public string? service_name { get; set; }
+        public string? treatment_notes { get; set; }
+        public string? staff_name { get; set; }
+        public Guid? appointment_id { get; set; }
     }
 }

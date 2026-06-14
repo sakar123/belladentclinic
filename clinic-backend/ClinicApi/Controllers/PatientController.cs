@@ -4,10 +4,12 @@ using System.Threading.Tasks;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AllStaff")]
     public class PatientController : ControllerBase
     {
         private readonly IPatientService _patientService;
@@ -55,6 +57,7 @@ namespace ClinicApi.Controllers
                 return BadRequest(ex.Message);
             }
         }
+        [Authorize(Policy = "AdminOnly")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePatient(Guid id)
         {

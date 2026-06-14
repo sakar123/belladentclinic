@@ -87,6 +87,7 @@ CREATE TABLE tooth_status (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   code VARCHAR(25) UNIQUE NOT NULL,
   description VARCHAR(200),
+  color VARCHAR(7),
 
   -- Auditing
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -138,7 +139,9 @@ CREATE TABLE service (
     specialty_id UUID REFERENCES specialty(id),
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    cost NUMERIC(10, 2) NOT NULL CHECK (cost >= 0)
+    cost NUMERIC(10, 2) NOT NULL CHECK (cost >= 0),
+    resulting_tooth_status_id UUID REFERENCES tooth_status(id),
+    visual_cue_code VARCHAR(30)
 );
 
 CREATE TABLE treatment (
@@ -150,13 +153,26 @@ CREATE TABLE treatment (
     treatment_scope TEXT NOT NULL,
     CONSTRAINT chk_treatment_scope
       CHECK (treatment_scope IN ('NonTooth', 'SingleTooth', 'MultipleTeeth', 'FullMouth')),
+    status TEXT NOT NULL DEFAULT 'Planned',
+    CONSTRAINT chk_treatment_status
+      CHECK (status IN ('Planned', 'InProgress', 'Completed', 'Cancelled')),
+    completed_at TIMESTAMPTZ,
     notes TEXT,
+    surfaces VARCHAR(10),
 
     -- Auditing
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(50),
     updated_by VARCHAR(50)
+);
+
+-- Optional per-tooth surface links for treatments (for advanced surface tracking)
+CREATE TABLE treatmenttoothsurface (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    treatment_id UUID NOT NULL REFERENCES treatment(id) ON DELETE CASCADE,
+    tooth_id UUID NOT NULL REFERENCES tooth(id) ON DELETE CASCADE,
+    surface VARCHAR(10) NOT NULL
 );
 CREATE TABLE prescription (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -188,6 +204,15 @@ CREATE TABLE service_tooth_scope (
     PRIMARY KEY (service_id, tooth_scope)
 );
 
+-- Surface pricing tiers for surface-based services (e.g., fillings)
+CREATE TABLE surface_pricing_tier (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    service_id UUID NOT NULL REFERENCES service(id) ON DELETE CASCADE,
+    min_surfaces INTEGER NOT NULL,
+    max_surfaces INTEGER NOT NULL,
+    multiplier DECIMAL(5,2) NOT NULL
+);
+
 -- ================================================================
 -- BILLING & PAYMENT TABLES (TEXT instead of ENUM)
 -- ================================================================
@@ -204,6 +229,9 @@ CREATE TABLE billing (
     status TEXT NOT NULL DEFAULT 'Draft',
     CONSTRAINT chk_billing_status
       CHECK (status IN ('Draft', 'Open', 'Paid', 'Partial', 'Void')),
+
+    -- Free-form billing notes
+    notes TEXT,
 
     -- Auditing
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -276,6 +304,7 @@ CREATE TABLE payment (
       CHECK (method IN ('Cash', 'Credit Card', 'Insurance', 'Bank Transfer', 'Mobile-Pay')),
 
     transaction_ref VARCHAR(255),
+    notes TEXT,
 
     -- Auditing
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -306,7 +335,34 @@ CREATE TABLE document (
 
   -- Auditing
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ================================================================
+-- PERIODONTAL TABLES
+-- ================================================================
+
+CREATE TABLE periostatus (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    patient_id UUID NOT NULL REFERENCES patient(id) ON DELETE CASCADE,
+    staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+    examination_date TIMESTAMPTZ NOT NULL,
+    smoker BOOLEAN NOT NULL DEFAULT FALSE,
+    bone_loss INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE periomeasurement (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    perio_status_id UUID NOT NULL REFERENCES periostatus(id) ON DELETE CASCADE,
+    tooth_number INTEGER NOT NULL,
+    site_index INTEGER NOT NULL CHECK (site_index BETWEEN 0 AND 5),
+    pocket_depth INTEGER NOT NULL DEFAULT 0,
+    clinical_attachment_level INTEGER NOT NULL DEFAULT 0,
+    gingival_margin INTEGER NOT NULL DEFAULT 0,
+    bleeding_on_probing BOOLEAN NOT NULL DEFAULT FALSE,
+    recession INTEGER NOT NULL DEFAULT 0,
+    mobility INTEGER NOT NULL DEFAULT 0,
+    furcation INTEGER NOT NULL DEFAULT 0
 );
 
 -- ================================================================
@@ -349,6 +405,8 @@ CREATE INDEX idx_billing_line_items_billing_id ON billing_line_item (billing_id)
 CREATE INDEX idx_billing_line_items_treatment_id ON billing_line_item (treatment_id);
 CREATE INDEX idx_billing_line_items_service_id ON billing_line_item (service_id);
 CREATE INDEX idx_billing_line_items_line_item_type ON billing_line_item (line_item_type);
+-- surface_pricing_tier table
+CREATE INDEX idx_surface_pricing_tier_service_id ON surface_pricing_tier (service_id);
 -- payment table
 CREATE INDEX idx_payments_billing_id ON payment (billing_id);
 
@@ -358,6 +416,15 @@ CREATE INDEX idx_treatment_tooth_treatment_id
 
 CREATE INDEX idx_treatment_tooth_tooth_id
     ON treatment_tooth (tooth_id);
+
+-- treatmenttoothsurface indexes
+CREATE INDEX idx_treatmenttoothsurface_treatment_id ON treatmenttoothsurface (treatment_id);
+CREATE INDEX idx_treatmenttoothsurface_tooth_id ON treatmenttoothsurface (tooth_id);
+
+-- perio indexes
+CREATE INDEX idx_periostatus_patient_id ON periostatus (patient_id);
+CREATE INDEX idx_periostatus_staff_id ON periostatus (staff_id);
+CREATE INDEX idx_periomeasurement_perio_status_id ON periomeasurement (perio_status_id);
 -- ================================================================
 -- TRIGGERS: updated_at auto-update
 -- ================================================================

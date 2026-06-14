@@ -34,9 +34,17 @@ namespace ClinicApi.Services.Implementations
             _fileStorageService = fileStorageService;
         }
 
-        public async Task<IEnumerable<DocumentDTO>> GetAllDocumentsAsync()
+        public async Task<IEnumerable<DocumentDTO>> GetAllDocumentsAsync(Guid? patientId = null)
         {
-            var documents = await _documentRepository.GetAllAsync();
+            IEnumerable<Document> documents;
+            if (patientId.HasValue)
+            {
+                documents = await _documentRepository.FindAsync(d => d.patient_id == patientId.Value);
+            }
+            else
+            {
+                documents = await _documentRepository.GetAllAsync();
+            }
             return documents.Select(d => d.ToDto()).ToList();
         }
 

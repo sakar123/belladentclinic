@@ -1,3 +1,8 @@
+-- Ensure we operate in public schema and required extensions exist
+SET search_path TO public;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 	-- 1. Insert Roles
 	INSERT INTO role (id, name, description) VALUES
 (gen_random_uuid(), 'Dentist', 'Primary dental care provider'),
@@ -115,18 +120,54 @@
 	((SELECT id FROM service WHERE name = 'Fluoride Treatment'), 'NonTooth'),
 	((SELECT id FROM service WHERE name = 'Filling'), 'SingleTooth'),
 	((SELECT id FROM service WHERE name = 'Retainer Fitting'), 'MultipleTeeth');
-	-- 8. Insert Tooth Statuses
-	INSERT INTO tooth_status (id, code, description, created_at, updated_at) VALUES
-(gen_random_uuid(), 'HEALTHY', 'No decay or damage', NOW(), NOW()),
-(gen_random_uuid(), 'DECAYED', 'Caries present', NOW(), NOW()),
-(gen_random_uuid(), 'FILLED', 'Restored with filling', NOW(), NOW()),
-(gen_random_uuid(), 'CROWNED', 'Covered with dental crown', NOW(), NOW()),
-(gen_random_uuid(), 'MISSING', 'Tooth extracted', NOW(), NOW()),
-(gen_random_uuid(), 'IMPACTED', 'Tooth not fully erupted', NOW(), NOW()),
-(gen_random_uuid(), 'FRACTURED', 'Cracked or broken', NOW(), NOW()),
-(gen_random_uuid(), 'ABSCESSED', 'Infection at root', NOW(), NOW()),
-(gen_random_uuid(), 'ERODED', 'Worn down surface', NOW(), NOW()),
-(gen_random_uuid(), 'MOBILITY', 'Loose tooth', NOW(), NOW());
+	-- 8. Insert Tooth Statuses (canonical 28 with colors)
+	INSERT INTO tooth_status (id, code, description, color, created_at, updated_at) VALUES
+(gen_random_uuid(), 'HEALTHY', 'Healthy', '#22c55e', NOW(), NOW()),
+(gen_random_uuid(), 'TEMPORARY', 'Temporary', '#38bdf8', NOW(), NOW()),
+(gen_random_uuid(), 'CARIES', 'Caries', '#ef4444', NOW(), NOW()),
+(gen_random_uuid(), 'FILLED', 'Filled', '#64748b', NOW(), NOW()),
+(gen_random_uuid(), 'DEFECTIVE_RESTORATION', 'Defective Restoration', '#f97316', NOW(), NOW()),
+(gen_random_uuid(), 'NON_CARIES_LESION', 'Non-Caries Lesion', '#a855f7', NOW(), NOW()),
+(gen_random_uuid(), 'PULPITIS', 'Pulpitis', '#ef4444', NOW(), NOW()),
+(gen_random_uuid(), 'NECROSIS', 'Necrosis', '#7f1d1d', NOW(), NOW()),
+(gen_random_uuid(), 'RESORPTION', 'Resorption', '#ef4444', NOW(), NOW()),
+(gen_random_uuid(), 'APICAL_LESION', 'Apical Lesion', '#ef4444', NOW(), NOW()),
+(gen_random_uuid(), 'RCT', 'Root Canal Treatment', '#e11d48', NOW(), NOW()),
+(gen_random_uuid(), 'POST', 'Radicular Post', '#94a3b8', NOW(), NOW()),
+(gen_random_uuid(), 'ROOT', 'Root (Severely Destroyed)', '#c084fc', NOW(), NOW()),
+(gen_random_uuid(), 'FRACTURED', 'Fracture', '#f97316', NOW(), NOW()),
+(gen_random_uuid(), 'MISSING', 'Missing', '#94a3b8', NOW(), NOW()),
+(gen_random_uuid(), 'EXTRACTED', 'Extracted', '#94a3b8', NOW(), NOW()),
+(gen_random_uuid(), 'PERIODONTITIS', 'Periodontitis', '#f97316', NOW(), NOW()),
+(gen_random_uuid(), 'MOBILITY', 'Mobility', '#eab308', NOW(), NOW()),
+(gen_random_uuid(), 'CROWNED', 'Crown', '#d4a44a', NOW(), NOW()),
+(gen_random_uuid(), 'BRIDGE', 'Bridge', '#b8860b', NOW(), NOW()),
+(gen_random_uuid(), 'SPLINT', 'Splint', '#9ca3af', NOW(), NOW()),
+(gen_random_uuid(), 'PONTIC', 'Pontic', '#78716c', NOW(), NOW()),
+(gen_random_uuid(), 'IMPLANT', 'Implant', '#0ea5e9', NOW(), NOW()),
+(gen_random_uuid(), 'IMPACTED', 'Impacted', '#6366f1', NOW(), NOW()),
+(gen_random_uuid(), 'DENTURE', 'Denture', '#fb7185', NOW(), NOW()),
+(gen_random_uuid(), 'CALCULUS', 'Calculus', '#f59e0b', NOW(), NOW()),
+(gen_random_uuid(), 'VENEER', 'Veneer', '#e2e8f0', NOW(), NOW()),
+(gen_random_uuid(), 'ABSCESSED', 'Abscessed', '#dc2626', NOW(), NOW());
+
+	-- 7c / 8b. Map Services to resulting Tooth Status and set seeded Treatment statuses
+	-- Place after tooth_status insert so the status codes exist
+	-- Map services that imply a resulting tooth status
+	UPDATE service SET resulting_tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'MISSING'), visual_cue_code = 'EXTRACTION'
+	  WHERE name = 'Tooth Extraction';
+	UPDATE service SET resulting_tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'RCT'), visual_cue_code = 'ROOT_CANAL'
+	  WHERE name = 'Root Canal';
+	UPDATE service SET resulting_tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'CROWNED'), visual_cue_code = 'CROWN'
+	  WHERE name = 'Crown Fitting';
+	UPDATE service SET resulting_tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'FILLED'), visual_cue_code = 'FILLING'
+	  WHERE name = 'Filling';
+
+    -- Add remaining visual cue codes
+    UPDATE service SET visual_cue_code = 'BRACKET' WHERE name = 'Braces Adjustment';
+    UPDATE service SET visual_cue_code = 'RETAINER' WHERE name = 'Retainer Fitting';
+    UPDATE service SET visual_cue_code = 'SEALANT' WHERE name = 'Fluoride Treatment';
+
 	-- 9. Insert Teeth (for first patient + teeth needed for treatments)
 	INSERT INTO tooth (patient_id, tooth_number, tooth_name, tooth_status_id) VALUES
 	-- james.j@example.com (full set upper arch)
@@ -134,7 +175,7 @@
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 2, 'Second Molar', (SELECT id FROM tooth_status WHERE code = 'FILLED')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 3, 'First Molar', (SELECT id FROM tooth_status WHERE code = 'CROWNED')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 4, 'Second Premolar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
-	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'DECAYED')),
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'CARIES')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 6, 'Canine', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 7, 'Lateral Incisor', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 8, 'Central Incisor', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
@@ -149,7 +190,7 @@
 	-- c.harris@example.com (tooth 3 for extraction)
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')), 3, 'First Molar', (SELECT id FROM tooth_status WHERE code = 'IMPACTED')),
 	-- d.thompson@example.com (tooth 5 for root canal)
-	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'DECAYED')),
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'CARIES')),
 	-- linda.m@example.com (teeth 4,5 for braces adjustment)
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')), 4, 'Second Premolar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
@@ -159,7 +200,7 @@
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')), 8, 'Central Incisor', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')), 9, 'Central Incisor', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
 	-- lisa.g@example1.com (tooth 5 for filling)
-	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'DECAYED'));
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'CARIES'));
 	-- 10. Insert Appointments
 	INSERT INTO appointment (patient_id, staff_id, status_id, appointment_start_time, duration_minutes, reason_for_visit) VALUES
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')), (SELECT id FROM appointment_status WHERE name = 'Scheduled'), '2023-10-01 09:00:00', 30, 'Routine checkup'),
@@ -188,6 +229,8 @@
 	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'amanda.t@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'amanda.t@example.com')), (SELECT id FROM service WHERE name = 'Retainer Fitting'), 'MultipleTeeth', 'New patient consultation'),
 	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')), (SELECT id FROM service WHERE name = 'Filling'), 'SingleTooth', 'Composite filling'),
 	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com')), (SELECT id FROM service WHERE name = 'Fluoride Treatment'), 'NonTooth', 'Post-cleaning fluoride');
+	-- 11a. Set all seeded treatments to Completed and stamp completed_at
+	UPDATE treatment SET status = 'Completed', completed_at = created_at;
 	-- 11b. Insert Treatment-Tooth links (for SingleTooth/MultipleTeeth treatments)
 	INSERT INTO treatment_tooth (treatment_id, tooth_id) VALUES
 	-- Tooth Extraction: c.harris tooth 3
@@ -232,6 +275,12 @@
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')), '2023-10-02', '2023-10-16', 150.00, 0.00, 'Draft'),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), '2023-10-02', '2023-10-16', 200.00, 0.00, 'Open'),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')), '2023-10-02', '2023-10-16', 50.00, 50.00, 'Paid');
+
+	-- 13b. Add demo notes to some billing and payment rows
+	UPDATE billing SET notes = 'Routine checkup billing' WHERE id = (SELECT id FROM billing WHERE status = 'Paid' AND notes IS NULL LIMIT 1);
+	UPDATE billing SET notes = 'Deep cleaning – follow-up in 6 months' WHERE id = (SELECT id FROM billing WHERE status IN ('Open','Partial') AND notes IS NULL LIMIT 1);
+	UPDATE payment SET notes = 'Paid via clinic POS terminal' WHERE method = 'Credit Card' AND notes IS NULL;
+	UPDATE payment SET notes = 'Insurance claim submitted' WHERE method = 'Insurance' AND notes IS NULL;
 	-- 14. Insert Billing Line Items (with service_id and line_item_type)
 	INSERT INTO billing_line_item (billing_id, treatment_id, service_id, line_item_type, description, quantity, unit_price, discount_percentage) VALUES
 	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Routine Checkup')), (SELECT id FROM service WHERE name = 'Routine Checkup'), 'Service', 'Routine Checkup', 1, 150.00, 0.00),
@@ -585,3 +634,80 @@
 	INSERT INTO person_channel_suppression (person_id, channel, contact_value, reason, is_active) VALUES
 	((SELECT id FROM person WHERE email = 'rob.m@example1.com'), 'Email', 'rob.m@example1.com', 'Hard bounce detected by SES', TRUE),
 	((SELECT id FROM person WHERE email = 'd.wilson@example1.com'), 'SMS', '+15555556666', 'User requested SMS opt-out', FALSE);
+
+-- 29. Odontogram demo data: pricing tiers, surfaces, bridges/splints, perio
+
+-- 29a. Surface Pricing Tiers for Fillings
+INSERT INTO surface_pricing_tier (service_id, min_surfaces, max_surfaces, multiplier)
+VALUES
+((SELECT id FROM service WHERE name = 'Filling'), 1, 1, 1.00),
+((SELECT id FROM service WHERE name = 'Filling'), 2, 2, 1.25),
+((SELECT id FROM service WHERE name = 'Filling'), 3, 10, 1.50);
+
+-- 29c. Demonstrate bridge across 14-15-16 for james.j (14 & 16 = BRIDGE terminals, 15 = PONTIC)
+UPDATE tooth SET tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'BRIDGE')
+WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))
+  AND tooth_number IN (14,16);
+UPDATE tooth SET tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'PONTIC')
+WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))
+  AND tooth_number = 15;
+
+-- 29d. Demonstrate splint across upper incisors (8-9) for james.j
+UPDATE tooth SET tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'SPLINT')
+WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))
+  AND tooth_number IN (8,9);
+
+-- 29e. Mark an implant for c.harris tooth 3
+UPDATE tooth SET tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'IMPLANT')
+WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com'))
+  AND tooth_number = 3;
+
+-- 29f. Completed MOD filling: set surfaces on an existing Filling treatment for lisa.g@example1 (tooth 5)
+UPDATE treatment SET surfaces = 'MOD', status = 'Completed'
+WHERE id = (
+  SELECT t.id FROM treatment t
+  JOIN patient p ON p.id = t.patient_id
+  JOIN person pe ON pe.id = p.person_id
+  WHERE pe.email = 'lisa.g@example1.com'
+    AND t.service_id = (SELECT id FROM service WHERE name = 'Filling')
+  LIMIT 1
+);
+
+-- 29g. Add per-surface rows for that treatment (M,O,D)
+INSERT INTO treatmenttoothsurface (id, treatment_id, tooth_id, surface)
+SELECT gen_random_uuid(), t.id, tt.tooth_id, s.surf
+FROM (
+  SELECT (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Filling')
+            AND patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com'))
+            LIMIT 1) AS tid
+) x
+JOIN treatment_tooth tt ON tt.treatment_id = x.tid
+JOIN treatment t ON t.id = x.tid
+JOIN LATERAL (VALUES ('M'),('O'),('D')) AS s(surf) ON TRUE
+WHERE NOT EXISTS (
+  SELECT 1 FROM treatmenttoothsurface z WHERE z.treatment_id = x.tid AND z.tooth_id = tt.tooth_id AND z.surface = s.surf
+);
+
+-- 29h. Latest Perio exam for james.j@example.com on tooth 11 (6 sites)
+INSERT INTO periostatus (id, patient_id, staff_id, examination_date, smoker, bone_loss)
+VALUES (
+  gen_random_uuid(),
+  (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')),
+  (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')),
+  NOW() - INTERVAL '2 days', FALSE, 10
+);
+
+-- PD/GM/CAL/BOP per site for tooth 11
+WITH ps AS (
+  SELECT id AS perio_status_id FROM periostatus
+  WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))
+  ORDER BY examination_date DESC LIMIT 1
+)
+INSERT INTO periomeasurement (perio_status_id, tooth_number, site_index, pocket_depth, clinical_attachment_level, gingival_margin, bleeding_on_probing, mobility, furcation)
+VALUES
+((SELECT perio_status_id FROM ps), 11, 0, 3, 3, 0, TRUE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 1, 5, 6, 1, TRUE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 2, 4, 5, 1, FALSE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 3, 4, 5, 1, TRUE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 4, 3, 3, 0, FALSE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 5, 6, 7, 1, TRUE, 1, 0);

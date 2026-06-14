@@ -12,6 +12,11 @@ using System.Reflection;
 using System.Collections.Generic;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using ClinicApi.Auth;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using ClinicApi.Middleware;
 using ClinicApi.Models.AppSettings;
 using ClinicApi.Models.Entities;
@@ -55,6 +60,43 @@ try
         {
             opts.JsonSerializerOptions.Converters.Add(new ClinicApi.Converters.NullableGuidEmptyToNullConverter());
         });
+    // Configure Auth
+    var auth0Settings = builder.Configuration.GetSection("Auth0").Get<Auth0Settings>() ?? new Auth0Settings();
+    if (auth0Settings.Enabled)
+    {
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.Authority = $"https://{auth0Settings.Domain}/";
+                options.Audience = auth0Settings.Audience;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    NameClaimType = ClaimTypes.NameIdentifier
+                };
+            });
+    }
+    else
+    {
+        builder.Services.AddAuthentication("NoAuth")
+            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, NoAuthHandler>("NoAuth", options => { });
+    }
+
+    builder.Services.AddSingleton<IAuthorizationHandler, RoleRequirementHandler>();
+
+    builder.Services.AddAuthorization(options =>
+    {
+        options.FallbackPolicy = new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
+
+        options.AddPolicy("AdminOnly", policy => policy.Requirements.Add(new RoleRequirement("Administrator")));
+        options.AddPolicy("ClinicalOrAbove", policy => policy.Requirements.Add(new RoleRequirement("Administrator", "Dentist", "Oral Surgeon", "Orthodontist", "Endodontist", "Periodontist", "Prosthodontist")));
+        options.AddPolicy("SupportOrAbove", policy => policy.Requirements.Add(new RoleRequirement("Administrator", "Dentist", "Oral Surgeon", "Orthodontist", "Endodontist", "Periodontist", "Prosthodontist", "Hygienist", "Radiologist")));
+        options.AddPolicy("AllStaff", policy => policy.Requirements.Add(new RoleRequirement("Administrator", "Dentist", "Oral Surgeon", "Orthodontist", "Endodontist", "Periodontist", "Prosthodontist", "Hygienist", "Radiologist", "Receptionist")));
+        options.AddPolicy("BillingStaff", policy => policy.Requirements.Add(new RoleRequirement("Administrator", "Dentist", "Oral Surgeon", "Orthodontist", "Endodontist", "Periodontist", "Prosthodontist", "Receptionist")));
+        options.AddPolicy("SalesStaff", policy => policy.Requirements.Add(new RoleRequirement("Administrator", "Receptionist")));
+    });
+
     // Configure FluentValidation
     builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
@@ -85,6 +127,7 @@ try
     });
 
     // Configure EmailSettings, ClinicSettings, NotificationWorkerSettings, and S3Settings
+    builder.Services.Configure<Auth0Settings>(builder.Configuration.GetSection("Auth0"));
     builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
     builder.Services.Configure<ClinicSettings>(builder.Configuration.GetSection("ClinicSettings"));
     builder.Services.Configure<NotificationWorkerSettings>(builder.Configuration.GetSection("NotificationWorker"));
@@ -97,6 +140,8 @@ try
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
     // Register services
+    builder.Services.AddMemoryCache();
+    builder.Services.AddHttpClient<IAuth0ManagementService, Auth0ManagementService>();
     builder.Services.AddScoped<IAppointmentService, AppointmentService>();
     builder.Services.AddScoped<IBillingService, BillingService>();
     builder.Services.AddScoped<IDocumentService, DocumentService>();
@@ -123,6 +168,8 @@ try
     builder.Services.AddScoped<ILookupService<DiscountType, CreateDiscountTypeDto>, LookupService<DiscountType, CreateDiscountTypeDto>>();
     builder.Services.AddScoped<ILookupService<Role, CreateRoleDto>, LookupService<Role, CreateRoleDto>>();
     builder.Services.AddScoped<ILookupService<ToothStatus, CreateToothStatusDto>, LookupService<ToothStatus, CreateToothStatusDto>>();
+    // Perio service
+    builder.Services.AddScoped<IPerioService, PerioService>();
 
 
     // Configure AutoMapper
@@ -135,14 +182,24 @@ try
     var app = builder.Build();
     
     // Setup Database
-    // In environments where the schema is provisioned externally (SQL scripts / Docker), avoid running EF migrations.
-    // EnsureCreated is safe: it no-ops if the schema already exists; otherwise creates minimal schema for dev.
+    // Prefer EF migrations to bring existing databases up-to-date (adds new tables like perio/odontogram).
+    // Fallback to EnsureCreated only for brand‑new dev databases.
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<DentalClinicContext>();
         try
         {
-            db.Database.EnsureCreated();
+            // Try to apply pending migrations; if none exist or provider not configured for migrations,
+            // fall back to EnsureCreated for dev convenience.
+            try
+            {
+                db.Database.Migrate();
+            }
+            catch (Exception migrateEx)
+            {
+                Log.Warning(migrateEx, "Database.Migrate failed; falling back to EnsureCreated.");
+                db.Database.EnsureCreated();
+            }
             // Idempotent data seeding for lookups (runs only if empty)
             db.SeedData();
         }
@@ -175,6 +232,7 @@ try
     app.UseRouting();
     app.UseCors("DevCors");
 
+    app.UseAuthentication();
     app.UseAuthorization();
 
     app.MapControllers();

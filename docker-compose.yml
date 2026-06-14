@@ -1,26 +1,26 @@
 name: clinic-suite
 
 services:
-  # db:
-  #   image: postgres:16-alpine
-  #   container_name: clinic-db
-  #   restart: unless-stopped
-  #   environment:
-  #     POSTGRES_USER: clinic_backend_user
-  #     POSTGRES_PASSWORD: pD7pr
-  #     POSTGRES_DB: clinic_db
-  #   ports:
-  #     - "5433:5433"
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
-  #     # Initialize schema and seed on first boot only
-  #     - ./clinic-db/database-schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
-  #     - ./clinic-db/insert-statement.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 20
+  db:
+    build:
+      context: ./clinic-db
+      dockerfile: Dockerfile.DB
+    container_name: clinic-db
+    restart: unless-stopped
+    ports:
+      - "5433:5433"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -p 5433"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    profiles:
+      - db
+      - api
+      - tests
+      - portal
 
   api:
     container_name: clinic-api
@@ -32,11 +32,13 @@ services:
       - "8080:8080"
     environment:
       # Use the service name 'db' as host inside the Docker network
-      #use host.docker.internal for local development with docker desktop (pgadmin)
-      ConnectionStrings__clinicDbConnection: Host=db;Database=clinic_db;Username=clinic_backend_user;Password=pD7pr;
-    # depends_on:
-    #   db:
-    #     condition: service_healthy
+      ConnectionStrings__clinicDbConnection: Host=db;Port=5433;Database=clinic_db;Username=clinic_backend_user;Password=pD7pr;
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - api
+      - portal
 
   api-tests:
     container_name: clinic-api-tests
@@ -44,10 +46,12 @@ services:
       context: ./clinic-backend
       dockerfile: ClinicApi.Tests/Dockerfile
     environment:
-      ConnectionStrings__clinicDbConnection: Host=db;Database=clinic_db;Username=clinic_backend_user;Password=pD7pr;
-    # depends_on:
-    #   db:
-    #     condition: service_healthy
+      ConnectionStrings__clinicDbConnection: Host=db;Port=5433;Database=clinic_db;Username=clinic_backend_user;Password=pD7pr;
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - tests
 
   portal:
     container_name: clinic-portal
@@ -69,6 +73,8 @@ services:
       - ./clinic-portal/.env.local
     depends_on:
       - api
+    profiles:
+      - portal
 
   landing:
     container_name: clinic-landing
@@ -78,6 +84,8 @@ services:
     restart: unless-stopped
     ports:
       - "3001:80"
+    profiles:
+      - landing
 
 volumes:
   pgdata:

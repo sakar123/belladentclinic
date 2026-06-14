@@ -10,6 +10,7 @@ import { Mail, Phone, ShieldCheck } from 'lucide-react';
 import Input from '@/components/ui/input';
 import { useMemo, useState } from 'react';
 import Empty from '@/components/ui/empty';
+import { withRole } from '@/components/withAuth';
 
 function StaffCard({ s }) {
   const p = s.person || {};
@@ -43,7 +44,7 @@ function StaffCard({ s }) {
   );
 }
 
-export default function StaffPage() {
+function StaffPage() {
   const { data: staff, error } = useSWR('staff', () => api.staff.getAll());
   const [q, setQ] = useState('');
 
@@ -58,8 +59,8 @@ export default function StaffPage() {
     });
   }, [staff, q]);
 
-  if (error) return <div className="text-red-600">Failed to load staff.</div>;
-  if (!staff) return <div>Loading...</div>;
+  if (error) return <div className="text-red-600 p-6">Failed to load staff.</div>;
+  if (!staff) return <div className="p-6">Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -71,7 +72,7 @@ export default function StaffPage() {
         <div className="flex items-center gap-2">
           <Input placeholder="Search staff…" className="w-64" value={q} onChange={(e) => setQ(e.target.value)} />
           <Button asChild>
-            <Link href="/admin/staff/new">Add Staff</Link>
+            <Link href="/admin/staff/invite">Invite Staff</Link>
           </Button>
         </div>
       </div>
@@ -79,8 +80,10 @@ export default function StaffPage() {
         {filtered.map((s) => (<StaffCard key={s.id} s={s} />))}
       </div>
       {filtered.length === 0 && (
-        <Empty title="No staff found" subtitle="Try a different search or add a staff member." />
+        <Empty title="No staff found" subtitle="Try a different search or invite a staff member." />
       )}
     </div>
   );
 }
+
+export default withRole(StaffPage, 'AdminOnly');

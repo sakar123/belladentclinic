@@ -204,6 +204,25 @@ Environment variables and endpoints:
 How to use this log: Append a new entry on each work session with date, what changed, and any decisions taken. Keep it concise (3–6 lines).
 
 ## Session Log (new entries)
+- 2026-05-02: Treatment validation error handling.
+  - Backend: `POST/PUT /api/treatments` now catch service-level `InvalidOperationException` clinical rule failures and return `422 Unprocessable Entity` with a structured `{ message }` body instead of surfacing as unhandled 500s.
+  - Preserves the existing root-canal-on-implant guardrail while making the API response intentional for the portal/client.
+
+- 2026-04-05: Portal polish + defaults.
+  - Buttons: primary hover no longer flips to white; now uses lighter teal (`hover:bg-teal-600`).
+  - Forms: Patients/New and Staff/New (admin and staff modal) now use a Gender dropdown with values Male/Female/Other and send those exact tokens to the API.
+  - Appointments: default view switched from List to Week.
+
+- 2026-04-05: Treatment completion auto-updates tooth status (full-stack).
+  - DB: Added `service.resulting_tooth_status_id` (nullable FK) and `treatment.status` + `treatment.completed_at` with status check constraint.
+  - Seeds: Mapped services to statuses (Extraction→MISSING, Root Canal→RCT, Crown→CROWNED, Filling→FILLED); set seeded treatments to Completed.
+  - Backend: Entities/DTOs/Mappers updated; TreatmentService includes service nav, exposes Complete/Cancel; TreatmentsController adds POST `/{id}/complete|cancel`; EF config sets Service→ToothStatus relation and default status.
+  - Frontend: api.treatments.complete/cancel added; Dental chart ToothDetailPanel shows status badge, service name, resulting status arrow, dates; adds Complete action that revalidates treatments and refreshes tooth statuses.
+ 
+- 2026-04-10: QDento Odontogram & Perio integration (phase 1).
+  - Backend: Added PerioController + PerioService with entities mapped; endpoints `GET /api/perio/latest?patientId=...` and `POST /api/perio` to persist measurements. Wired DI registration. Added basic clinical validations in TreatmentService (block surface-based plans on missing/extracted, RCT on implants, bridge requires >=2 teeth). Soft-delete treatments now voids via cancel; added `POST /api/treatments/{id}/void` alias. Included treatment.surfaces in creation/update and in Billing description; updated SQL schema to include `periostatus`, `periomeasurement`, and `treatmenttoothsurface` for Compose.
+  - Frontend: DentalChart now overlays mobility (roman numerals) and furcation (triangles) from latest perio; Treatment drawer sends `surfaces` (MO, MOD, etc.) to API; Patient page adds a Periodontal Chart section (editable grid) that posts to `/api/perio` and displays values >=4mm in red.
+  - Notes: Rendering stack matches QDento (base→missing/impacted→existing/planned/completed layers). Multi-tooth arch macros are available in Treatment drawer; patient page has quick region selectors. Further parity items queued (supernumeral handling, additional detailed surface incompatibility checks, richer perio visuals).
 - 2026-04-02: Notifications feature (portal).
   - Portal: Added Notifications hub at `/notifications` with four tabs — Send Reminder (filters appointments by date range, selects recipients, preview + dispatch via backend), Campaign (audience+topic selection, dynamic filters, preview, create & launch), Quick Send (one-off email to a patient/staff with optional JSON payload), and History (lists campaigns and shows delivery stats).
   - Components: Created reusable `RecipientSelector`, `CampaignPreviewCard`, `DeliveryStatsCard`, `TopicSelector`, and `AudienceFilterForm` under `src/components/notifications` using existing UI primitives.
@@ -233,3 +252,55 @@ How to use this log: Append a new entry on each work session with date, what cha
   - Backend: On patient creation (API and Landing), auto-create teeth based on DOB using FDI: permanent (11–48) or primary (51–85). All set to HEALTHY (creates status if missing).
   - Portal: Patient profile adds Teeth tab with full list, per-tooth status editing, region quick-select (quadrants, arches, full), and bulk apply. “Set appointment with selected” passes patient and teeth to new appointment.
   - Appointments/new: Reads `patientId` and `teeth` query params; displays preselected teeth info and seeds notes.
+- 2026-04-05: Billing Center Redesign (phase 1).
+  - DB: added notes to billing and payment tables in schema; demo notes in seeds.
+  - Backend: expanded BillingDTO with notes + enrichments; added notes to PaymentDTO; DTO/mappers updated; BillingService now returns rich detail, manages payments and line items, discount application, and totals recalculation; BillingController exposes nested payment/line-item endpoints.
+  - Frontend: api.js includes payment/line item/discount methods; new `/billing/[id]` detail page with line items, payments, summary, notes; list cards are clickable; payment dialog creates real Payment with method/ref/notes; receipt shows line items and payment history; appointment page navigates to created bill and links to patient bills.
+
+- 2026-04-11: QDento parity — Stage 0/1/3 initial.
+  - Backend: Added ToothStatus.color and migration to upsert canonical 28-status taxonomy with colors; updated Lookup DTO to include color. Seeded service.visual_cue_code by name patterns. Wired TreatmentToothSurface creation in TreatmentService and added GET /api/teeth/{toothId}/surfaces endpoint with SurfaceHistoryDTO.
+  - Frontend: Added atlas.json manifest, extended DINO_ASSETS (bridge, denture, cervical, post, perio, calculus, resorption), sprite preloader with V2 flag, BRIDGE/DENTURE treatment cues, CONDITION_STYLES aligned (Caries merge, new lesion types, Periodontitis), added 6th cervical surface to selector and interactive overlay, added api.toothSurfaces.getHistory and treatment-drawer surface_map payload. next.config includes NEXT_PUBLIC_QDENTO_* env.
+
+- 2026-04-11: QDento parity — Stage 2/4 fine-tune + Stage 5 basics.
+  - DinoTooth: aligned layer order, added perioActive, bridgePosition, splintPosition, surfaceStates, bopSites props; switched POST/RESORPTION/CALCULUS to sprite layers; false-tooth crown for DENTURE; added SplintRenderer front/behind; BridgeConnector sprites with fallback gradient; BOP droplets overlay.
+  - Chart: fine-tuned perioActive (any PD ≥4 or BOP); computed per-tooth PD/GM/CAL/BOP maps; added PerioChartLine polylines (GM in gray, CAL in red) per arch under V2 flag.
+  - PerioGrid: restructured to include BOP toggles, GM/CAL rows; state shape expanded; Save emits {pd, gm, cal, bop, mobility, furcation}.
+  - Backend: added PerioMeasurement.recession + migration; Perio DTOs include recession; PerioService maps new field and exposes GetStatisticsAsync; PerioController adds GET /api/perio/statistics; Added PerioStatisticsDTO. api.perio.statistics added.
+
+- 2026-04-11: QDento parity — Stage 6 UI panels.
+  - Added SurfacePanel (zoomed occlusal grid with 6-surface interactive states and color coding) and MacroButtons (MO/MOD/Remove Crown, bridge hint).
+  - ConditionPanel embeds SurfacePanel and shows per-surface treatment history (via /api/teeth/{toothId}/surfaces). OcclusalView displays surface status dots.
+  - TreatmentOverlay SurfaceFill accepts per-surface colors and supports stripes via tooth_stripes pattern (backward compatible with single color).
+
+- 2026-04-11: QDento parity — Stage 7 validation/pricing.
+  - Backend: ToothStatusValidator with incompatibility matrix; applied in ToothService.Update with 422 response on violations (IncompatibleToothStatusException). Added SurfacePricingTier entity + migration; TreatmentService uses tier multiplier for surface-based costs (fallback to 1.25x if no tiers configured).
+  - Frontend: INCOMPATIBLE_STATUSES map exported; ConditionPanel warns on incompatible status changes before calling the API.
+
+- 2026-05-01: Portal auth login flow refinement.
+  - Navbar login now initiates Auth0 `loginWithRedirect` directly instead of routing to a sign-in page first.
+  - `login()` now accepts an optional return path and passes it through Auth0 app state for post-login return handling.
+  - `/login` is now redirect-only and immediately sends unauthenticated users to the IdP.
+  - Fixed missing client Auth0 env exposure by adding `NEXT_PUBLIC_AUTH0_DOMAIN`, `NEXT_PUBLIC_AUTH0_CLIENT_ID`, and `NEXT_PUBLIC_AUTH0_AUDIENCE`; provider now logs a clear error if client Auth0 vars are absent.
+  - Made Auth0 audience optional for local login. Removed the local `NEXT_PUBLIC_AUTH0_AUDIENCE` because Auth0 rejected `https://api.belladentclinic.com` with `access_denied: Service not found`.
+  - Finalized real local Auth0 flow: restored the correct audience `https://api.belladentclinic.com/api/`, enabled Auth0 validation in `clinic-backend/ClinicApi/appsettings.local.json`, added Auth0 redirect callback routing to `returnTo`, and only send `connection` when explicitly configured.
+  - Forced the portal’s local Auth0 login connection to `Staff-Database` via `NEXT_PUBLIC_AUTH0_CONNECTION`; mirrored the backend local Auth0 `Connection` setting for consistency with staff invitation/auth flows.
+  - Local portal now targets the real backend origin `https://localhost:5112/api` instead of the old Next `/backend` proxy, and `src/lib/api.js` now attaches Auth0 bearer tokens via `authFetch` so protected endpoints work under real local Auth0.
+
+- 2026-06-13: Dental chart foundation + clinical UI pass.
+  - Portal: Fixed DinoTooth compositing so lesion/perio/calculus overlays render above tooth anatomy; status opacity now applies to base anatomy so missing/extracted markers stay visible.
+  - Portal: Fixed dental hook/runtime issues, replaced DOM-ref teeth caching with React state, normalized selected-detail/treatment overlay tooth lookups, and corrected the lookup API path.
+  - Portal: Upgraded the full DentalChart UI with a clinical odontogram header, stats chips, larger staff chart on the patient Teeth tab, a wider detail panel, arch labels, and backend status colors in the legend.
+  - Verification: `npm run lint` passes with existing non-dental warnings; `npm run build` passes.
+
+- 2026-06-13: Dental chart phase 2 numbering and mixed dentition pass.
+  - Portal: Added shared tooth-numbering utilities for Universal chart positions, permanent FDI, primary FDI, arch/quadrant helpers, and raw backend tooth number extraction.
+  - Portal: DentalChart now separates raw API tooth normalization from clicked/selected chart numbers, supports primary/mixed dentition rows, and normalizes statuses, treatment cues, ortho connectors, and perio overlays.
+  - Portal: Patient Teeth tab, Treatment drawer, Appointment detail editor, Visit Summary, and `/me` dental card now translate chart selections back to backend tooth numbers before scheduling or saving treatments.
+  - Portal: Treatment drawer preserves per-tooth surface selections in drafts and uses patient-aware arch quick-selects.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes.
+
+- 2026-06-14: Dental chart phase 3 workflow polish.
+  - Portal: Added tooth jump/search, finding focus/clear controls, and a sticky selected-teeth tray to the full DentalChart for faster chairside navigation.
+  - Portal: Primary teeth now get chart anchors so search/focus works for mixed dentition as well as permanent teeth.
+  - Portal: Improved the tooth detail panel with status color, open-treatment/record counts, clearer surface-history empty states, and richer treatment rows with dates/surfaces.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes.

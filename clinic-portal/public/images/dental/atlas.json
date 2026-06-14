@@ -1,0 +1,63 @@
+{
+  "version": 2,
+  "permanentIndices": [0,1,2,3,4,5,6,7,7,6,5,4,3,2,1,0,8,9,10,11,12,13,14,15,15,14,13,12,11,10,9,8],
+  "columns": [
+    {"idx":0,"width":180,"xOffset":0,"isMolar":true},
+    {"idx":1,"width":180,"xOffset":180,"isMolar":true},
+    {"idx":2,"width":180,"xOffset":360,"isMolar":true},
+    {"idx":3,"width":120,"xOffset":540,"isMolar":false},
+    {"idx":4,"width":120,"xOffset":660,"isMolar":false},
+    {"idx":5,"width":120,"xOffset":780,"isMolar":false},
+    {"idx":6,"width":120,"xOffset":900,"isMolar":false},
+    {"idx":7,"width":120,"xOffset":1020,"isMolar":false},
+    {"idx":8,"width":180,"xOffset":1140,"isMolar":true},
+    {"idx":9,"width":180,"xOffset":1320,"isMolar":true},
+    {"idx":10,"width":180,"xOffset":1500,"isMolar":true},
+    {"idx":11,"width":120,"xOffset":1680,"isMolar":false},
+    {"idx":12,"width":120,"xOffset":1800,"isMolar":false},
+    {"idx":13,"width":120,"xOffset":1920,"isMolar":false},
+    {"idx":14,"width":120,"xOffset":2040,"isMolar":false},
+    {"idx":15,"width":120,"xOffset":2160,"isMolar":false}
+  ],
+  "commonTexture": {
+    "path": "/images/dental/tooth_common.png",
+    "regions": {
+      "implantFront":         {"x":0,"y":0,"w":120,"h":860},
+      "calculusImplantFront": {"x":120,"y":0,"w":120,"h":860},
+      "perioImplantFront":    {"x":240,"y":0,"w":120,"h":860},
+      "dentureFront":         {"x":360,"y":0,"w":120,"h":860},
+      "implantMolar":         {"x":480,"y":0,"w":180,"h":860},
+      "calculusImplantMolar": {"x":660,"y":0,"w":180,"h":860},
+      "perioImplantMolar":    {"x":840,"y":0,"w":180,"h":860},
+      "dentureMolar":         {"x":1020,"y":0,"w":180,"h":860}
+    }
+  },
+  "spriteRects": {
+    "molar":     {"crownY":210,"crownH":440,"surfaceCropX":25,"surfaceCropY":360,"surfaceCropW":140,"surfaceCropH":140},
+    "premolar":  {"crownY":210,"crownH":440,"surfaceCropX":12,"surfaceCropY":360,"surfaceCropW":94,"surfaceCropH":116},
+    "frontal":   {"crownY":210,"crownH":440,"surfaceCropX":-10,"surfaceCropY":210,"surfaceCropW":130,"surfaceCropH":145}
+  },
+  "atlases": {
+    "teeth":       "/images/dental/tooth_teeth.png",
+    "roots":       "/images/dental/tooth_roots.png",
+    "lesion":      "/images/dental/tooth_lesion.png",
+    "endo":        "/images/dental/tooth_endo.png",
+    "crown":       "/images/dental/tooth_crown.png",
+    "common":      "/images/dental/tooth_common.png",
+    "buccal":      "/images/dental/tooth_buccal.png",
+    "lingual":     "/images/dental/tooth_lingual.png",
+    "occlusal":    "/images/dental/tooth_occlusal.png",
+    "approximal":  "/images/dental/tooth_approximal.png",
+    "cervical":    "/images/dental/tooth_cervical.png",
+    "stripes":     "/images/dental/tooth_stripes.png",
+    "bridgeCon":   "/images/dental/tooth_bridgeCon.png",
+    "bridgeSep":   "/images/dental/tooth_bridgeSep.png",
+    "falseTooth":  "/images/dental/tooth_false.png",
+    "fiberBridge": "/images/dental/tooth_fiberBridge.png",
+    "perio":       "/images/dental/tooth_perio.png",
+    "post":        "/images/dental/tooth_post.png",
+    "calculus":    "/images/dental/tooth_calculus.png",
+    "resorption":  "/images/dental/tooth_resorption.png"
+  }
+}
+
