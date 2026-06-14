@@ -1,3 +1,8 @@
+-- Ensure we operate in public schema and required extensions exist
+SET search_path TO public;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 	-- 1. Insert Roles
 	INSERT INTO role (id, name, description) VALUES
 (gen_random_uuid(), 'Dentist', 'Primary dental care provider'),
@@ -77,6 +82,7 @@
 	((SELECT id FROM person WHERE email = 'rob.m@example1.com'), 'Amy Martinez', '+15551111111');
 	-- 6. Insert Appointment Statuses
 	INSERT INTO appointment_status (id, name) VALUES
+(gen_random_uuid(), 'Scheduled'),
 (gen_random_uuid(), 'Confirmed'),
 (gen_random_uuid(), 'In Progress'),
 (gen_random_uuid(), 'Completed'),
@@ -100,25 +106,76 @@
 	((SELECT id FROM specialty WHERE name = 'Preventive Care'), 'Fluoride Treatment', 'Fluoride application', 50.00),
 	((SELECT id FROM specialty WHERE name = 'General Dentistry'), 'Filling', 'Amalgam filling', 200.00),
 	((SELECT id FROM specialty WHERE name = 'Orthodontics'), 'Retainer Fitting', 'Custom retainer placement', 350.00);
-	-- 8. Insert Tooth Statuses
-	INSERT INTO tooth_status (id, code, description, created_at, updated_at) VALUES
-(gen_random_uuid(), 'HEALTHY', 'No decay or damage', NOW(), NOW()),
-(gen_random_uuid(), 'DECAYED', 'Caries present', NOW(), NOW()),
-(gen_random_uuid(), 'FILLED', 'Restored with filling', NOW(), NOW()),
-(gen_random_uuid(), 'CROWNED', 'Covered with dental crown', NOW(), NOW()),
-(gen_random_uuid(), 'MISSING', 'Tooth extracted', NOW(), NOW()),
-(gen_random_uuid(), 'IMPACTED', 'Tooth not fully erupted', NOW(), NOW()),
-(gen_random_uuid(), 'FRACTURED', 'Cracked or broken', NOW(), NOW()),
-(gen_random_uuid(), 'ABSCESSED', 'Infection at root', NOW(), NOW()),
-(gen_random_uuid(), 'ERODED', 'Worn down surface', NOW(), NOW()),
-(gen_random_uuid(), 'MOBILITY', 'Loose tooth', NOW(), NOW());
-	-- 9. Insert Teeth (for first patient)
+	-- 7b. Insert Service Tooth Scopes
+	INSERT INTO service_tooth_scope (service_id, tooth_scope) VALUES
+	((SELECT id FROM service WHERE name = 'Routine Checkup'), 'FullMouth'),
+	((SELECT id FROM service WHERE name = 'Braces Adjustment'), 'MultipleTeeth'),
+	((SELECT id FROM service WHERE name = 'Tooth Extraction'), 'SingleTooth'),
+	((SELECT id FROM service WHERE name = 'Root Canal'), 'SingleTooth'),
+	((SELECT id FROM service WHERE name = 'Deep Cleaning'), 'FullMouth'),
+	((SELECT id FROM service WHERE name = 'Crown Fitting'), 'SingleTooth'),
+	((SELECT id FROM service WHERE name = 'Dental X-Ray'), 'FullMouth'),
+	((SELECT id FROM service WHERE name = 'Teeth Whitening'), 'FullMouth'),
+	((SELECT id FROM service WHERE name = 'Child Cleaning'), 'FullMouth'),
+	((SELECT id FROM service WHERE name = 'Fluoride Treatment'), 'NonTooth'),
+	((SELECT id FROM service WHERE name = 'Filling'), 'SingleTooth'),
+	((SELECT id FROM service WHERE name = 'Retainer Fitting'), 'MultipleTeeth');
+	-- 8. Insert Tooth Statuses (canonical 28 with colors)
+	INSERT INTO tooth_status (id, code, description, color, created_at, updated_at) VALUES
+(gen_random_uuid(), 'HEALTHY', 'Healthy', '#22c55e', NOW(), NOW()),
+(gen_random_uuid(), 'TEMPORARY', 'Temporary', '#38bdf8', NOW(), NOW()),
+(gen_random_uuid(), 'CARIES', 'Caries', '#ef4444', NOW(), NOW()),
+(gen_random_uuid(), 'FILLED', 'Filled', '#64748b', NOW(), NOW()),
+(gen_random_uuid(), 'DEFECTIVE_RESTORATION', 'Defective Restoration', '#f97316', NOW(), NOW()),
+(gen_random_uuid(), 'NON_CARIES_LESION', 'Non-Caries Lesion', '#a855f7', NOW(), NOW()),
+(gen_random_uuid(), 'PULPITIS', 'Pulpitis', '#ef4444', NOW(), NOW()),
+(gen_random_uuid(), 'NECROSIS', 'Necrosis', '#7f1d1d', NOW(), NOW()),
+(gen_random_uuid(), 'RESORPTION', 'Resorption', '#ef4444', NOW(), NOW()),
+(gen_random_uuid(), 'APICAL_LESION', 'Apical Lesion', '#ef4444', NOW(), NOW()),
+(gen_random_uuid(), 'RCT', 'Root Canal Treatment', '#e11d48', NOW(), NOW()),
+(gen_random_uuid(), 'POST', 'Radicular Post', '#94a3b8', NOW(), NOW()),
+(gen_random_uuid(), 'ROOT', 'Root (Severely Destroyed)', '#c084fc', NOW(), NOW()),
+(gen_random_uuid(), 'FRACTURED', 'Fracture', '#f97316', NOW(), NOW()),
+(gen_random_uuid(), 'MISSING', 'Missing', '#94a3b8', NOW(), NOW()),
+(gen_random_uuid(), 'EXTRACTED', 'Extracted', '#94a3b8', NOW(), NOW()),
+(gen_random_uuid(), 'PERIODONTITIS', 'Periodontitis', '#f97316', NOW(), NOW()),
+(gen_random_uuid(), 'MOBILITY', 'Mobility', '#eab308', NOW(), NOW()),
+(gen_random_uuid(), 'CROWNED', 'Crown', '#d4a44a', NOW(), NOW()),
+(gen_random_uuid(), 'BRIDGE', 'Bridge', '#b8860b', NOW(), NOW()),
+(gen_random_uuid(), 'SPLINT', 'Splint', '#9ca3af', NOW(), NOW()),
+(gen_random_uuid(), 'PONTIC', 'Pontic', '#78716c', NOW(), NOW()),
+(gen_random_uuid(), 'IMPLANT', 'Implant', '#0ea5e9', NOW(), NOW()),
+(gen_random_uuid(), 'IMPACTED', 'Impacted', '#6366f1', NOW(), NOW()),
+(gen_random_uuid(), 'DENTURE', 'Denture', '#fb7185', NOW(), NOW()),
+(gen_random_uuid(), 'CALCULUS', 'Calculus', '#f59e0b', NOW(), NOW()),
+(gen_random_uuid(), 'VENEER', 'Veneer', '#e2e8f0', NOW(), NOW()),
+(gen_random_uuid(), 'ABSCESSED', 'Abscessed', '#dc2626', NOW(), NOW());
+
+	-- 7c / 8b. Map Services to resulting Tooth Status and set seeded Treatment statuses
+	-- Place after tooth_status insert so the status codes exist
+	-- Map services that imply a resulting tooth status
+	UPDATE service SET resulting_tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'MISSING'), visual_cue_code = 'EXTRACTION'
+	  WHERE name = 'Tooth Extraction';
+	UPDATE service SET resulting_tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'RCT'), visual_cue_code = 'ROOT_CANAL'
+	  WHERE name = 'Root Canal';
+	UPDATE service SET resulting_tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'CROWNED'), visual_cue_code = 'CROWN'
+	  WHERE name = 'Crown Fitting';
+	UPDATE service SET resulting_tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'FILLED'), visual_cue_code = 'FILLING'
+	  WHERE name = 'Filling';
+
+    -- Add remaining visual cue codes
+    UPDATE service SET visual_cue_code = 'BRACKET' WHERE name = 'Braces Adjustment';
+    UPDATE service SET visual_cue_code = 'RETAINER' WHERE name = 'Retainer Fitting';
+    UPDATE service SET visual_cue_code = 'SEALANT' WHERE name = 'Fluoride Treatment';
+
+	-- 9. Insert Teeth (for first patient + teeth needed for treatments)
 	INSERT INTO tooth (patient_id, tooth_number, tooth_name, tooth_status_id) VALUES
+	-- james.j@example.com (full set upper arch)
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 1, 'Third Molar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 2, 'Second Molar', (SELECT id FROM tooth_status WHERE code = 'FILLED')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 3, 'First Molar', (SELECT id FROM tooth_status WHERE code = 'CROWNED')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 4, 'Second Premolar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
-	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'DECAYED')),
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'CARIES')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 6, 'Canine', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 7, 'Lateral Incisor', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 8, 'Central Incisor', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
@@ -129,7 +186,21 @@
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 13, 'Second Premolar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 14, 'First Molar', (SELECT id FROM tooth_status WHERE code = 'CROWNED')),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 15, 'Second Molar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
-	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 16, 'Third Molar', (SELECT id FROM tooth_status WHERE code = 'MISSING'));
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 16, 'Third Molar', (SELECT id FROM tooth_status WHERE code = 'MISSING')),
+	-- c.harris@example.com (tooth 3 for extraction)
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')), 3, 'First Molar', (SELECT id FROM tooth_status WHERE code = 'IMPACTED')),
+	-- d.thompson@example.com (tooth 5 for root canal)
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'CARIES')),
+	-- linda.m@example.com (teeth 4,5 for braces adjustment)
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')), 4, 'Second Premolar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
+	-- sarah.j@example1.com (tooth 3 for crown fitting)
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example1.com')), 3, 'First Molar', (SELECT id FROM tooth_status WHERE code = 'FRACTURED')),
+	-- emily.d@example1.com (teeth 8,9 for retainer fitting)
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')), 8, 'Central Incisor', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')), 9, 'Central Incisor', (SELECT id FROM tooth_status WHERE code = 'HEALTHY')),
+	-- lisa.g@example1.com (tooth 5 for filling)
+	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), 5, 'First Premolar', (SELECT id FROM tooth_status WHERE code = 'CARIES'));
 	-- 10. Insert Appointments
 	INSERT INTO appointment (patient_id, staff_id, status_id, appointment_start_time, duration_minutes, reason_for_visit) VALUES
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')), (SELECT id FROM appointment_status WHERE name = 'Scheduled'), '2023-10-01 09:00:00', 30, 'Routine checkup'),
@@ -144,35 +215,38 @@
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'amanda.t@example.com')), (SELECT id FROM appointment_status WHERE name = 'Arrived'), '2023-10-02 11:00:00', 30, 'Consultation'),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')), (SELECT id FROM appointment_status WHERE name = 'Scheduled'), '2023-10-02 13:00:00', 45, 'Filling'),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com')), (SELECT id FROM appointment_status WHERE name = 'Confirmed'), '2023-10-02 14:00:00', 30, 'Fluoride treatment');
-	-- Allow NULL for treatment.tooth_id during seed (will backfill and enforce later)
-	DO $$ BEGIN
-	  IF EXISTS (
-	    SELECT 1 FROM information_schema.columns 
-	    WHERE table_schema = 'public' AND table_name = 'treatment' AND column_name = 'tooth_id'
-	  ) THEN
-	    BEGIN
-	      ALTER TABLE treatment ALTER COLUMN tooth_id DROP NOT NULL;
-	    EXCEPTION WHEN others THEN
-	      -- ignore if already nullable
-	      NULL;
-	    END;
-	  END IF;
-	END $$;
-
-	-- 11. Insert Treatments
-	INSERT INTO treatment (appointment_id, patient_id, staff_id, service_id, tooth_number, notes) VALUES
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')), (SELECT id FROM service WHERE name = 'Routine Checkup'), 1, 'No issues found'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com')), (SELECT id FROM service WHERE name = 'Deep Cleaning'), 2, 'Significant tartar buildup'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example.com')), (SELECT id FROM service WHERE name = 'Tooth Extraction'), 3, 'Impacted wisdom tooth'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example.com')), (SELECT id FROM service WHERE name = 'Braces Adjustment'), 4, 'Tightened wires'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example.com')), (SELECT id FROM service WHERE name = 'Root Canal'), 5, 'Severe decay'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example.com')), (SELECT id FROM service WHERE name = 'Child Cleaning'), 6, 'Gum inflammation'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example.com')), (SELECT id FROM service WHERE name = 'Crown Fitting'), 3, 'Temporary crown placed'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'j.anderson@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'j.anderson@example.com')), (SELECT id FROM service WHERE name = 'Dental X-Ray'), 7, 'Full mouth series'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'w.taylor@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'w.taylor@example.com')), (SELECT id FROM service WHERE name = 'Teeth Whitening'), 8, 'In-office bleaching'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'amanda.t@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'amanda.t@example.com')), (SELECT id FROM service WHERE name = 'Retainer Fitting'), 9, 'New patient consultation'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')), (SELECT id FROM service WHERE name = 'Filling'), 5, 'Composite filling'),
-	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com')), (SELECT id FROM service WHERE name = 'Fluoride Treatment'), 11, 'Post-cleaning fluoride');
+	-- 11. Insert Treatments (treatment_scope replaces tooth_number)
+	INSERT INTO treatment (appointment_id, patient_id, staff_id, service_id, treatment_scope, notes) VALUES
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')), (SELECT id FROM service WHERE name = 'Routine Checkup'), 'FullMouth', 'No issues found'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com')), (SELECT id FROM service WHERE name = 'Deep Cleaning'), 'FullMouth', 'Significant tartar buildup'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example.com')), (SELECT id FROM service WHERE name = 'Tooth Extraction'), 'SingleTooth', 'Impacted wisdom tooth'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example.com')), (SELECT id FROM service WHERE name = 'Braces Adjustment'), 'MultipleTeeth', 'Tightened wires'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example.com')), (SELECT id FROM service WHERE name = 'Root Canal'), 'SingleTooth', 'Severe decay'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example.com')), (SELECT id FROM service WHERE name = 'Child Cleaning'), 'FullMouth', 'Gum inflammation'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example.com')), (SELECT id FROM service WHERE name = 'Crown Fitting'), 'SingleTooth', 'Temporary crown placed'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'j.anderson@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'j.anderson@example.com')), (SELECT id FROM service WHERE name = 'Dental X-Ray'), 'FullMouth', 'Full mouth series'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'w.taylor@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'w.taylor@example.com')), (SELECT id FROM service WHERE name = 'Teeth Whitening'), 'FullMouth', 'In-office bleaching'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'amanda.t@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'amanda.t@example.com')), (SELECT id FROM service WHERE name = 'Retainer Fitting'), 'MultipleTeeth', 'New patient consultation'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')), (SELECT id FROM service WHERE name = 'Filling'), 'SingleTooth', 'Composite filling'),
+	((SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com'))), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')), (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com')), (SELECT id FROM service WHERE name = 'Fluoride Treatment'), 'NonTooth', 'Post-cleaning fluoride');
+	-- 11a. Set all seeded treatments to Completed and stamp completed_at
+	UPDATE treatment SET status = 'Completed', completed_at = created_at;
+	-- 11b. Insert Treatment-Tooth links (for SingleTooth/MultipleTeeth treatments)
+	INSERT INTO treatment_tooth (treatment_id, tooth_id) VALUES
+	-- Tooth Extraction: c.harris tooth 3
+	((SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Tooth Extraction')), (SELECT id FROM tooth WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')) AND tooth_number = 3)),
+	-- Root Canal: d.thompson tooth 5
+	((SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Root Canal')), (SELECT id FROM tooth WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')) AND tooth_number = 5)),
+	-- Braces Adjustment: linda.m teeth 4 and 5
+	((SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Braces Adjustment')), (SELECT id FROM tooth WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')) AND tooth_number = 4)),
+	((SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Braces Adjustment')), (SELECT id FROM tooth WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')) AND tooth_number = 5)),
+	-- Crown Fitting: sarah.j@example1 tooth 3
+	((SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Crown Fitting')), (SELECT id FROM tooth WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example1.com')) AND tooth_number = 3)),
+	-- Retainer Fitting: emily.d@example1 teeth 8 and 9
+	((SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Retainer Fitting')), (SELECT id FROM tooth WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')) AND tooth_number = 8)),
+	((SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Retainer Fitting')), (SELECT id FROM tooth WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')) AND tooth_number = 9)),
+	-- Filling: lisa.g@example1 tooth 5
+	((SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Filling')), (SELECT id FROM tooth WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')) AND tooth_number = 5));
 	-- 12. Insert Prescriptions
 	INSERT INTO prescription (treatment_id, drug_name, dosage, instructions) VALUES
 	((SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Root Canal')), 'Amoxicillin', '500mg', 'Take 1 capsule three times daily for 7 days'),
@@ -201,43 +275,26 @@
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')), '2023-10-02', '2023-10-16', 150.00, 0.00, 'Draft'),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), '2023-10-02', '2023-10-16', 200.00, 0.00, 'Open'),
 	((SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')), '2023-10-02', '2023-10-16', 50.00, 50.00, 'Paid');
-	-- 14. Insert Billing Line Items
-	INSERT INTO billing_line_item (billing_id, treatment_id, description, quantity, unit_price, discount_percentage) VALUES
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Routine Checkup')), 'Routine Checkup', 1, 150.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Deep Cleaning')), 'Deep Cleaning', 1, 250.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Tooth Extraction')), 'Tooth Extraction', 1, 300.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Braces Adjustment')), 'Braces Adjustment', 1, 100.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Root Canal')), 'Root Canal', 1, 800.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Deep Cleaning')), 'Deep Cleaning', 1, 250.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Crown Fitting')), 'Crown Fitting', 1, 1200.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Dental X-Ray')), 'Dental X-Ray', 1, 120.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Teeth Whitening')), 'Teeth Whitening', 1, 400.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Routine Checkup')), 'Routine Checkup', 1, 150.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Filling')), 'Filling', 1, 200.00, 0.00),
-	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Fluoride Treatment')), 'Fluoride Treatment', 1, 50.00, 0.00);
 
-	-- Backfill treatment.tooth_id from tooth_number + patient_id, then enforce NOT NULL
-	UPDATE treatment t
-	SET tooth_id = th.id
-	FROM tooth th
-	WHERE t.tooth_id IS NULL
-	  AND th.patient_id = t.patient_id
-	  AND th.tooth_number = t.tooth_number;
-
-	-- Enforce NOT NULL after backfill
-	DO $$ BEGIN
-	  IF EXISTS (
-	    SELECT 1 FROM information_schema.columns 
-	    WHERE table_schema = 'public' AND table_name = 'treatment' AND column_name = 'tooth_id'
-	  ) THEN
-	    BEGIN
-	      ALTER TABLE treatment ALTER COLUMN tooth_id SET NOT NULL;
-	    EXCEPTION WHEN others THEN
-	      -- ignore if constraint already in place
-	      NULL;
-	    END;
-	  END IF;
-	END $$;
+	-- 13b. Add demo notes to some billing and payment rows
+	UPDATE billing SET notes = 'Routine checkup billing' WHERE id = (SELECT id FROM billing WHERE status = 'Paid' AND notes IS NULL LIMIT 1);
+	UPDATE billing SET notes = 'Deep cleaning – follow-up in 6 months' WHERE id = (SELECT id FROM billing WHERE status IN ('Open','Partial') AND notes IS NULL LIMIT 1);
+	UPDATE payment SET notes = 'Paid via clinic POS terminal' WHERE method = 'Credit Card' AND notes IS NULL;
+	UPDATE payment SET notes = 'Insurance claim submitted' WHERE method = 'Insurance' AND notes IS NULL;
+	-- 14. Insert Billing Line Items (with service_id and line_item_type)
+	INSERT INTO billing_line_item (billing_id, treatment_id, service_id, line_item_type, description, quantity, unit_price, discount_percentage) VALUES
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Routine Checkup')), (SELECT id FROM service WHERE name = 'Routine Checkup'), 'Service', 'Routine Checkup', 1, 150.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Deep Cleaning')), (SELECT id FROM service WHERE name = 'Deep Cleaning'), 'Service', 'Deep Cleaning', 1, 250.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Tooth Extraction')), (SELECT id FROM service WHERE name = 'Tooth Extraction'), 'Service', 'Tooth Extraction', 1, 300.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Braces Adjustment')), (SELECT id FROM service WHERE name = 'Braces Adjustment'), 'Service', 'Braces Adjustment', 1, 100.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Root Canal')), (SELECT id FROM service WHERE name = 'Root Canal'), 'Service', 'Root Canal', 1, 800.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Child Cleaning')), (SELECT id FROM service WHERE name = 'Child Cleaning'), 'Service', 'Deep Cleaning', 1, 250.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Crown Fitting')), (SELECT id FROM service WHERE name = 'Crown Fitting'), 'Service', 'Crown Fitting', 1, 1200.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Dental X-Ray')), (SELECT id FROM service WHERE name = 'Dental X-Ray'), 'Service', 'Dental X-Ray', 1, 120.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Teeth Whitening')), (SELECT id FROM service WHERE name = 'Teeth Whitening'), 'Service', 'Teeth Whitening', 1, 400.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Retainer Fitting')), (SELECT id FROM service WHERE name = 'Retainer Fitting'), 'Service', 'Consultation', 1, 150.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Filling')), (SELECT id FROM service WHERE name = 'Filling'), 'Service', 'Filling', 1, 200.00, 0.00),
+	((SELECT id FROM billing WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com'))), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Fluoride Treatment')), (SELECT id FROM service WHERE name = 'Fluoride Treatment'), 'Service', 'Fluoride Treatment', 1, 50.00, 0.00);
 	-- 15. Insert Discount Types
 	INSERT INTO discount_type (discount_name, discount_percentage) VALUES
 	('Senior Discount', 10.00),
@@ -254,17 +311,17 @@
 	('Bulk Service Discount', 25.00);
 	-- 16. Insert Sale Items
 	INSERT INTO sale_item (quantity, discount_id, patient_id, cost) VALUES
-	(1, (SELECT id FROM discount_type WHERE discount_name = 'New Patient Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example.com')), 25.00),
+	(1, (SELECT id FROM discount_type WHERE discount_name = 'New Patient Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example1.com')), 25.00),
 	(2, (SELECT id FROM discount_type WHERE discount_name = 'Family Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'linda.m@example.com')), 50.00),
-	(1, (SELECT id FROM discount_type WHERE discount_name = 'Senior Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')), 30.00),
+	(1, (SELECT id FROM discount_type WHERE discount_name = 'Senior Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example1.com')), 30.00),
 	(3, (SELECT id FROM discount_type WHERE discount_name = 'Student Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')), 75.00),
-	(1, (SELECT id FROM discount_type WHERE discount_name = 'Veteran Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example.com')), 20.00),
-	(2, (SELECT id FROM discount_type WHERE discount_name = 'Employee Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com')), 40.00),
+	(1, (SELECT id FROM discount_type WHERE discount_name = 'Veteran Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')), 20.00),
+	(2, (SELECT id FROM discount_type WHERE discount_name = 'Employee Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example1.com')), 40.00),
 	(1, (SELECT id FROM discount_type WHERE discount_name = 'Cash Payment Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com')), 15.00),
 	(4, (SELECT id FROM discount_type WHERE discount_name = 'Loyalty Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')), 100.00),
-	(1, (SELECT id FROM discount_type WHERE discount_name = 'Seasonal Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example.com')), 35.00),
-	(2, (SELECT id FROM discount_type WHERE discount_name = 'Holiday Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example.com')), 60.00),
-	(1, (SELECT id FROM discount_type WHERE discount_name = 'Referral Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example.com')), 25.00),
+	(1, (SELECT id FROM discount_type WHERE discount_name = 'Seasonal Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'emily.d@example1.com')), 35.00),
+	(2, (SELECT id FROM discount_type WHERE discount_name = 'Holiday Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example1.com')), 60.00),
+	(1, (SELECT id FROM discount_type WHERE discount_name = 'Referral Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), 25.00),
 	(5, (SELECT id FROM discount_type WHERE discount_name = 'Bulk Service Discount'), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')), 150.00);
 	-- 17. Insert Payments
 	INSERT INTO payment (billing_id, amount, payment_date, method, transaction_ref, created_by) VALUES
@@ -309,3 +366,348 @@
 	((SELECT id FROM tooth WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')) AND tooth_number = 5), (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Filling')), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com')), (SELECT id FROM document_type WHERE document_type = 'XRAY'), 'Post-treatment X-ray', FALSE, '/docs/xray_lisa_5_post.jpg'),
 	(NULL, NULL, (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'rob.m@example1.com')), (SELECT id FROM document_type WHERE document_type = 'INVOICE'), 'Treatment invoice', FALSE, '/docs/invoice_rob_m.pdf'),
 	(NULL, (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Root Canal')), (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')), (SELECT id FROM document_type WHERE document_type = 'RX'), 'Post-op prescription', TRUE, '/docs/rx_d_thompson.pdf');
+
+	-- ================================================================
+	-- NOTIFICATION RELATED SEED DATA
+	-- ================================================================
+
+	-- 20. Insert Person Contact Methods
+	INSERT INTO person_contact_method (person_id, channel, contact_value, is_primary, is_verified, is_active) VALUES
+	-- Staff email contacts
+	((SELECT id FROM person WHERE email = 'john.smith@example.com'), 'Email', 'john.smith@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'sarah.j@example.com'), 'Email', 'sarah.j@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'm.brown@example.com'), 'Email', 'm.brown@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'emily.d@example.com'), 'Email', 'emily.d@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'd.wilson@example.com'), 'Email', 'd.wilson@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'lisa.g@example.com'), 'Email', 'lisa.g@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'rob.m@example.com'), 'Email', 'rob.m@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'j.anderson@example.com'), 'Email', 'j.anderson@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'w.taylor@example.com'), 'Email', 'w.taylor@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'amanda.t@example.com'), 'Email', 'amanda.t@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'james.j@example.com'), 'Email', 'james.j@example.com', TRUE, TRUE, TRUE),
+	-- Patient-only person email contacts
+	((SELECT id FROM person WHERE email = 'p.white@example.com'), 'Email', 'p.white@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'c.harris@example.com'), 'Email', 'c.harris@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'linda.m@example.com'), 'Email', 'linda.m@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'd.thompson@example.com'), 'Email', 'd.thompson@example.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'john.smith@example1.com'), 'Email', 'john.smith@example1.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'sarah.j@example1.com'), 'Email', 'sarah.j@example1.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'm.brown@example1.com'), 'Email', 'm.brown@example1.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'emily.d@example1.com'), 'Email', 'emily.d@example1.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'd.wilson@example1.com'), 'Email', 'd.wilson@example1.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'lisa.g@example1.com'), 'Email', 'lisa.g@example1.com', TRUE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'rob.m@example1.com'), 'Email', 'rob.m@example1.com', TRUE, TRUE, TRUE),
+	-- A few SMS contacts
+	((SELECT id FROM person WHERE email = 'john.smith@example.com'), 'SMS', '+15551234567', FALSE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'james.j@example.com'), 'SMS', '+15551357913', FALSE, TRUE, TRUE),
+	((SELECT id FROM person WHERE email = 'john.smith@example1.com'), 'SMS', '+15551234567', FALSE, FALSE, TRUE),
+	((SELECT id FROM person WHERE email = 'sarah.j@example1.com'), 'SMS', '+15559876543', FALSE, TRUE, TRUE);
+
+	-- 21. Insert Notification Topics
+	INSERT INTO notification_topic (code, name, description, category, audience_scope) VALUES
+	('APPT_CONFIRMATION', 'Appointment Confirmation', 'Sent when an appointment is booked or confirmed', 'Transactional', 'Patient'),
+	('APPT_REMINDER', 'Appointment Reminder', 'Sent before an upcoming appointment', 'Transactional', 'Patient'),
+	('APPT_CANCELLED', 'Appointment Cancelled', 'Sent when an appointment is cancelled', 'Transactional', 'Patient'),
+	('APPT_UPDATED', 'Appointment Updated', 'Sent when appointment details change', 'Transactional', 'Patient'),
+	('BILLING_INVOICE', 'Billing Invoice', 'Invoice or payment reminder sent to patient', 'Transactional', 'Patient'),
+	('PROMO_SEASONAL', 'Seasonal Promotion', 'Marketing offers and seasonal deals', 'Marketing', 'Patient'),
+	('STAFF_SCHEDULE', 'Staff Schedule Update', 'Schedule changes communicated to staff', 'Operational', 'Staff'),
+	('WELCOME_NEW_PATIENT', 'Welcome New Patient', 'Welcome message for newly registered patients', 'Greeting', 'Patient');
+
+	-- 22. Insert Notification Templates
+	INSERT INTO notification_template (code, topic_id, channel, audience_scope, provider, subject_template, body_text, body_html, is_active) VALUES
+	('APPOINTMENT_CONFIRMATION_EMAIL',
+	 (SELECT id FROM notification_topic WHERE code = 'APPT_CONFIRMATION'),
+	 'Email', 'Patient', 'AmazonSES',
+	 'Your Appointment is Confirmed',
+	 'Dear {{patient_name}}, your appointment on {{appointment_date}} at {{appointment_time}} with {{staff_name}} has been confirmed. Please arrive 10 minutes early.',
+	 '<h2>Appointment Confirmed</h2><p>Dear {{patient_name}},</p><p>Your appointment on <strong>{{appointment_date}}</strong> at <strong>{{appointment_time}}</strong> with {{staff_name}} has been confirmed.</p><p>Please arrive 10 minutes early.</p><p>— BellaDent Dental Clinic</p>',
+	 TRUE),
+	('APPOINTMENT_REMINDER_EMAIL',
+	 (SELECT id FROM notification_topic WHERE code = 'APPT_REMINDER'),
+	 'Email', 'Patient', 'AmazonSES',
+	 'Appointment Reminder - {{appointment_date}}',
+	 'Hi {{patient_name}}, this is a reminder for your appointment on {{appointment_date}} at {{appointment_time}}. If you need to reschedule, please contact us.',
+	 '<h2>Appointment Reminder</h2><p>Hi {{patient_name}},</p><p>This is a reminder for your upcoming appointment:</p><ul><li>Date: {{appointment_date}}</li><li>Time: {{appointment_time}}</li><li>Doctor: {{staff_name}}</li></ul><p>If you need to reschedule, please contact us.</p><p>— BellaDent Dental Clinic</p>',
+	 TRUE),
+	('APPOINTMENT_CANCELLED_EMAIL',
+	 (SELECT id FROM notification_topic WHERE code = 'APPT_CANCELLED'),
+	 'Email', 'Patient', 'AmazonSES',
+	 'Appointment Cancelled',
+	 'Dear {{patient_name}}, your appointment on {{appointment_date}} at {{appointment_time}} has been cancelled. Please contact us to reschedule.',
+	 '<h2>Appointment Cancelled</h2><p>Dear {{patient_name}},</p><p>Your appointment on <strong>{{appointment_date}}</strong> at <strong>{{appointment_time}}</strong> has been cancelled.</p><p>Please contact us to reschedule at your convenience.</p><p>— BellaDent Dental Clinic</p>',
+	 TRUE),
+	('APPOINTMENT_UPDATED_EMAIL',
+	 (SELECT id FROM notification_topic WHERE code = 'APPT_UPDATED'),
+	 'Email', 'Patient', 'AmazonSES',
+	 'Appointment Updated',
+	 'Dear {{patient_name}}, your appointment has been updated. New date: {{appointment_date}} at {{appointment_time}}. Please contact us if this does not work for you.',
+	 '<h2>Appointment Updated</h2><p>Dear {{patient_name}},</p><p>Your appointment has been updated:</p><ul><li>New Date: {{appointment_date}}</li><li>New Time: {{appointment_time}}</li></ul><p>Please contact us if this does not work for you.</p><p>— BellaDent Dental Clinic</p>',
+	 TRUE),
+	('BILLING_INVOICE_EMAIL',
+	 (SELECT id FROM notification_topic WHERE code = 'BILLING_INVOICE'),
+	 'Email', 'Patient', 'AmazonSES',
+	 'Your Invoice from BellaDent - Rs {{total_amount}}',
+	 'Dear {{patient_name}}, your invoice of Rs {{total_amount}} is due on {{due_date}}. Please contact us for payment options.',
+	 '<h2>Invoice</h2><p>Dear {{patient_name}},</p><p>Your invoice details:</p><ul><li>Amount: Rs {{total_amount}}</li><li>Due Date: {{due_date}}</li></ul><p>Please contact us for payment options.</p><p>— BellaDent Dental Clinic</p>',
+	 TRUE),
+	('PROMO_SEASONAL_EMAIL',
+	 (SELECT id FROM notification_topic WHERE code = 'PROMO_SEASONAL'),
+	 'Email', 'Patient', 'AmazonSES',
+	 'Special Offer from BellaDent!',
+	 'Hi {{patient_name}}, we have a special offer for you! {{promo_details}}. Book your appointment today.',
+	 '<h2>Special Offer!</h2><p>Hi {{patient_name}},</p><p>{{promo_details}}</p><p>Book your appointment today and take advantage of this limited-time offer.</p><p>— BellaDent Dental Clinic</p>',
+	 TRUE),
+	('STAFF_SCHEDULE_EMAIL',
+	 (SELECT id FROM notification_topic WHERE code = 'STAFF_SCHEDULE'),
+	 'Email', 'Staff', 'AmazonSES',
+	 'Schedule Update - {{schedule_date}}',
+	 'Hi {{staff_name}}, your schedule for {{schedule_date}} has been updated. Please check the portal for details.',
+	 '<h2>Schedule Update</h2><p>Hi {{staff_name}},</p><p>Your schedule for <strong>{{schedule_date}}</strong> has been updated. Please check the portal for details.</p><p>— BellaDent Admin</p>',
+	 TRUE),
+	('WELCOME_NEW_PATIENT_EMAIL',
+	 (SELECT id FROM notification_topic WHERE code = 'WELCOME_NEW_PATIENT'),
+	 'Email', 'Patient', 'AmazonSES',
+	 'Welcome to BellaDent Dental Clinic!',
+	 'Dear {{patient_name}}, welcome to BellaDent! We look forward to providing you with excellent dental care. Book your first appointment today.',
+	 '<h2>Welcome to BellaDent!</h2><p>Dear {{patient_name}},</p><p>Welcome to BellaDent Dental Clinic! We are delighted to have you as a patient.</p><p>We look forward to providing you with excellent dental care.</p><p>— BellaDent Dental Clinic</p>',
+	 TRUE);
+
+	-- 23. Insert Person Notification Preferences
+	INSERT INTO person_notification_preference (person_id, topic_id, channel, is_enabled, opt_in_status, source) VALUES
+	-- Patient james.j: transactional opt-in
+	((SELECT id FROM person WHERE email = 'james.j@example.com'), (SELECT id FROM notification_topic WHERE code = 'APPT_CONFIRMATION'), 'Email', TRUE, 'Implicit', 'FrontDesk'),
+	((SELECT id FROM person WHERE email = 'james.j@example.com'), (SELECT id FROM notification_topic WHERE code = 'APPT_REMINDER'), 'Email', TRUE, 'Implicit', 'FrontDesk'),
+	((SELECT id FROM person WHERE email = 'james.j@example.com'), (SELECT id FROM notification_topic WHERE code = 'PROMO_SEASONAL'), 'Email', TRUE, 'Explicit', 'WebForm'),
+	-- Patient p.white: transactional only
+	((SELECT id FROM person WHERE email = 'p.white@example.com'), (SELECT id FROM notification_topic WHERE code = 'APPT_CONFIRMATION'), 'Email', TRUE, 'Implicit', 'FrontDesk'),
+	((SELECT id FROM person WHERE email = 'p.white@example.com'), (SELECT id FROM notification_topic WHERE code = 'BILLING_INVOICE'), 'Email', TRUE, 'Implicit', 'FrontDesk'),
+	-- Patient c.harris: opted out of marketing
+	((SELECT id FROM person WHERE email = 'c.harris@example.com'), (SELECT id FROM notification_topic WHERE code = 'APPT_CONFIRMATION'), 'Email', TRUE, 'Implicit', 'FrontDesk'),
+	((SELECT id FROM person WHERE email = 'c.harris@example.com'), (SELECT id FROM notification_topic WHERE code = 'PROMO_SEASONAL'), 'Email', FALSE, 'OptedOut', 'AdminPanel'),
+	-- Patient john.smith@example1: all enabled
+	((SELECT id FROM person WHERE email = 'john.smith@example1.com'), (SELECT id FROM notification_topic WHERE code = 'APPT_CONFIRMATION'), 'Email', TRUE, 'Implicit', 'FrontDesk'),
+	((SELECT id FROM person WHERE email = 'john.smith@example1.com'), (SELECT id FROM notification_topic WHERE code = 'PROMO_SEASONAL'), 'Email', TRUE, 'Explicit', 'WebForm'),
+	-- Staff john.smith: operational
+	((SELECT id FROM person WHERE email = 'john.smith@example.com'), (SELECT id FROM notification_topic WHERE code = 'STAFF_SCHEDULE'), 'Email', TRUE, 'Implicit', 'AdminPanel');
+
+	-- 24. Insert Notification Campaigns
+	INSERT INTO notification_campaign (name, topic_id, template_id, channel, audience_scope, status, launched_at, completed_at, description) VALUES
+	('Spring Cleaning Special 2023',
+	 (SELECT id FROM notification_topic WHERE code = 'PROMO_SEASONAL'),
+	 (SELECT id FROM notification_template WHERE code = 'PROMO_SEASONAL_EMAIL'),
+	 'Email', 'Patient', 'Completed', '2023-09-15 10:00:00', '2023-09-15 10:05:00',
+	 'Spring promotion offering 20% off dental cleanings'),
+	('New Year Whitening Offer 2024',
+	 (SELECT id FROM notification_topic WHERE code = 'PROMO_SEASONAL'),
+	 (SELECT id FROM notification_template WHERE code = 'PROMO_SEASONAL_EMAIL'),
+	 'Email', 'Patient', 'Draft', NULL, NULL,
+	 'New year promotion for teeth whitening services');
+
+	-- 25. Insert Notifications
+	INSERT INTO notification (topic_id, template_id, campaign_id, appointment_id, patient_id, channel, provider, status, subject_rendered, body_rendered_text, body_rendered_html, processed_at) VALUES
+	-- Appointment confirmation for james.j (Sent)
+	((SELECT id FROM notification_topic WHERE code = 'APPT_CONFIRMATION'),
+	 (SELECT id FROM notification_template WHERE code = 'APPOINTMENT_CONFIRMATION_EMAIL'),
+	 NULL,
+	 (SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com'))),
+	 (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')),
+	 'Email', 'AmazonSES', 'Sent',
+	 'Your Appointment is Confirmed',
+	 'Dear James Jackson, your appointment on Oct 1, 2023 at 9:00 AM with Dr. John Smith has been confirmed.',
+	 '<h2>Appointment Confirmed</h2><p>Dear James Jackson,</p><p>Your appointment on <strong>Oct 1, 2023</strong> at <strong>9:00 AM</strong> with Dr. John Smith has been confirmed.</p>',
+	 '2023-09-30 08:00:00'),
+	-- Appointment confirmation for p.white (Sent)
+	((SELECT id FROM notification_topic WHERE code = 'APPT_CONFIRMATION'),
+	 (SELECT id FROM notification_template WHERE code = 'APPOINTMENT_CONFIRMATION_EMAIL'),
+	 NULL,
+	 (SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'sarah.j@example.com'))),
+	 (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com')),
+	 'Email', 'AmazonSES', 'Sent',
+	 'Your Appointment is Confirmed',
+	 'Dear Patricia White, your appointment on Oct 1, 2023 at 10:00 AM with Sarah Johnson has been confirmed.',
+	 '<h2>Appointment Confirmed</h2><p>Dear Patricia White,</p><p>Your appointment on <strong>Oct 1, 2023</strong> at <strong>10:00 AM</strong> with Sarah Johnson has been confirmed.</p>',
+	 '2023-09-30 08:01:00'),
+	-- Appointment confirmation for c.harris (Sent)
+	((SELECT id FROM notification_topic WHERE code = 'APPT_CONFIRMATION'),
+	 (SELECT id FROM notification_template WHERE code = 'APPOINTMENT_CONFIRMATION_EMAIL'),
+	 NULL,
+	 (SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'm.brown@example.com'))),
+	 (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com')),
+	 'Email', 'AmazonSES', 'Sent',
+	 'Your Appointment is Confirmed',
+	 'Dear Christopher Harris, your appointment on Oct 1, 2023 at 11:00 AM with Dr. Michael Brown has been confirmed.',
+	 '<h2>Appointment Confirmed</h2><p>Dear Christopher Harris,</p><p>Your appointment on <strong>Oct 1, 2023</strong> at <strong>11:00 AM</strong> with Dr. Michael Brown has been confirmed.</p>',
+	 '2023-09-30 08:02:00'),
+	-- Appointment cancelled for d.thompson (Failed)
+	((SELECT id FROM notification_topic WHERE code = 'APPT_CANCELLED'),
+	 (SELECT id FROM notification_template WHERE code = 'APPOINTMENT_CANCELLED_EMAIL'),
+	 NULL,
+	 (SELECT id FROM appointment WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')) AND staff_id = (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'd.wilson@example.com'))),
+	 (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com')),
+	 'Email', 'AmazonSES', 'Failed',
+	 'Appointment Cancelled',
+	 'Dear Daniel Thompson, your appointment on Oct 1, 2023 at 2:00 PM has been cancelled.',
+	 '<h2>Appointment Cancelled</h2><p>Dear Daniel Thompson,</p><p>Your appointment on <strong>Oct 1, 2023</strong> at <strong>2:00 PM</strong> has been cancelled.</p>',
+	 '2023-10-01 12:00:00'),
+	-- Campaign: Spring Cleaning promo for james.j (Sent)
+	((SELECT id FROM notification_topic WHERE code = 'PROMO_SEASONAL'),
+	 (SELECT id FROM notification_template WHERE code = 'PROMO_SEASONAL_EMAIL'),
+	 (SELECT id FROM notification_campaign WHERE name = 'Spring Cleaning Special 2023'),
+	 NULL,
+	 (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')),
+	 'Email', 'AmazonSES', 'Sent',
+	 'Special Offer from BellaDent!',
+	 'Hi James, we have a special offer for you! Get 20% off your next dental cleaning. Book your appointment today.',
+	 '<h2>Special Offer!</h2><p>Hi James,</p><p>Get 20% off your next dental cleaning!</p><p>Book your appointment today.</p>',
+	 '2023-09-15 10:01:00'),
+	-- Campaign: Spring Cleaning promo for john.smith@example1 (Sent)
+	((SELECT id FROM notification_topic WHERE code = 'PROMO_SEASONAL'),
+	 (SELECT id FROM notification_template WHERE code = 'PROMO_SEASONAL_EMAIL'),
+	 (SELECT id FROM notification_campaign WHERE name = 'Spring Cleaning Special 2023'),
+	 NULL,
+	 (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example1.com')),
+	 'Email', 'AmazonSES', 'Sent',
+	 'Special Offer from BellaDent!',
+	 'Hi John, we have a special offer for you! Get 20% off your next dental cleaning. Book your appointment today.',
+	 '<h2>Special Offer!</h2><p>Hi John,</p><p>Get 20% off your next dental cleaning!</p><p>Book your appointment today.</p>',
+	 '2023-09-15 10:02:00');
+
+	-- 26. Insert Notification Recipients
+	INSERT INTO notification_recipient (notification_id, person_id, contact_method_id, recipient_address, delivery_status, provider_message_id, sent_at, delivered_at, opened_at, failed_at, failure_reason) VALUES
+	-- james.j appointment confirmation → Delivered + Opened
+	((SELECT n.id FROM notification n JOIN patient p ON n.patient_id = p.id JOIN person pe ON p.person_id = pe.id WHERE pe.email = 'james.j@example.com' AND n.status = 'Sent' AND n.topic_id = (SELECT id FROM notification_topic WHERE code = 'APPT_CONFIRMATION') LIMIT 1),
+	 (SELECT id FROM person WHERE email = 'james.j@example.com'),
+	 (SELECT id FROM person_contact_method WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com') AND channel = 'Email' LIMIT 1),
+	 'james.j@example.com', 'Opened', 'ses-msg-001', '2023-09-30 08:00:01', '2023-09-30 08:00:03', '2023-09-30 09:15:00', NULL, NULL),
+	-- p.white appointment confirmation → Delivered
+	((SELECT n.id FROM notification n JOIN patient p ON n.patient_id = p.id JOIN person pe ON p.person_id = pe.id WHERE pe.email = 'p.white@example.com' AND n.status = 'Sent' LIMIT 1),
+	 (SELECT id FROM person WHERE email = 'p.white@example.com'),
+	 (SELECT id FROM person_contact_method WHERE person_id = (SELECT id FROM person WHERE email = 'p.white@example.com') AND channel = 'Email' LIMIT 1),
+	 'p.white@example.com', 'Delivered', 'ses-msg-002', '2023-09-30 08:01:01', '2023-09-30 08:01:04', NULL, NULL, NULL),
+	-- c.harris appointment confirmation → Delivered
+	((SELECT n.id FROM notification n JOIN patient p ON n.patient_id = p.id JOIN person pe ON p.person_id = pe.id WHERE pe.email = 'c.harris@example.com' AND n.status = 'Sent' LIMIT 1),
+	 (SELECT id FROM person WHERE email = 'c.harris@example.com'),
+	 (SELECT id FROM person_contact_method WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com') AND channel = 'Email' LIMIT 1),
+	 'c.harris@example.com', 'Delivered', 'ses-msg-003', '2023-09-30 08:02:01', '2023-09-30 08:02:05', NULL, NULL, NULL),
+	-- d.thompson appointment cancelled → Failed (bounce)
+	((SELECT n.id FROM notification n JOIN patient p ON n.patient_id = p.id JOIN person pe ON p.person_id = pe.id WHERE pe.email = 'd.thompson@example.com' AND n.status = 'Failed' LIMIT 1),
+	 (SELECT id FROM person WHERE email = 'd.thompson@example.com'),
+	 (SELECT id FROM person_contact_method WHERE person_id = (SELECT id FROM person WHERE email = 'd.thompson@example.com') AND channel = 'Email' LIMIT 1),
+	 'd.thompson@example.com', 'Bounced', NULL, '2023-10-01 12:00:01', NULL, NULL, '2023-10-01 12:00:05', 'Mailbox full — hard bounce'),
+	-- james.j campaign promo → Delivered
+	((SELECT n.id FROM notification n JOIN patient p ON n.patient_id = p.id JOIN person pe ON p.person_id = pe.id WHERE pe.email = 'james.j@example.com' AND n.campaign_id IS NOT NULL LIMIT 1),
+	 (SELECT id FROM person WHERE email = 'james.j@example.com'),
+	 (SELECT id FROM person_contact_method WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com') AND channel = 'Email' LIMIT 1),
+	 'james.j@example.com', 'Delivered', 'ses-msg-005', '2023-09-15 10:01:01', '2023-09-15 10:01:04', NULL, NULL, NULL),
+	-- john.smith@example1 campaign promo → Clicked
+	((SELECT n.id FROM notification n JOIN patient p ON n.patient_id = p.id JOIN person pe ON p.person_id = pe.id WHERE pe.email = 'john.smith@example1.com' AND n.campaign_id IS NOT NULL LIMIT 1),
+	 (SELECT id FROM person WHERE email = 'john.smith@example1.com'),
+	 (SELECT id FROM person_contact_method WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example1.com') AND channel = 'Email' LIMIT 1),
+	 'john.smith@example1.com', 'Clicked', 'ses-msg-006', '2023-09-15 10:02:01', '2023-09-15 10:02:04', '2023-09-15 11:30:00', NULL, NULL);
+
+	-- 27. Insert Notification Provider Events
+	INSERT INTO notification_provider_event (notification_recipient_id, provider, event_type, event_time, payload) VALUES
+	-- james.j appt confirmation: Send → Delivery → Open
+	((SELECT id FROM notification_recipient WHERE recipient_address = 'james.j@example.com' AND provider_message_id = 'ses-msg-001'),
+	 'AmazonSES', 'Send', '2023-09-30 08:00:01', '{"messageId": "ses-msg-001"}'),
+	((SELECT id FROM notification_recipient WHERE recipient_address = 'james.j@example.com' AND provider_message_id = 'ses-msg-001'),
+	 'AmazonSES', 'Delivery', '2023-09-30 08:00:03', '{"messageId": "ses-msg-001", "smtpResponse": "250 OK"}'),
+	((SELECT id FROM notification_recipient WHERE recipient_address = 'james.j@example.com' AND provider_message_id = 'ses-msg-001'),
+	 'AmazonSES', 'Open', '2023-09-30 09:15:00', '{"messageId": "ses-msg-001", "ipAddress": "192.168.1.1"}'),
+	-- d.thompson: Send → Bounce
+	((SELECT id FROM notification_recipient WHERE recipient_address = 'd.thompson@example.com' AND delivery_status = 'Bounced'),
+	 'AmazonSES', 'Send', '2023-10-01 12:00:01', '{"messageId": "ses-msg-004-attempt"}'),
+	((SELECT id FROM notification_recipient WHERE recipient_address = 'd.thompson@example.com' AND delivery_status = 'Bounced'),
+	 'AmazonSES', 'Bounce', '2023-10-01 12:00:05', '{"bounceType": "Permanent", "bounceSubType": "MailboxFull"}'),
+	-- john.smith@example1 campaign: Send → Delivery → Open → Click
+	((SELECT id FROM notification_recipient WHERE recipient_address = 'john.smith@example1.com' AND provider_message_id = 'ses-msg-006'),
+	 'AmazonSES', 'Send', '2023-09-15 10:02:01', '{"messageId": "ses-msg-006"}'),
+	((SELECT id FROM notification_recipient WHERE recipient_address = 'john.smith@example1.com' AND provider_message_id = 'ses-msg-006'),
+	 'AmazonSES', 'Delivery', '2023-09-15 10:02:04', '{"messageId": "ses-msg-006", "smtpResponse": "250 OK"}'),
+	((SELECT id FROM notification_recipient WHERE recipient_address = 'john.smith@example1.com' AND provider_message_id = 'ses-msg-006'),
+	 'AmazonSES', 'Open', '2023-09-15 11:30:00', '{"messageId": "ses-msg-006"}'),
+	((SELECT id FROM notification_recipient WHERE recipient_address = 'john.smith@example1.com' AND provider_message_id = 'ses-msg-006'),
+	 'AmazonSES', 'Click', '2023-09-15 11:31:00', '{"messageId": "ses-msg-006", "link": "https://belladentclinic.com/book"}');
+
+	-- 28. Insert Person Channel Suppressions
+	INSERT INTO person_channel_suppression (person_id, channel, contact_value, reason, is_active) VALUES
+	((SELECT id FROM person WHERE email = 'rob.m@example1.com'), 'Email', 'rob.m@example1.com', 'Hard bounce detected by SES', TRUE),
+	((SELECT id FROM person WHERE email = 'd.wilson@example1.com'), 'SMS', '+15555556666', 'User requested SMS opt-out', FALSE);
+
+-- 29. Odontogram demo data: pricing tiers, surfaces, bridges/splints, perio
+
+-- 29a. Surface Pricing Tiers for Fillings
+INSERT INTO surface_pricing_tier (service_id, min_surfaces, max_surfaces, multiplier)
+VALUES
+((SELECT id FROM service WHERE name = 'Filling'), 1, 1, 1.00),
+((SELECT id FROM service WHERE name = 'Filling'), 2, 2, 1.25),
+((SELECT id FROM service WHERE name = 'Filling'), 3, 10, 1.50);
+
+-- 29c. Demonstrate bridge across 14-15-16 for james.j (14 & 16 = BRIDGE terminals, 15 = PONTIC)
+UPDATE tooth SET tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'BRIDGE')
+WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))
+  AND tooth_number IN (14,16);
+UPDATE tooth SET tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'PONTIC')
+WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))
+  AND tooth_number = 15;
+
+-- 29d. Demonstrate splint across upper incisors (8-9) for james.j
+UPDATE tooth SET tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'SPLINT')
+WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))
+  AND tooth_number IN (8,9);
+
+-- 29e. Mark an implant for c.harris tooth 3
+UPDATE tooth SET tooth_status_id = (SELECT id FROM tooth_status WHERE code = 'IMPLANT')
+WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'c.harris@example.com'))
+  AND tooth_number = 3;
+
+-- 29f. Completed MOD filling: set surfaces on an existing Filling treatment for lisa.g@example1 (tooth 5)
+UPDATE treatment SET surfaces = 'MOD', status = 'Completed'
+WHERE id = (
+  SELECT t.id FROM treatment t
+  JOIN patient p ON p.id = t.patient_id
+  JOIN person pe ON pe.id = p.person_id
+  WHERE pe.email = 'lisa.g@example1.com'
+    AND t.service_id = (SELECT id FROM service WHERE name = 'Filling')
+  LIMIT 1
+);
+
+-- 29g. Add per-surface rows for that treatment (M,O,D)
+INSERT INTO treatmenttoothsurface (id, treatment_id, tooth_id, surface)
+SELECT gen_random_uuid(), t.id, tt.tooth_id, s.surf
+FROM (
+  SELECT (SELECT id FROM treatment WHERE service_id = (SELECT id FROM service WHERE name = 'Filling')
+            AND patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'lisa.g@example1.com'))
+            LIMIT 1) AS tid
+) x
+JOIN treatment_tooth tt ON tt.treatment_id = x.tid
+JOIN treatment t ON t.id = x.tid
+JOIN LATERAL (VALUES ('M'),('O'),('D')) AS s(surf) ON TRUE
+WHERE NOT EXISTS (
+  SELECT 1 FROM treatmenttoothsurface z WHERE z.treatment_id = x.tid AND z.tooth_id = tt.tooth_id AND z.surface = s.surf
+);
+
+-- 29h. Latest Perio exam for james.j@example.com on tooth 11 (6 sites)
+INSERT INTO periostatus (id, patient_id, staff_id, examination_date, smoker, bone_loss)
+VALUES (
+  gen_random_uuid(),
+  (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com')),
+  (SELECT id FROM staff WHERE person_id = (SELECT id FROM person WHERE email = 'john.smith@example.com')),
+  NOW() - INTERVAL '2 days', FALSE, 10
+);
+
+-- PD/GM/CAL/BOP per site for tooth 11
+WITH ps AS (
+  SELECT id AS perio_status_id FROM periostatus
+  WHERE patient_id = (SELECT id FROM patient WHERE person_id = (SELECT id FROM person WHERE email = 'james.j@example.com'))
+  ORDER BY examination_date DESC LIMIT 1
+)
+INSERT INTO periomeasurement (perio_status_id, tooth_number, site_index, pocket_depth, clinical_attachment_level, gingival_margin, bleeding_on_probing, mobility, furcation)
+VALUES
+((SELECT perio_status_id FROM ps), 11, 0, 3, 3, 0, TRUE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 1, 5, 6, 1, TRUE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 2, 4, 5, 1, FALSE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 3, 4, 5, 1, TRUE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 4, 3, 3, 0, FALSE, 1, 0),
+((SELECT perio_status_id FROM ps), 11, 5, 6, 7, 1, TRUE, 1, 0);

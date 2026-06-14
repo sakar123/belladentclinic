@@ -9,7 +9,7 @@ namespace ClinicApi.Services
 {
     public interface IAppointmentService
     {
-        Task<IEnumerable<AppointmentDTO>> GetAllAppointmentsAsync();
+        Task<IEnumerable<AppointmentDTO>> GetAllAppointmentsAsync(Guid? patientId = null);
         Task<AppointmentDTO> GetAppointmentByIdAsync(Guid id);
         Task<AppointmentDTO> CreateAppointmentAsync(AppointmentDTO appointmentDto);
         Task<AppointmentDTO> UpdateAppointmentAsync(Guid id, AppointmentDTO appointmentDto);

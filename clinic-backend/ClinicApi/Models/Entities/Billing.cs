@@ -30,6 +30,9 @@ namespace ClinicApi.Models.Entities
         
         [Required]
         public string status { get; set; } = "Draft";
+
+        [StringLength(2000)]
+        public string? notes { get; set; }
         
         public DateTime created_at { get; set; } = DateTime.UtcNow;
         public DateTime updated_at { get; set; } = DateTime.UtcNow;

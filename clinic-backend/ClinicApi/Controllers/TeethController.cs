@@ -4,11 +4,13 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "SupportOrAbove")]
     public class TeethController : ControllerBase
     {
         private readonly IToothService _toothService;
@@ -19,9 +21,9 @@ namespace ClinicApi.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ToothDTO>>> GetTeeth()
+        public async Task<ActionResult<IEnumerable<ToothDTO>>> GetTeeth([FromQuery] Guid? patientId)
         {
-            var teeth = await _toothService.GetAllTeethAsync();
+            var teeth = await _toothService.GetAllTeethAsync(patientId);
             return Ok(teeth);
         }
 
@@ -56,6 +58,10 @@ namespace ClinicApi.Controllers
             {
                 var updatedTooth = await _toothService.UpdateToothAsync(id, toothDto);
                 return Ok(updatedTooth);
+            }
+            catch (ClinicApi.Models.Exceptions.IncompatibleToothStatusException ex)
+            {
+                return UnprocessableEntity(new { message = ex.Message, current_status = ex.CurrentStatus, new_status = ex.NewStatus });
             }
             catch (KeyNotFoundException ex)
             {

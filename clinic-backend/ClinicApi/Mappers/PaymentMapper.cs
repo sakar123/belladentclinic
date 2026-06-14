@@ -25,6 +25,7 @@ namespace ClinicApi.Mappers
                 payment_date = entity.payment_date,
                 method = entity.method,
                 transaction_ref = entity.transaction_ref,
+                notes = entity.notes,
                 created_by = entity.created_by
             };
         }
@@ -45,6 +46,7 @@ namespace ClinicApi.Mappers
                 payment_date = dto.payment_date,
                 method = dto.method,
                 transaction_ref = dto.transaction_ref,
+                notes = dto.notes,
                 created_by = dto.created_by,
                 billing = null
             };

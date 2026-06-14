@@ -11,6 +11,8 @@ namespace ClinicApi.Models.DTOs
         public Guid billing_id { get; set; }
         
         public Guid? treatment_id { get; set; }
+        public Guid? service_id { get; set; }
+        public string? line_item_type { get; set; }
         
         [Required]
         [StringLength(1000)]
@@ -26,5 +28,11 @@ namespace ClinicApi.Models.DTOs
         
         [Range(0, 100)]
         public decimal discount_percentage { get; set; }
+
+        // Read-only enrichments
+        public string? service_name { get; set; }
+        public string? treatment_notes { get; set; }
+        public string? staff_name { get; set; }
+        public Guid? appointment_id { get; set; }
     }
 }

@@ -1,5 +1,8 @@
 using ClinicApi.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using System.Collections.Generic;
 
 namespace ClinicApi.Data
 {
@@ -36,7 +39,24 @@ namespace ClinicApi.Data
         public DbSet<SaleItem> SaleItem { get; set; }
         public DbSet<Treatment> Treatment { get; set; }
         public DbSet<Service> Service { get; set; }
+        public DbSet<SurfacePricingTier> SurfacePricingTier { get; set; }
         public DbSet<Prescription> Prescription { get; set; }
+
+        // Dental Odontogram and Perio DbSets
+        public DbSet<TreatmentToothSurface> TreatmentToothSurface { get; set; }
+        public DbSet<PerioStatus> PerioStatus { get; set; }
+        public DbSet<PerioMeasurement> PerioMeasurement { get; set; }
+
+        // Notification-related DbSets
+        public DbSet<PersonContactMethod> PersonContactMethod { get; set; }
+        public DbSet<NotificationTopic> NotificationTopic { get; set; }
+        public DbSet<PersonNotificationPreference> PersonNotificationPreference { get; set; }
+        public DbSet<NotificationTemplate> NotificationTemplate { get; set; }
+        public DbSet<NotificationCampaign> NotificationCampaign { get; set; }
+        public DbSet<Notification> Notification { get; set; }
+        public DbSet<NotificationRecipient> NotificationRecipient { get; set; }
+        public DbSet<NotificationProviderEvent> NotificationProviderEvent { get; set; }
+        public DbSet<PersonChannelSuppression> PersonChannelSuppression { get; set; }
 
         /// <summary>
         /// This method configures the database schema and relationships between entities.
@@ -54,7 +74,11 @@ namespace ClinicApi.Data
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
                 // Convert all table names to lowercase for PostgreSQL naming convention
-                entityType.SetTableName(entityType.GetTableName()!.ToLower());
+                var tbl = entityType.GetTableName();
+                if (!string.IsNullOrEmpty(tbl))
+                {
+                    entityType.SetTableName(tbl!.ToLower());
+                }
                 
                 // For all entities that inherit from BaseEntity, configure automatic UUID generation
                 // This means every new record will automatically get a unique ID without you having to set it manually
@@ -66,13 +90,63 @@ namespace ClinicApi.Data
                 }
             }
 
+            // Force all DateTime writes to use UTC to satisfy PostgreSQL TIMESTAMPTZ
+            // and avoid Npgsql "Kind=Unspecified" errors.
+            var dateTimeConverter = new ValueConverter<DateTime, DateTime>(
+                v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                v => DateTime.SpecifyKind(v, DateTimeKind.Utc)
+            );
+            var nullableDateTimeConverter = new ValueConverter<DateTime?, DateTime?>(
+                v => v.HasValue
+                    ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime())
+                    : v,
+                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v
+            );
+
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                // Skip shared-type entities (e.g., many-to-many join tables using Dictionary<string, object>)
+                if (entityType.ClrType == typeof(System.Collections.Generic.Dictionary<string, object>))
+                {
+                    continue;
+                }
+                var entity = modelBuilder.Entity(entityType.ClrType);
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTime))
+                    {
+                        entity.Property(property.Name).HasConversion(dateTimeConverter);
+                    }
+                    else if (property.ClrType == typeof(DateTime?))
+                    {
+                        entity.Property(property.Name).HasConversion(nullableDateTimeConverter);
+                    }
+                }
+            }
+
             // Override specific table names that use snake_case in the database
             modelBuilder.Entity<AppointmentStatus>().ToTable("appointment_status");
             modelBuilder.Entity<ToothStatus>().ToTable("tooth_status");
             modelBuilder.Entity<BillingLineItem>().ToTable("billing_line_item");
+            modelBuilder.Entity<ServiceToothScope>().ToTable("service_tooth_scope");
             modelBuilder.Entity<DocumentType>().ToTable("document_type");
             modelBuilder.Entity<DiscountType>().ToTable("discount_type");
             modelBuilder.Entity<SaleItem>().ToTable("sale_item");
+
+            // Notification-related table name overrides
+            modelBuilder.Entity<PersonContactMethod>().ToTable("person_contact_method");
+            modelBuilder.Entity<NotificationTopic>().ToTable("notification_topic");
+            modelBuilder.Entity<PersonNotificationPreference>().ToTable("person_notification_preference");
+            modelBuilder.Entity<NotificationTemplate>().ToTable("notification_template");
+            modelBuilder.Entity<NotificationCampaign>().ToTable("notification_campaign");
+            modelBuilder.Entity<NotificationRecipient>().ToTable("notification_recipient");
+            modelBuilder.Entity<NotificationProviderEvent>().ToTable("notification_provider_event");
+            modelBuilder.Entity<PersonChannelSuppression>().ToTable("person_channel_suppression");
+
+            // Map known DATE columns explicitly (schema uses DATE, not TIMESTAMPTZ)
+            modelBuilder.Entity<Person>().Property(p => p.date_of_birth).HasColumnType("date");
+            modelBuilder.Entity<Billing>().Property(p => p.issue_date).HasColumnType("date");
+            modelBuilder.Entity<Billing>().Property(p => p.due_date).HasColumnType("date");
 
             // No enum conversions necessary; properties are strings.
             
@@ -146,6 +220,47 @@ namespace ClinicApi.Data
                 .WithMany(s => s.treatments)
                 .HasForeignKey(t => t.service_id)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Service optionally results in a ToothStatus when completed
+            modelBuilder.Entity<Service>()
+                .HasOne(s => s.resulting_tooth_status)
+                .WithMany()
+                .HasForeignKey(s => s.resulting_tooth_status_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Treatment status default
+            modelBuilder.Entity<Treatment>()
+                .Property(t => t.status)
+                .HasDefaultValue("Planned");
+
+            // Treatment <-> Tooth many-to-many via join table treatment_tooth
+            modelBuilder.Entity<Treatment>()
+                .HasMany(t => t.teeth)
+                .WithMany(t => t.treatments)
+                .UsingEntity<Dictionary<string, object>>(
+                    "treatment_tooth",
+                    j => j
+                        .HasOne<Tooth>()
+                        .WithMany()
+                        .HasForeignKey("tooth_id")
+                        .OnDelete(DeleteBehavior.Cascade),
+                    j => j
+                        .HasOne<Treatment>()
+                        .WithMany()
+                        .HasForeignKey("treatment_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                );
+
+            // Service -> ServiceToothScope one-to-many (composite key on join table)
+            modelBuilder.Entity<ServiceToothScope>(e =>
+            {
+                e.HasKey(x => new { x.service_id, x.tooth_scope });
+                e.Property(x => x.tooth_scope).HasMaxLength(25);
+                e.HasOne(x => x.service)
+                 .WithMany(s => s.tooth_scopes)
+                 .HasForeignKey(x => x.service_id)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
             
             // === ONE-TO-MANY RELATIONSHIPS WITH CASCADE DELETE ===
             // CASCADE means deleting the parent automatically deletes all child records
@@ -212,6 +327,13 @@ namespace ClinicApi.Data
                 .HasOne(bli => bli.treatment)
                 .WithMany(t => t.billing_line_item)
                 .HasForeignKey(bli => bli.treatment_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // BillingLineItem optionally references a Service (SET NULL)
+            modelBuilder.Entity<BillingLineItem>()
+                .HasOne(bli => bli.service)
+                .WithMany()
+                .HasForeignKey(bli => bli.service_id)
                 .OnDelete(DeleteBehavior.SetNull);
             
             // Payment belongs to a Billing (CASCADE: deleting Billing deletes all its Payments)
@@ -306,6 +428,10 @@ namespace ClinicApi.Data
             modelBuilder.Entity<Service>()
                 .Property(s => s.cost)
                 .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<SurfacePricingTier>()
+                .Property(p => p.multiplier)
+                .HasColumnType("decimal(5,2)");
             
             // === DEFAULT VALUES ===
             // These values are automatically set when creating new records if not specified
@@ -362,6 +488,197 @@ namespace ClinicApi.Data
                 }
             }
             
+            // === NOTIFICATION-RELATED RELATIONSHIPS ===
+
+            // PersonContactMethod unique constraint (person_id, channel, contact_value)
+            modelBuilder.Entity<PersonContactMethod>()
+                .HasIndex(e => new { e.person_id, e.channel, e.contact_value })
+                .IsUnique();
+
+            modelBuilder.Entity<PersonContactMethod>()
+                .HasOne(e => e.person)
+                .WithMany(p => p.contact_methods)
+                .HasForeignKey(e => e.person_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // NotificationTopic unique code
+            modelBuilder.Entity<NotificationTopic>()
+                .HasIndex(e => e.code)
+                .IsUnique();
+
+            // PersonNotificationPreference unique constraint (person_id, topic_id, channel)
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .HasIndex(e => new { e.person_id, e.topic_id, e.channel })
+                .IsUnique();
+
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .HasOne(e => e.person)
+                .WithMany(p => p.notification_preferences)
+                .HasForeignKey(e => e.person_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .HasOne(e => e.topic)
+                .WithMany(t => t.preferences)
+                .HasForeignKey(e => e.topic_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // NotificationTemplate unique code
+            modelBuilder.Entity<NotificationTemplate>()
+                .HasIndex(e => e.code)
+                .IsUnique();
+
+            modelBuilder.Entity<NotificationTemplate>()
+                .HasOne(e => e.topic)
+                .WithMany(t => t.templates)
+                .HasForeignKey(e => e.topic_id)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // NotificationCampaign relationships
+            modelBuilder.Entity<NotificationCampaign>()
+                .HasOne(e => e.topic)
+                .WithMany(t => t.campaigns)
+                .HasForeignKey(e => e.topic_id)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<NotificationCampaign>()
+                .HasOne(e => e.template)
+                .WithMany()
+                .HasForeignKey(e => e.template_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Notification relationships
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.topic)
+                .WithMany(t => t.notifications)
+                .HasForeignKey(e => e.topic_id)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.template)
+                .WithMany(t => t.notifications)
+                .HasForeignKey(e => e.template_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.campaign)
+                .WithMany(c => c.notifications)
+                .HasForeignKey(e => e.campaign_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.appointment)
+                .WithMany()
+                .HasForeignKey(e => e.appointment_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.patient)
+                .WithMany()
+                .HasForeignKey(e => e.patient_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(e => e.staff)
+                .WithMany()
+                .HasForeignKey(e => e.staff_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // NotificationRecipient unique constraint (notification_id, person_id, recipient_address)
+            modelBuilder.Entity<NotificationRecipient>()
+                .HasIndex(e => new { e.notification_id, e.person_id, e.recipient_address })
+                .IsUnique();
+
+            modelBuilder.Entity<NotificationRecipient>()
+                .HasOne(e => e.notification)
+                .WithMany(n => n.recipients)
+                .HasForeignKey(e => e.notification_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<NotificationRecipient>()
+                .HasOne(e => e.person)
+                .WithMany()
+                .HasForeignKey(e => e.person_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<NotificationRecipient>()
+                .HasOne(e => e.contact_method)
+                .WithMany()
+                .HasForeignKey(e => e.contact_method_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // NotificationProviderEvent relationships
+            modelBuilder.Entity<NotificationProviderEvent>()
+                .HasOne(e => e.notification_recipient)
+                .WithMany(r => r.provider_events)
+                .HasForeignKey(e => e.notification_recipient_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<NotificationProviderEvent>()
+                .Property(e => e.payload)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<NotificationCampaign>()
+                .Property(e => e.filter_criteria_json)
+                .HasColumnType("jsonb");
+
+            // PersonChannelSuppression unique constraint (person_id, channel, contact_value)
+            modelBuilder.Entity<PersonChannelSuppression>()
+                .HasIndex(e => new { e.person_id, e.channel, e.contact_value })
+                .IsUnique();
+
+            modelBuilder.Entity<PersonChannelSuppression>()
+                .HasOne(e => e.person)
+                .WithMany(p => p.channel_suppressions)
+                .HasForeignKey(e => e.person_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Notification default values
+            modelBuilder.Entity<PersonContactMethod>()
+                .Property(e => e.is_primary).HasDefaultValue(false);
+            modelBuilder.Entity<PersonContactMethod>()
+                .Property(e => e.is_verified).HasDefaultValue(false);
+            modelBuilder.Entity<PersonContactMethod>()
+                .Property(e => e.is_active).HasDefaultValue(true);
+
+            modelBuilder.Entity<NotificationTopic>()
+                .Property(e => e.is_active).HasDefaultValue(true);
+            modelBuilder.Entity<NotificationTopic>()
+                .Property(e => e.audience_scope).HasDefaultValue("Any");
+
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .Property(e => e.is_enabled).HasDefaultValue(true);
+            modelBuilder.Entity<PersonNotificationPreference>()
+                .Property(e => e.opt_in_status).HasDefaultValue("Implicit");
+
+            modelBuilder.Entity<NotificationTemplate>()
+                .Property(e => e.is_active).HasDefaultValue(true);
+            modelBuilder.Entity<NotificationTemplate>()
+                .Property(e => e.audience_scope).HasDefaultValue("Any");
+            modelBuilder.Entity<NotificationTemplate>()
+                .Property(e => e.provider).HasDefaultValue("AmazonSES");
+
+            modelBuilder.Entity<NotificationCampaign>()
+                .Property(e => e.audience_scope).HasDefaultValue("Any");
+            modelBuilder.Entity<NotificationCampaign>()
+                .Property(e => e.status).HasDefaultValue("Draft");
+
+            modelBuilder.Entity<Notification>()
+                .Property(e => e.provider).HasDefaultValue("AmazonSES");
+            modelBuilder.Entity<Notification>()
+                .Property(e => e.status).HasDefaultValue("Queued");
+
+            modelBuilder.Entity<NotificationRecipient>()
+                .Property(e => e.recipient_type).HasDefaultValue("Primary");
+            modelBuilder.Entity<NotificationRecipient>()
+                .Property(e => e.delivery_status).HasDefaultValue("Queued");
+
+            modelBuilder.Entity<NotificationProviderEvent>()
+                .Property(e => e.provider).HasDefaultValue("AmazonSES");
+
+            modelBuilder.Entity<PersonChannelSuppression>()
+                .Property(e => e.is_active).HasDefaultValue(true);
+
             // === DATA SEEDING ===
             modelBuilder.Entity<AppointmentStatus>().HasData(
                 new AppointmentStatus { id = new Guid("cf063462-6a13-43d1-ac87-c18d161aa954"), name = "Scheduled" },
@@ -385,6 +702,10 @@ namespace ClinicApi.Data
                 new Role { id = new Guid("4c64b60f-eb58-4c28-b4ee-8d5bf850b3b6"), name = "Admin" },
                 new Role { id = new Guid("c96127a9-12dd-4211-85ed-8079504231ca"), name = "Dentist" },
                 new Role { id = new Guid("1160be54-0d90-425d-aae1-e30491121809"), name = "Receptionist" }
+            );
+
+            modelBuilder.Entity<Specialty>().HasData(
+                new Specialty { id = new Guid("a5f1f0fe-7e51-4b0f-8ccf-3b9e0e24f001"), name = "General Dentistry", description = "General practice" }
             );
 
             modelBuilder.Entity<ToothStatus>().HasData(
@@ -592,12 +913,13 @@ namespace ClinicApi.Data
                     staff = staff,
                     service_id = service.id,
                     service = service,
-                    tooth_id = tooth.id,
-                    tooth = tooth,
+                    treatment_scope = "SingleTooth",
                     notes = "Initial treatment",
                     created_at = now,
                     updated_at = now
                 };
+                // Link tooth via many-to-many
+                treatment.teeth.Add(tooth);
                 Treatment.Add(treatment);
                 SaveChanges();
             }
@@ -638,6 +960,7 @@ namespace ClinicApi.Data
             // 8) BillingLineItem
             if (!BillingLineItem.Any())
             {
+                var firstService = Service.First();
                 BillingLineItem.Add(new BillingLineItem
                 {
                     id = Guid.NewGuid(),
@@ -645,6 +968,9 @@ namespace ClinicApi.Data
                     billing = billing,
                     treatment_id = treatment.id,
                     treatment = treatment,
+                    service_id = firstService.id,
+                    service = firstService,
+                    line_item_type = "Service",
                     description = "Treatment charge",
                     quantity = 1,
                     unit_price = 100m,
@@ -665,7 +991,7 @@ namespace ClinicApi.Data
                     billing = billing,
                     amount = 20m,
                     payment_date = now,
-                    method = "CARD",
+                    method = "Credit Card",
                     transaction_ref = "SEED-REF-1",
                     created_at = now,
                     created_by = "seed"
@@ -730,6 +1056,155 @@ namespace ClinicApi.Data
                     updated_by = "seed"
                 });
                 SaveChanges();
+            }
+
+            // 13) Notification Topics — the topic catalog
+            if (!NotificationTopic.Any())
+            {
+                var topics = new[]
+                {
+                    new NotificationTopic { id = Guid.NewGuid(), code = "APPOINTMENT_CONFIRMATION", name = "Appointment Confirmation", category = "Transactional", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "APPOINTMENT_UPDATED", name = "Appointment Updated", category = "Transactional", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "APPOINTMENT_CANCELLED", name = "Appointment Cancelled", category = "Transactional", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "APPOINTMENT_REMINDER", name = "Appointment Reminder", category = "Transactional", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "MARKETING_PROMOTION", name = "Marketing Promotion", category = "Marketing", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "MARKETING_COUPON", name = "Marketing Coupon", category = "Marketing", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "BIRTHDAY_GREETING", name = "Birthday Greeting", category = "Greeting", audience_scope = "Any", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "RECALL_CAMPAIGN", name = "Recall Campaign", category = "Marketing", audience_scope = "Patient", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "STAFF_ALERT", name = "Staff Alert", category = "Operational", audience_scope = "Staff", created_at = now, updated_at = now, created_by = "seed" },
+                    new NotificationTopic { id = Guid.NewGuid(), code = "SYSTEM_NOTICE", name = "System Notice", category = "Operational", audience_scope = "Any", created_at = now, updated_at = now, created_by = "seed" },
+                };
+                NotificationTopic.AddRange(topics);
+                SaveChanges();
+            }
+
+            // 14) Notification Templates — seeded per topic for Email channel
+            if (!NotificationTemplate.Any())
+            {
+                var topicMap = NotificationTopic.ToDictionary(t => t.code, t => t.id);
+
+                var templates = new List<NotificationTemplate>();
+
+                if (topicMap.TryGetValue("APPOINTMENT_CONFIRMATION", out var confirmId))
+                {
+                    templates.Add(new NotificationTemplate
+                    {
+                        id = Guid.NewGuid(),
+                        code = "APPOINTMENT_CONFIRMATION_EMAIL",
+                        topic_id = confirmId,
+                        channel = "Email",
+                        audience_scope = "Patient",
+                        provider = "AmazonSES",
+                        subject_template = "Your Appointment is Confirmed - BellaDent Dental Clinic",
+                        body_html = @"<div style=""font-family:Arial,sans-serif;max-width:600px;margin:0 auto"">
+<h2 style=""color:#2c5282"">Appointment Confirmed</h2>
+<p>Dear Patient,</p>
+<p>Your dental appointment has been confirmed with the following details:</p>
+<table style=""border-collapse:collapse;width:100%;margin:16px 0"">
+<tr><td style=""padding:8px;font-weight:bold"">Date:</td><td style=""padding:8px"">{{appointment_date}}</td></tr>
+<tr><td style=""padding:8px;font-weight:bold"">Time:</td><td style=""padding:8px"">{{appointment_time}}</td></tr>
+</table>
+<p>Please arrive 10 minutes early. If you need to reschedule, contact us at your earliest convenience.</p>
+<p style=""margin-top:24px"">Best regards,<br/><strong>BellaDent Dental Clinic</strong></p>
+</div>",
+                        body_text = "Appointment Confirmed\n\nYour dental appointment has been confirmed.\nDate: {{appointment_date}}\nTime: {{appointment_time}}\n\nPlease arrive 10 minutes early.\n\nBellaDent Dental Clinic",
+                        is_active = true,
+                        created_at = now,
+                        updated_at = now,
+                        created_by = "seed"
+                    });
+                }
+
+                if (topicMap.TryGetValue("APPOINTMENT_UPDATED", out var updatedId))
+                {
+                    templates.Add(new NotificationTemplate
+                    {
+                        id = Guid.NewGuid(),
+                        code = "APPOINTMENT_UPDATED_EMAIL",
+                        topic_id = updatedId,
+                        channel = "Email",
+                        audience_scope = "Patient",
+                        provider = "AmazonSES",
+                        subject_template = "Your Appointment Has Been Updated - BellaDent Dental Clinic",
+                        body_html = @"<div style=""font-family:Arial,sans-serif;max-width:600px;margin:0 auto"">
+<h2 style=""color:#2c5282"">Appointment Updated</h2>
+<p>Dear Patient,</p>
+<p>Your appointment has been updated. Here are the new details:</p>
+<table style=""border-collapse:collapse;width:100%;margin:16px 0"">
+<tr><td style=""padding:8px;font-weight:bold"">Date:</td><td style=""padding:8px"">{{appointment_date}}</td></tr>
+<tr><td style=""padding:8px;font-weight:bold"">Time:</td><td style=""padding:8px"">{{appointment_time}}</td></tr>
+</table>
+<p>If you have any questions, please don't hesitate to contact us.</p>
+<p style=""margin-top:24px"">Best regards,<br/><strong>BellaDent Dental Clinic</strong></p>
+</div>",
+                        body_text = "Appointment Updated\n\nYour appointment has been updated.\nDate: {{appointment_date}}\nTime: {{appointment_time}}\n\nBellaDent Dental Clinic",
+                        is_active = true,
+                        created_at = now,
+                        updated_at = now,
+                        created_by = "seed"
+                    });
+                }
+
+                if (topicMap.TryGetValue("APPOINTMENT_CANCELLED", out var cancelledId))
+                {
+                    templates.Add(new NotificationTemplate
+                    {
+                        id = Guid.NewGuid(),
+                        code = "APPOINTMENT_CANCELLED_EMAIL",
+                        topic_id = cancelledId,
+                        channel = "Email",
+                        audience_scope = "Patient",
+                        provider = "AmazonSES",
+                        subject_template = "Your Appointment Has Been Cancelled - BellaDent Dental Clinic",
+                        body_html = @"<div style=""font-family:Arial,sans-serif;max-width:600px;margin:0 auto"">
+<h2 style=""color:#c53030"">Appointment Cancelled</h2>
+<p>Dear Patient,</p>
+<p>Your appointment has been cancelled. If you did not request this cancellation or wish to reschedule, please contact us.</p>
+<p style=""margin-top:24px"">Best regards,<br/><strong>BellaDent Dental Clinic</strong></p>
+</div>",
+                        body_text = "Appointment Cancelled\n\nYour appointment has been cancelled. If you did not request this or wish to reschedule, please contact us.\n\nBellaDent Dental Clinic",
+                        is_active = true,
+                        created_at = now,
+                        updated_at = now,
+                        created_by = "seed"
+                    });
+                }
+
+                if (topicMap.TryGetValue("APPOINTMENT_REMINDER", out var reminderId))
+                {
+                    templates.Add(new NotificationTemplate
+                    {
+                        id = Guid.NewGuid(),
+                        code = "APPOINTMENT_REMINDER_EMAIL",
+                        topic_id = reminderId,
+                        channel = "Email",
+                        audience_scope = "Patient",
+                        provider = "AmazonSES",
+                        subject_template = "Reminder: Your Appointment is Coming Up - BellaDent Dental Clinic",
+                        body_html = @"<div style=""font-family:Arial,sans-serif;max-width:600px;margin:0 auto"">
+<h2 style=""color:#2c5282"">Appointment Reminder</h2>
+<p>Dear Patient,</p>
+<p>This is a reminder about your upcoming appointment:</p>
+<table style=""border-collapse:collapse;width:100%;margin:16px 0"">
+<tr><td style=""padding:8px;font-weight:bold"">Date:</td><td style=""padding:8px"">{{appointment_date}}</td></tr>
+<tr><td style=""padding:8px;font-weight:bold"">Time:</td><td style=""padding:8px"">{{appointment_time}}</td></tr>
+</table>
+<p>Please arrive 10 minutes early. If you need to reschedule, contact us as soon as possible.</p>
+<p style=""margin-top:24px"">Best regards,<br/><strong>BellaDent Dental Clinic</strong></p>
+</div>",
+                        body_text = "Appointment Reminder\n\nYour upcoming appointment:\nDate: {{appointment_date}}\nTime: {{appointment_time}}\n\nPlease arrive 10 minutes early.\n\nBellaDent Dental Clinic",
+                        is_active = true,
+                        created_at = now,
+                        updated_at = now,
+                        created_by = "seed"
+                    });
+                }
+
+                if (templates.Count > 0)
+                {
+                    NotificationTemplate.AddRange(templates);
+                    SaveChanges();
+                }
             }
 
             if (isRelational)

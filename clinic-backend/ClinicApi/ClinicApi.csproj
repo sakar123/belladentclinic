@@ -14,8 +14,10 @@
 </ItemGroup>
   <ItemGroup>
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.3" />
     <PackageReference Include="AWSSDK.SimpleEmail" Version="4.0.2.8" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.*" />
 
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -36,6 +38,9 @@
   <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
     <_Parameter1>ClinicApi.Tests</_Parameter1>
   </AssemblyAttribute>
+</ItemGroup>
+<ItemGroup>
+  <Folder Include="logs\" />
 </ItemGroup>
 
 </Project>

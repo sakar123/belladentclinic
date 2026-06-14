@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(req) {
+  if (process.env.NODE_ENV === 'production' && (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_FROM_NUMBER)) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
   try {
     const { to, body } = await req.json();
     if (!to || !body) return NextResponse.json({ error: 'Missing to/body' }, { status: 400 });

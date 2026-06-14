@@ -133,10 +133,14 @@ namespace ClinicApi.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTime>("due_date")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("date");
 
                     b.Property<DateTime>("issue_date")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("date");
+
+                    b.Property<string>("notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<Guid>("patient_id")
                         .HasColumnType("uuid");
@@ -190,10 +194,18 @@ namespace ClinicApi.Migrations
                         .HasColumnType("decimal(5,2)")
                         .HasDefaultValue(0.00m);
 
+                    b.Property<string>("line_item_type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int>("quantity")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(1);
+
+                    b.Property<Guid?>("service_id")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("treatment_id")
                         .HasColumnType("uuid");
@@ -207,6 +219,8 @@ namespace ClinicApi.Migrations
                     b.HasKey("id");
 
                     b.HasIndex("billing_id");
+
+                    b.HasIndex("service_id");
 
                     b.HasIndex("treatment_id");
 
@@ -247,18 +261,18 @@ namespace ClinicApi.Migrations
                         new
                         {
                             id = new Guid("d0115ad2-4098-42f9-b1c2-1faddf373ccb"),
-                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1580),
+                            created_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(1760),
                             discount_name = "Senior Citizen",
                             discount_percentage = 10m,
-                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1580)
+                            updated_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(1760)
                         },
                         new
                         {
                             id = new Guid("782b35f4-1252-4de6-a710-9b2681112f7f"),
-                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(2000),
+                            created_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(2160),
                             discount_name = "Student",
                             discount_percentage = 5m,
-                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(2000)
+                            updated_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(2160)
                         });
                 });
 
@@ -323,9 +337,6 @@ namespace ClinicApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("created_at")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("description")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -341,9 +352,6 @@ namespace ClinicApi.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<DateTime>("updated_at")
-                        .HasColumnType("timestamp with time zone");
-
                     b.HasKey("id");
 
                     b.ToTable("document_type", (string)null);
@@ -352,27 +360,430 @@ namespace ClinicApi.Migrations
                         new
                         {
                             id = new Guid("de3b98d3-9281-439c-a014-0d87e38cdb5a"),
-                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(780),
                             document_type_code = "XRAY",
-                            name = "X-Ray",
-                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(780)
+                            name = "X-Ray"
                         },
                         new
                         {
                             id = new Guid("4ba01043-3d4d-440f-85ca-79f7c6fd52f2"),
-                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1240),
                             document_type_code = "CONSENT",
-                            name = "Consent Form",
-                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1240)
+                            name = "Consent Form"
                         },
                         new
                         {
                             id = new Guid("e8a3bf49-f083-443e-9749-00f54f7bc4bb"),
-                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1240),
                             document_type_code = "OTHER",
-                            name = "Other",
-                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(1240)
+                            name = "Other"
                         });
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("appointment_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("body_rendered_html")
+                        .HasColumnType("text");
+
+                    b.Property<string>("body_rendered_text")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("campaign_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("created_by")
+                        .HasColumnType("text");
+
+                    b.Property<string>("error_message")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("patient_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("processed_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("provider")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("AmazonSES");
+
+                    b.Property<DateTime?>("scheduled_for")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("staff_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Queued");
+
+                    b.Property<string>("subject_rendered")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<Guid?>("template_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("topic_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("updated_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("updated_by")
+                        .HasColumnType("text");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("appointment_id");
+
+                    b.HasIndex("campaign_id");
+
+                    b.HasIndex("patient_id");
+
+                    b.HasIndex("staff_id");
+
+                    b.HasIndex("template_id");
+
+                    b.HasIndex("topic_id");
+
+                    b.ToTable("notification");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationCampaign", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("audience_scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Any");
+
+                    b.Property<string>("channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("completed_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("created_by")
+                        .HasColumnType("text");
+
+                    b.Property<string>("description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("filter_criteria_json")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("launched_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime?>("scheduled_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Draft");
+
+                    b.Property<Guid?>("template_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("topic_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("updated_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("updated_by")
+                        .HasColumnType("text");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("template_id");
+
+                    b.HasIndex("topic_id");
+
+                    b.ToTable("notification_campaign", (string)null);
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationProviderEvent", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("event_time")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("event_type")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)");
+
+                    b.Property<Guid>("notification_recipient_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("payload")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("provider")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("AmazonSES");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("notification_recipient_id");
+
+                    b.ToTable("notification_provider_event", (string)null);
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationRecipient", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("clicked_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("contact_method_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("created_by")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("delivered_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("delivery_status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Queued");
+
+                    b.Property<DateTime?>("failed_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("failure_reason")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("notification_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("opened_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("person_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("provider_message_id")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("recipient_address")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("recipient_type")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Primary");
+
+                    b.Property<DateTime?>("sent_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("updated_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("updated_by")
+                        .HasColumnType("text");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("contact_method_id");
+
+                    b.HasIndex("person_id");
+
+                    b.HasIndex("notification_id", "person_id", "recipient_address")
+                        .IsUnique();
+
+                    b.ToTable("notification_recipient", (string)null);
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationTemplate", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("audience_scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Any");
+
+                    b.Property<string>("body_html")
+                        .HasColumnType("text");
+
+                    b.Property<string>("body_text")
+                        .HasColumnType("text");
+
+                    b.Property<string>("channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("created_by")
+                        .HasColumnType("text");
+
+                    b.Property<string>("description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("is_active")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("provider")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("AmazonSES");
+
+                    b.Property<string>("subject_template")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<Guid>("topic_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("updated_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("updated_by")
+                        .HasColumnType("text");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("code")
+                        .IsUnique();
+
+                    b.HasIndex("topic_id");
+
+                    b.ToTable("notification_template", (string)null);
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationTopic", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("audience_scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Any");
+
+                    b.Property<string>("category")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)");
+
+                    b.Property<string>("code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("created_by")
+                        .HasColumnType("text");
+
+                    b.Property<string>("description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("is_active")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("updated_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("updated_by")
+                        .HasColumnType("text");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("code")
+                        .IsUnique();
+
+                    b.ToTable("notification_topic", (string)null);
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Patient", b =>
@@ -435,6 +846,10 @@ namespace ClinicApi.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<DateTime>("payment_date")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -449,6 +864,79 @@ namespace ClinicApi.Migrations
                     b.HasIndex("billing_id");
 
                     b.ToTable("payment");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PerioMeasurement", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("bleeding_on_probing")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("clinical_attachment_level")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("furcation")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("gingival_margin")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("mobility")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("perio_status_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("pocket_depth")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("recession")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("site_index")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("tooth_number")
+                        .HasColumnType("integer");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("perio_status_id");
+
+                    b.ToTable("periomeasurement");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PerioStatus", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("bone_loss")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("examination_date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("patient_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("smoker")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("staff_id")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("patient_id");
+
+                    b.HasIndex("staff_id");
+
+                    b.ToTable("periostatus");
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Person", b =>
@@ -471,7 +959,7 @@ namespace ClinicApi.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("date_of_birth")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("date");
 
                     b.Property<string>("email")
                         .HasMaxLength(100)
@@ -503,6 +991,171 @@ namespace ClinicApi.Migrations
                     b.HasKey("id");
 
                     b.ToTable("person");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PersonChannelSuppression", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("contact_value")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("created_by")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("expires_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("is_active")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<Guid>("person_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("suppressed_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("person_id", "channel", "contact_value")
+                        .IsUnique();
+
+                    b.ToTable("person_channel_suppression", (string)null);
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PersonContactMethod", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("contact_value")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("created_by")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("is_active")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("is_primary")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("is_verified")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<Guid>("person_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("updated_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("updated_by")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("verified_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("person_id", "channel", "contact_value")
+                        .IsUnique();
+
+                    b.ToTable("person_contact_method", (string)null);
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PersonNotificationPreference", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("created_by")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("is_enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("opt_in_status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Implicit");
+
+                    b.Property<DateTime?>("opted_in_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("opted_out_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("person_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("source")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("topic_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("updated_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("updated_by")
+                        .HasColumnType("text");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("topic_id");
+
+                    b.HasIndex("person_id", "topic_id", "channel")
+                        .IsUnique();
+
+                    b.ToTable("person_notification_preference", (string)null);
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Prescription", b =>
@@ -641,14 +1294,37 @@ namespace ClinicApi.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid?>("resulting_tooth_status_id")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("specialty_id")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("visual_cue_code")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.HasKey("id");
+
+                    b.HasIndex("resulting_tooth_status_id");
 
                     b.HasIndex("specialty_id");
 
                     b.ToTable("service");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.ServiceToothScope", b =>
+                {
+                    b.Property<Guid>("service_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("tooth_scope")
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)");
+
+                    b.HasKey("service_id", "tooth_scope");
+
+                    b.ToTable("service_tooth_scope", (string)null);
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Specialty", b =>
@@ -669,6 +1345,14 @@ namespace ClinicApi.Migrations
                     b.HasKey("id");
 
                     b.ToTable("specialty");
+
+                    b.HasData(
+                        new
+                        {
+                            id = new Guid("a5f1f0fe-7e51-4b0f-8ccf-3b9e0e24f001"),
+                            description = "General practice",
+                            name = "General Dentistry"
+                        });
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Staff", b =>
@@ -719,6 +1403,31 @@ namespace ClinicApi.Migrations
                     b.ToTable("staff");
                 });
 
+            modelBuilder.Entity("ClinicApi.Models.Entities.SurfacePricingTier", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("max_surfaces")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("min_surfaces")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("multiplier")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<Guid>("service_id")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("service_id");
+
+                    b.ToTable("surfacepricingtier");
+                });
+
             modelBuilder.Entity("ClinicApi.Models.Entities.Tooth", b =>
                 {
                     b.Property<Guid>("id")
@@ -766,6 +1475,10 @@ namespace ClinicApi.Migrations
                         .HasMaxLength(25)
                         .HasColumnType("character varying(25)");
 
+                    b.Property<string>("color")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
                     b.Property<DateTime>("created_at")
                         .HasColumnType("timestamp with time zone");
 
@@ -788,33 +1501,33 @@ namespace ClinicApi.Migrations
                         {
                             id = new Guid("23ab8f4c-1944-46df-80d9-dc137752f649"),
                             code = "HEALTHY",
-                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3240),
+                            created_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(4030),
                             description = "Healthy",
-                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3240)
+                            updated_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(4030)
                         },
                         new
                         {
                             id = new Guid("665eb447-6d2e-4889-97b0-ea80c931c7bd"),
                             code = "CAVITY",
-                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3630),
+                            created_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(4420),
                             description = "Cavity",
-                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640)
+                            updated_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(4420)
                         },
                         new
                         {
                             id = new Guid("58921fa0-25c3-45f4-976c-ea17379a98ed"),
                             code = "MISSING",
-                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640),
+                            created_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(4420),
                             description = "Missing",
-                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640)
+                            updated_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(4420)
                         },
                         new
                         {
                             id = new Guid("49bc7706-a3d4-4927-a4d8-9c505dbd426a"),
                             code = "OTHER",
-                            created_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640),
+                            created_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(4420),
                             description = "Other",
-                            updated_at = new DateTime(2026, 1, 8, 22, 56, 44, 606, DateTimeKind.Utc).AddTicks(3640)
+                            updated_at = new DateTime(2026, 4, 12, 1, 22, 19, 598, DateTimeKind.Utc).AddTicks(4420)
                         });
                 });
 
@@ -826,6 +1539,9 @@ namespace ClinicApi.Migrations
 
                     b.Property<Guid>("appointment_id")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("completed_at")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("created_at")
                         .HasColumnType("timestamp with time zone");
@@ -846,8 +1562,21 @@ namespace ClinicApi.Migrations
                     b.Property<Guid>("staff_id")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("tooth_id")
-                        .HasColumnType("uuid");
+                    b.Property<string>("status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)")
+                        .HasDefaultValue("Planned");
+
+                    b.Property<string>("surfaces")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("treatment_scope")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)");
 
                     b.Property<DateTime>("updated_at")
                         .HasColumnType("timestamp with time zone");
@@ -865,9 +1594,48 @@ namespace ClinicApi.Migrations
 
                     b.HasIndex("staff_id");
 
+                    b.ToTable("treatment");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.TreatmentToothSurface", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("surface")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<Guid>("tooth_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("treatment_id")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("id");
+
                     b.HasIndex("tooth_id");
 
-                    b.ToTable("treatment");
+                    b.HasIndex("treatment_id");
+
+                    b.ToTable("treatmenttoothsurface");
+                });
+
+            modelBuilder.Entity("treatment_tooth", b =>
+                {
+                    b.Property<Guid>("tooth_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("treatment_id")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("tooth_id", "treatment_id");
+
+                    b.HasIndex("treatment_id");
+
+                    b.ToTable("treatment_tooth");
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Appointment", b =>
@@ -916,12 +1684,19 @@ namespace ClinicApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ClinicApi.Models.Entities.Service", "service")
+                        .WithMany()
+                        .HasForeignKey("service_id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ClinicApi.Models.Entities.Treatment", "treatment")
                         .WithMany("billing_line_item")
                         .HasForeignKey("treatment_id")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("billing");
+
+                    b.Navigation("service");
 
                     b.Navigation("treatment");
                 });
@@ -959,6 +1734,118 @@ namespace ClinicApi.Migrations
                     b.Navigation("treatment");
                 });
 
+            modelBuilder.Entity("ClinicApi.Models.Entities.Notification", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Appointment", "appointment")
+                        .WithMany()
+                        .HasForeignKey("appointment_id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ClinicApi.Models.Entities.NotificationCampaign", "campaign")
+                        .WithMany("notifications")
+                        .HasForeignKey("campaign_id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ClinicApi.Models.Entities.Patient", "patient")
+                        .WithMany()
+                        .HasForeignKey("patient_id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ClinicApi.Models.Entities.Staff", "staff")
+                        .WithMany()
+                        .HasForeignKey("staff_id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ClinicApi.Models.Entities.NotificationTemplate", "template")
+                        .WithMany("notifications")
+                        .HasForeignKey("template_id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ClinicApi.Models.Entities.NotificationTopic", "topic")
+                        .WithMany("notifications")
+                        .HasForeignKey("topic_id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("appointment");
+
+                    b.Navigation("campaign");
+
+                    b.Navigation("patient");
+
+                    b.Navigation("staff");
+
+                    b.Navigation("template");
+
+                    b.Navigation("topic");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationCampaign", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.NotificationTemplate", "template")
+                        .WithMany()
+                        .HasForeignKey("template_id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ClinicApi.Models.Entities.NotificationTopic", "topic")
+                        .WithMany("campaigns")
+                        .HasForeignKey("topic_id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("template");
+
+                    b.Navigation("topic");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationProviderEvent", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.NotificationRecipient", "notification_recipient")
+                        .WithMany("provider_events")
+                        .HasForeignKey("notification_recipient_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("notification_recipient");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationRecipient", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.PersonContactMethod", "contact_method")
+                        .WithMany()
+                        .HasForeignKey("contact_method_id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ClinicApi.Models.Entities.Notification", "notification")
+                        .WithMany("recipients")
+                        .HasForeignKey("notification_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClinicApi.Models.Entities.Person", "person")
+                        .WithMany()
+                        .HasForeignKey("person_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("contact_method");
+
+                    b.Navigation("notification");
+
+                    b.Navigation("person");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationTemplate", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.NotificationTopic", "topic")
+                        .WithMany("templates")
+                        .HasForeignKey("topic_id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("topic");
+                });
+
             modelBuilder.Entity("ClinicApi.Models.Entities.Patient", b =>
                 {
                     b.HasOne("ClinicApi.Models.Entities.Person", "Person")
@@ -979,6 +1866,77 @@ namespace ClinicApi.Migrations
                         .IsRequired();
 
                     b.Navigation("billing");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PerioMeasurement", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.PerioStatus", "perio_status")
+                        .WithMany("measurements")
+                        .HasForeignKey("perio_status_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("perio_status");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PerioStatus", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Patient", "patient")
+                        .WithMany()
+                        .HasForeignKey("patient_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClinicApi.Models.Entities.Staff", "staff")
+                        .WithMany()
+                        .HasForeignKey("staff_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("patient");
+
+                    b.Navigation("staff");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PersonChannelSuppression", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Person", "person")
+                        .WithMany("channel_suppressions")
+                        .HasForeignKey("person_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("person");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PersonContactMethod", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Person", "person")
+                        .WithMany("contact_methods")
+                        .HasForeignKey("person_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("person");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PersonNotificationPreference", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Person", "person")
+                        .WithMany("notification_preferences")
+                        .HasForeignKey("person_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClinicApi.Models.Entities.NotificationTopic", "topic")
+                        .WithMany("preferences")
+                        .HasForeignKey("topic_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("person");
+
+                    b.Navigation("topic");
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Prescription", b =>
@@ -1011,11 +1969,29 @@ namespace ClinicApi.Migrations
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Service", b =>
                 {
+                    b.HasOne("ClinicApi.Models.Entities.ToothStatus", "resulting_tooth_status")
+                        .WithMany()
+                        .HasForeignKey("resulting_tooth_status_id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ClinicApi.Models.Entities.Specialty", "specialty")
                         .WithMany("services")
                         .HasForeignKey("specialty_id");
 
+                    b.Navigation("resulting_tooth_status");
+
                     b.Navigation("specialty");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.ServiceToothScope", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Service", "service")
+                        .WithMany("tooth_scopes")
+                        .HasForeignKey("service_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("service");
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Staff", b =>
@@ -1041,6 +2017,17 @@ namespace ClinicApi.Migrations
                     b.Navigation("role");
 
                     b.Navigation("specialty");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.SurfacePricingTier", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Service", "service")
+                        .WithMany()
+                        .HasForeignKey("service_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("service");
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Tooth", b =>
@@ -1088,12 +2075,6 @@ namespace ClinicApi.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ClinicApi.Models.Entities.Tooth", "tooth")
-                        .WithMany("treatments")
-                        .HasForeignKey("tooth_id")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("appointment");
 
                     b.Navigation("patient");
@@ -1101,8 +2082,40 @@ namespace ClinicApi.Migrations
                     b.Navigation("service");
 
                     b.Navigation("staff");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.TreatmentToothSurface", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Tooth", "tooth")
+                        .WithMany()
+                        .HasForeignKey("tooth_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClinicApi.Models.Entities.Treatment", "treatment")
+                        .WithMany()
+                        .HasForeignKey("treatment_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("tooth");
+
+                    b.Navigation("treatment");
+                });
+
+            modelBuilder.Entity("treatment_tooth", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Tooth", null)
+                        .WithMany()
+                        .HasForeignKey("tooth_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClinicApi.Models.Entities.Treatment", null)
+                        .WithMany()
+                        .HasForeignKey("treatment_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Appointment", b =>
@@ -1132,6 +2145,37 @@ namespace ClinicApi.Migrations
                     b.Navigation("documents");
                 });
 
+            modelBuilder.Entity("ClinicApi.Models.Entities.Notification", b =>
+                {
+                    b.Navigation("recipients");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationCampaign", b =>
+                {
+                    b.Navigation("notifications");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationRecipient", b =>
+                {
+                    b.Navigation("provider_events");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationTemplate", b =>
+                {
+                    b.Navigation("notifications");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.NotificationTopic", b =>
+                {
+                    b.Navigation("campaigns");
+
+                    b.Navigation("notifications");
+
+                    b.Navigation("preferences");
+
+                    b.Navigation("templates");
+                });
+
             modelBuilder.Entity("ClinicApi.Models.Entities.Patient", b =>
                 {
                     b.Navigation("appointments");
@@ -1147,6 +2191,20 @@ namespace ClinicApi.Migrations
                     b.Navigation("treatments");
                 });
 
+            modelBuilder.Entity("ClinicApi.Models.Entities.PerioStatus", b =>
+                {
+                    b.Navigation("measurements");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.Person", b =>
+                {
+                    b.Navigation("channel_suppressions");
+
+                    b.Navigation("contact_methods");
+
+                    b.Navigation("notification_preferences");
+                });
+
             modelBuilder.Entity("ClinicApi.Models.Entities.Role", b =>
                 {
                     b.Navigation("staff");
@@ -1154,6 +2212,8 @@ namespace ClinicApi.Migrations
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Service", b =>
                 {
+                    b.Navigation("tooth_scopes");
+
                     b.Navigation("treatments");
                 });
 
@@ -1174,8 +2234,6 @@ namespace ClinicApi.Migrations
             modelBuilder.Entity("ClinicApi.Models.Entities.Tooth", b =>
                 {
                     b.Navigation("documents");
-
-                    b.Navigation("treatments");
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.ToothStatus", b =>

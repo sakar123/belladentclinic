@@ -24,9 +24,17 @@ namespace ClinicApi.Services.Implementations
             _toothStatusRepository = toothStatusRepository;
         }
 
-        public async Task<IEnumerable<ToothDTO>> GetAllTeethAsync()
+        public async Task<IEnumerable<ToothDTO>> GetAllTeethAsync(Guid? patientId = null)
         {
-            var teeth = await _toothRepository.GetAllAsync();
+            IEnumerable<Tooth> teeth;
+            if (patientId.HasValue)
+            {
+                teeth = await _toothRepository.FindAsync(t => t.patient_id == patientId.Value);
+            }
+            else
+            {
+                teeth = await _toothRepository.GetAllAsync();
+            }
             var visited = new HashSet<object>();
             return teeth.Select(t => ToothMapper.ToDto(t, visited)).ToList();
         }
@@ -44,6 +52,13 @@ namespace ClinicApi.Services.Implementations
 
             if (!await _toothStatusRepository.ExistsAsync(toothDto.tooth_status_id))
                 throw new KeyNotFoundException("Tooth status not found");
+
+            // Idempotency: if a tooth with same patient_id + tooth_number exists, return it instead of erroring
+            var existing = (await _toothRepository.FindAsync(t => t.patient_id == toothDto.patient_id && t.tooth_number == toothDto.tooth_number)).FirstOrDefault();
+            if (existing != null)
+            {
+                return ToothMapper.ToDto(existing, new HashSet<object>());
+            }
 
             var tooth = ToothMapper.ToEntity(toothDto, new HashSet<object>());
             await _toothRepository.AddAsync(tooth);
@@ -63,6 +78,15 @@ namespace ClinicApi.Services.Implementations
 
             if (!await _toothStatusRepository.ExistsAsync(toothDto.tooth_status_id))
                 throw new KeyNotFoundException("Tooth status not found");
+
+            // Validate incompatible status transitions
+            var currentStatus = await _toothStatusRepository.GetByIdAsync(existingTooth.tooth_status_id);
+            var requestedStatus = await _toothStatusRepository.GetByIdAsync(toothDto.tooth_status_id);
+            var vr = ToothStatusValidator.Validate(currentStatus?.code, requestedStatus?.code);
+            if (!vr.IsValid)
+            {
+                throw new ClinicApi.Models.Exceptions.IncompatibleToothStatusException(vr.CurrentStatus ?? "", vr.NewStatus ?? "", vr.Reason);
+            }
 
             // Manual update
             existingTooth.patient_id = toothDto.patient_id;

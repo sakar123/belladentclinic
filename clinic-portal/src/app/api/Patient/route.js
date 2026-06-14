@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { store } from '../_dev/store';
 
-export async function GET() { return NextResponse.json(store.patients); }
+export async function GET() {
+  if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  return NextResponse.json(store.patients);
+}
 
 export async function POST(req) {
+  if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 });
   try {
     const body = await req.json();
     const id = store.nextPatientId++;

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(req) {
+  if (process.env.NODE_ENV === 'production' && !process.env.SENDGRID_API_KEY) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
   try {
     const { to, subject, html } = await req.json();
     if (!to || !subject || !html) return NextResponse.json({ error: 'Missing to/subject/html' }, { status: 400 });

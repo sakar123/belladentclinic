@@ -4,11 +4,13 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using ClinicApi.Models.DTOs;
 using ClinicApi.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = "AllStaff")]
     public class SaleController : ControllerBase
     {
         private readonly ISaleService _saleService;
@@ -35,6 +37,7 @@ namespace ClinicApi.Controllers
             return Ok(saleItem);
         }
 
+        [Authorize(Policy = "SalesStaff")]
         [HttpPost]
         public async Task<ActionResult<SaleItemDTO>> CreateSaleItem(SaleItemDTO saleItemDto)
         {
@@ -49,6 +52,7 @@ namespace ClinicApi.Controllers
             }
         }
 
+        [Authorize(Policy = "SalesStaff")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateSaleItem(Guid id, SaleItemDTO saleItemDto)
         {
@@ -63,6 +67,7 @@ namespace ClinicApi.Controllers
             }
         }
 
+        [Authorize(Policy = "AdminOnly")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteSaleItem(Guid id)
         {

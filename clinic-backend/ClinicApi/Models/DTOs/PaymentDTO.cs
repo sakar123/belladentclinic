@@ -22,6 +22,9 @@ namespace ClinicApi.Models.DTOs
         [StringLength(255)]
         public string? transaction_ref { get; set; }
         
+        [StringLength(2000)]
+        public string? notes { get; set; }
+        
         [Required]
         public string? created_by { get; set; }
     }

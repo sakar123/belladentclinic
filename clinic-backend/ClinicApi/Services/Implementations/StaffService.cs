@@ -71,7 +71,9 @@ namespace ClinicApi.Services.Implementations
                 id = Guid.NewGuid(),
                 first_name = staffDto.person.first_name,
                 last_name = staffDto.person.last_name,
-                date_of_birth = staffDto.person.date_of_birth,
+                date_of_birth = staffDto.person.date_of_birth.HasValue
+                    ? DateTime.SpecifyKind(staffDto.person.date_of_birth.Value, DateTimeKind.Utc)
+                    : (DateTime?)null,
                 gender = staffDto.person.gender,
                 phone_number = staffDto.person.phone_number,
                 email = staffDto.person.email,
@@ -132,7 +134,9 @@ namespace ClinicApi.Services.Implementations
             // Update Person manually
             existingPerson.first_name = staffDto.person.first_name;
             existingPerson.last_name = staffDto.person.last_name;
-            existingPerson.date_of_birth = staffDto.person.date_of_birth;
+            existingPerson.date_of_birth = staffDto.person.date_of_birth.HasValue
+                ? DateTime.SpecifyKind(staffDto.person.date_of_birth.Value, DateTimeKind.Utc)
+                : (DateTime?)null;
             existingPerson.gender = staffDto.person.gender;
             existingPerson.phone_number = staffDto.person.phone_number;
             existingPerson.email = staffDto.person.email;

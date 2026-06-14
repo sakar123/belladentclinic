@@ -1,10 +1,12 @@
 using ClinicApi.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClinicApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [AllowAnonymous]
     public class TestController : ControllerBase
     {
         private readonly DentalClinicContext _context;

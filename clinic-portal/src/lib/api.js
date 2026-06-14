@@ -1,19 +1,47 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5112/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+import { authFetch } from "./http";
 
 async function fetcher(url, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${url}`, options);
+  let finalUrl = `${API_BASE_URL}${url}`;
+  
+  if (options.params) {
+    const params = new URLSearchParams();
+    Object.entries(options.params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, value);
+      }
+    });
+    const queryString = params.toString();
+    if (queryString) {
+      finalUrl += (finalUrl.includes('?') ? '&' : '?') + queryString;
+    }
+  }
+
+  const response = await authFetch(finalUrl, options);
   if (!response.ok) {
     const error = new Error('An error occurred while fetching the data.');
-    error.info = await response.json();
+    try {
+      error.info = await response.json();
+    } catch {
+      try {
+        const text = await response.text();
+        error.info = { message: text };
+      } catch {}
+    }
     error.status = response.status;
     throw error;
   }
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    // No JSON body (e.g., 204), return null
+    return null;
+  }
 }
 
 export const api = {
   appointment: {
-    getAll: () => fetcher('/appointment'),
+    getAll: (params) => fetcher('/appointment', { params }),
     getById: (id) => fetcher(`/appointment/${id}`),
     create: (data) => fetcher('/appointment', {
       method: 'POST',
@@ -29,8 +57,11 @@ export const api = {
       method: 'DELETE',
     }),
   },
+  toothSurfaces: {
+    getHistory: (toothId) => fetcher(`/teeth/${toothId}/surfaces`),
+  },
   billing: {
-    getAll: () => fetcher('/billing'),
+    getAll: (params) => fetcher('/billing', { params }),
     getById: (id) => fetcher(`/billing/${id}`),
     create: (data) => fetcher('/billing', {
       method: 'POST',
@@ -45,10 +76,52 @@ export const api = {
     delete: (id) => fetcher(`/billing/${id}`, {
       method: 'DELETE',
     }),
+    // Payments
+    addPayment: (billingId, data) => fetcher(`/billing/${billingId}/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+    getPayments: (billingId) => fetcher(`/billing/${billingId}/payments`),
+    deletePayment: (billingId, paymentId) => fetcher(`/billing/${billingId}/payments/${paymentId}`, {
+      method: 'DELETE',
+    }),
+    // Line items
+    addLineItem: (billingId, data) => fetcher(`/billing/${billingId}/line-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+    updateLineItem: (billingId, lineItemId, data) => fetcher(`/billing/${billingId}/line-items/${lineItemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+    deleteLineItem: (billingId, lineItemId) => fetcher(`/billing/${billingId}/line-items/${lineItemId}`, {
+      method: 'DELETE',
+    }),
+    // Discounts / totals
+    applyDiscount: (billingId, percentage) => fetcher(`/billing/${billingId}/apply-discount`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(percentage),
+    }),
+    recalculate: (billingId) => fetcher(`/billing/${billingId}/recalculate`, {
+      method: 'POST',
+    }),
   },
   document: {
-    getAll: () => fetcher('/document'),
+    getAll: (params) => fetcher('/document', { params }),
     getById: (id) => fetcher(`/document/${id}`),
+    getDownloadUrl: (id) => fetcher(`/document/${id}/download-url`),
+    upload: async (formData) => {
+      const res = await authFetch(`${API_BASE_URL}/document/upload`, { method: 'POST', body: formData });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Upload failed');
+      }
+      return res.json();
+    },
     create: (data) => fetcher('/document', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -183,7 +256,7 @@ export const api = {
     }),
   },
   teeth: {
-    getAll: () => fetcher('/teeth'),
+    getAll: (params) => fetcher('/teeth', { params }),
     getById: (id) => fetcher(`/teeth/${id}`),
     create: (data) => fetcher('/teeth', {
       method: 'POST',
@@ -200,21 +273,49 @@ export const api = {
     }),
   },
   treatments: {
-    getAll: () => fetcher('/treatments'),
-    getById: (id) => fetcher(`/treatments/${id}`),
-    create: (data) => fetcher('/treatments', {
+      getAll: (params) => fetcher('/treatments', { params }),
+      getById: (id) => fetcher(`/treatments/${id}`),
+      create: (data) => fetcher('/treatments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+      update: (id, data) => fetcher(`/treatments/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+      delete: (id) => fetcher(`/treatments/${id}`, {
+        method: 'DELETE',
+      }),
+      complete: (id) => fetcher(`/treatments/${id}/complete`, {
+        method: 'POST',
+      }),
+      cancel: (id) => fetcher(`/treatments/${id}/cancel`, {
+        method: 'POST',
+      }),
+    },
+  perio: {
+    getLatest: (patientId) => fetcher('/perio/latest', { params: { patientId } }),
+    create: (data) => fetcher('/perio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
-    update: (id, data) => fetcher(`/treatments/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }),
-    delete: (id) => fetcher(`/treatments/${id}`, {
-      method: 'DELETE',
-    }),
+    statistics: (patientId) => fetcher('/perio/statistics', { params: { patientId } }),
+  },
+  // Notifications & Campaigns (use http client for snake/camel conversion)
+  notifications: {
+    topics: () => fetcher('/notifications/topics'),
+    dispatch: (data) => http.post('/notifications/dispatch', data),
+  },
+  campaigns: {
+    preview: (data) => http.post('/campaigns/preview', data),
+    create: (data) => http.post('/campaigns', data),
+    launch: (campaignId) => http.post(`/campaigns/${campaignId}/launch`, {}),
+    getById: (campaignId) => http.get(`/campaigns/${campaignId}`),
+    stats: (campaignId) => http.get(`/campaigns/${campaignId}/stats`),
+    list: () => fetcher('/campaigns'),
   },
   lookup: {
     appointmentStatus: {
@@ -299,6 +400,23 @@ export const api = {
         body: JSON.stringify(data),
       }),
       delete: (id) => fetcher(`/lookup/tooth-status/${id}`, {
+        method: 'DELETE',
+      }),
+    },
+    specialties: {
+      getAll: () => fetcher('/specialty'),
+      getById: (id) => fetcher(`/specialty/${id}`),
+      create: (data) => fetcher('/specialty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+      update: (id, data) => fetcher(`/specialty/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+      delete: (id) => fetcher(`/specialty/${id}`, {
         method: 'DELETE',
       }),
     },

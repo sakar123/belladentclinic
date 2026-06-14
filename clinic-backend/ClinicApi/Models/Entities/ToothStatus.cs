@@ -17,6 +17,9 @@ namespace ClinicApi.Models.Entities
         
         [StringLength(200)]
         public string? description { get; set; }
+
+        [StringLength(7)]
+        public string? color { get; set; }
         
         public DateTime created_at { get; set; } = DateTime.UtcNow;
         public DateTime updated_at { get; set; } = DateTime.UtcNow;

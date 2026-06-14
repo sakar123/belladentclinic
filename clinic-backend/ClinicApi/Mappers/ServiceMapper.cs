@@ -21,6 +21,9 @@ namespace ClinicApi.Mappers
             {
                 id = entity.id,
                 specialty_id = entity.specialty_id,
+                resulting_tooth_status_id = entity.resulting_tooth_status_id,
+                resulting_tooth_status_code = entity.resulting_tooth_status?.code,
+                visual_cue_code = entity.visual_cue_code,
                 name = entity.name,
                 description = entity.description,
                 cost = entity.cost
@@ -40,6 +43,8 @@ namespace ClinicApi.Mappers
                 id = dto.id ?? Guid.NewGuid(),
                 specialty_id = dto.specialty_id,
                 specialty = null, // TODO: Set this to the appropriate Specialty instance
+                resulting_tooth_status_id = dto.resulting_tooth_status_id,
+                visual_cue_code = dto.visual_cue_code,
                 name = dto.name,
                 description = dto.description,
                 cost = dto.cost,
