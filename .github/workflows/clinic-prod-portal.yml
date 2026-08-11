@@ -1,41 +1,291 @@
-name: Clinic Portal CI/CD (AWS)
+name: Deploy Clinic Portal (PROD) via S3 + SSM
 
 on:
   push:
     branches: [ main ]
     paths:
-      - 'clinic-code/clinic-portal/**'
+      - 'clinic-portal/**'
+      - '.github/workflows/clinic-prod-portal.yml'
+  workflow_dispatch:
+    inputs:
+      portal_server_name:
+        description: 'Optional nginx server_name to configure on EC2'
+        required: false
+        default: 'portal.belladentclinic.com'
+      configure_nginx:
+        description: 'Create or update an HTTP nginx proxy for the portal'
+        required: true
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+        default: 'false'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: clinic-portal-prod
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  ROLE_ARN: arn:aws:iam::816684203948:role/GitHubDeployRole-Prod
+  ARTIFACT_BUCKET: belladent-prod-deploy-artifacts
+  INSTANCE_ID: i-0b1a3760dc3cda3d0
+
+  APP_DIR: /opt/clinic-portal
+  SERVICE_NAME: ClinicPortal
+  PORTAL_PORT: '3000'
+  PORTAL_SERVER_NAME: ${{ github.event.inputs.portal_server_name || vars.PORTAL_SERVER_NAME || 'portal.belladentclinic.com' }}
+  CONFIGURE_NGINX: ${{ github.event.inputs.configure_nginx || vars.PORTAL_CONFIGURE_NGINX || 'false' }}
+
+  API_PROXY_TARGET: ${{ vars.PORTAL_API_PROXY_TARGET || 'http://127.0.0.1:5112' }}
+  NEXT_PUBLIC_API_BASE_URL: ${{ vars.PORTAL_NEXT_PUBLIC_API_BASE_URL || '/backend/api' }}
+  NEXT_PUBLIC_AUTH0_DOMAIN: ${{ vars.PORTAL_NEXT_PUBLIC_AUTH0_DOMAIN || vars.NEXT_PUBLIC_AUTH0_DOMAIN || secrets.PORTAL_NEXT_PUBLIC_AUTH0_DOMAIN || secrets.NEXT_PUBLIC_AUTH0_DOMAIN }}
+  NEXT_PUBLIC_AUTH0_CLIENT_ID: ${{ vars.PORTAL_NEXT_PUBLIC_AUTH0_CLIENT_ID || vars.NEXT_PUBLIC_AUTH0_CLIENT_ID || secrets.PORTAL_NEXT_PUBLIC_AUTH0_CLIENT_ID || secrets.NEXT_PUBLIC_AUTH0_CLIENT_ID }}
+  NEXT_PUBLIC_AUTH0_AUDIENCE: ${{ vars.PORTAL_NEXT_PUBLIC_AUTH0_AUDIENCE || vars.NEXT_PUBLIC_AUTH0_AUDIENCE || secrets.PORTAL_NEXT_PUBLIC_AUTH0_AUDIENCE || secrets.NEXT_PUBLIC_AUTH0_AUDIENCE || 'https://api.belladentclinic.com/api/' }}
+  NEXT_PUBLIC_AUTH0_CONNECTION: ${{ vars.PORTAL_NEXT_PUBLIC_AUTH0_CONNECTION || vars.NEXT_PUBLIC_AUTH0_CONNECTION || secrets.PORTAL_NEXT_PUBLIC_AUTH0_CONNECTION || secrets.NEXT_PUBLIC_AUTH0_CONNECTION || 'Staff-Database' }}
+  NEXT_PUBLIC_ODONTOGRAM_PROVIDER: ${{ vars.PORTAL_NEXT_PUBLIC_ODONTOGRAM_PROVIDER || 'advanced' }}
+  NEXT_PUBLIC_FRONTEND_LOGS: ${{ vars.PORTAL_NEXT_PUBLIC_FRONTEND_LOGS || '0' }}
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment: prod
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
+      - name: Assert ignored local artifacts are not tracked
+        run: |
+          set -euo pipefail
+          tracked="$(git ls-files | grep -E '(^|/)AGENTS\.md$|^docs/|(^|/)\.env[^/]*$|^qdento($|/)|^apexo-flutter($|/)' || true)"
+          if [[ -n "${tracked}" ]]; then
+            echo "These local/agent/env/vendor artifacts must not be tracked:" >&2
+            echo "${tracked}" >&2
+            exit 1
+          fi
 
-    - name: Install dependencies
-      run: npm ci
-      working-directory: clinic-code/clinic-portal
+      - name: Validate portal environment
+        run: |
+          set -euo pipefail
+          missing=0
+          for key in NEXT_PUBLIC_API_BASE_URL NEXT_PUBLIC_AUTH0_DOMAIN NEXT_PUBLIC_AUTH0_CLIENT_ID NEXT_PUBLIC_AUTH0_AUDIENCE API_PROXY_TARGET; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "Missing required portal env: ${key}" >&2
+              missing=1
+            fi
+          done
+          if [[ "${missing}" -ne 0 ]]; then
+            exit 1
+          fi
 
-    - name: Build
-      run: npm run build
-      working-directory: clinic-code/clinic-portal
+          if [[ "${NEXT_PUBLIC_API_BASE_URL}" != "/backend/api" && ! "${NEXT_PUBLIC_API_BASE_URL}" =~ ^https:// ]]; then
+            echo "NEXT_PUBLIC_API_BASE_URL must be /backend/api or an https:// URL" >&2
+            exit 1
+          fi
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+          if [[ ! "${API_PROXY_TARGET}" =~ ^http://127\.0\.0\.1:5112/?$ && ! "${API_PROXY_TARGET}" =~ ^https?:// ]]; then
+            echo "API_PROXY_TARGET must be an http(s) URL" >&2
+            exit 1
+          fi
 
-    - name: Deploy to S3
-      run: aws s3 sync ./clinic-code/clinic-portal/out s3://${{ secrets.AWS_S3_BUCKET_NAME_PORTAL }} --delete
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: clinic-portal/package-lock.json
 
-    - name: Invalidate CloudFront cache
-      run: aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID_PORTAL }} --paths "/*"
+      - name: Install dependencies
+        run: npm ci
+        working-directory: clinic-portal
+
+      - name: Lint
+        run: npm run lint
+        working-directory: clinic-portal
+
+      - name: Build standalone portal
+        run: npm run build
+        working-directory: clinic-portal
+
+      - name: Package standalone artifact
+        run: |
+          set -euo pipefail
+          artifact="ClinicPortal_${GITHUB_SHA}.tgz"
+          test -f clinic-portal/.next/standalone/server.js
+          tar -C clinic-portal/.next/standalone -czf "${artifact}" .
+          tar -tzf "${artifact}" | grep -q '^server\.js$'
+          echo "PORTAL_ARTIFACT=${artifact}" >> "${GITHUB_ENV}"
+          echo "PORTAL_ARTIFACT_URI=s3://${ARTIFACT_BUCKET}/clinic-portal/${artifact}" >> "${GITHUB_ENV}"
+          echo "PORTAL_ENV_URI=s3://${ARTIFACT_BUCKET}/clinic-portal/ClinicPortal_${GITHUB_SHA}.env" >> "${GITHUB_ENV}"
+          echo "PORTAL_DEPLOY_SCRIPT_URI=s3://${ARTIFACT_BUCKET}/clinic-portal/deploy-clinic-portal_${GITHUB_SHA}.sh" >> "${GITHUB_ENV}"
+
+      - name: Create runtime env file
+        run: |
+          set -euo pipefail
+          cat > ClinicPortal_${GITHUB_SHA}.env <<EOF
+          NODE_ENV=production
+          PORT=${PORTAL_PORT}
+          HOSTNAME=127.0.0.1
+          API_PROXY_TARGET=${API_PROXY_TARGET}
+          NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+          NEXT_PUBLIC_AUTH0_DOMAIN=${NEXT_PUBLIC_AUTH0_DOMAIN}
+          NEXT_PUBLIC_AUTH0_CLIENT_ID=${NEXT_PUBLIC_AUTH0_CLIENT_ID}
+          NEXT_PUBLIC_AUTH0_AUDIENCE=${NEXT_PUBLIC_AUTH0_AUDIENCE}
+          NEXT_PUBLIC_AUTH0_CONNECTION=${NEXT_PUBLIC_AUTH0_CONNECTION}
+          NEXT_PUBLIC_ODONTOGRAM_PROVIDER=${NEXT_PUBLIC_ODONTOGRAM_PROVIDER}
+          NEXT_PUBLIC_FRONTEND_LOGS=${NEXT_PUBLIC_FRONTEND_LOGS}
+          EOF
+          sed -i 's/^          //' ClinicPortal_${GITHUB_SHA}.env
+          chmod 600 ClinicPortal_${GITHUB_SHA}.env
+
+      - name: Create EC2 deploy script
+        run: |
+          set -euo pipefail
+          cat > deploy-clinic-portal.sh <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          ARTIFACT_URI="$1"
+          ENV_URI="$2"
+          APP_DIR="$3"
+          SERVICE_NAME="$4"
+          PORTAL_PORT="$5"
+          PORTAL_SERVER_NAME="${6:-}"
+          CONFIGURE_NGINX="${7:-false}"
+
+          find_node() {
+            if command -v node >/dev/null 2>&1; then
+              command -v node
+              return 0
+            fi
+
+            local candidate
+            candidate="$(find /home/ec2-user/.nvm/versions/node -path '*/bin/node' -type f 2>/dev/null | sort -V | tail -n 1 || true)"
+            if [[ -n "${candidate}" && -x "${candidate}" ]]; then
+              printf '%s\n' "${candidate}"
+              return 0
+            fi
+
+            return 1
+          }
+
+          NODE_BIN="$(find_node || true)"
+          if [[ -z "${NODE_BIN}" ]]; then
+            if command -v dnf >/dev/null 2>&1; then
+              dnf install -y nodejs npm
+              NODE_BIN="$(find_node || true)"
+            fi
+          fi
+
+          if [[ -z "${NODE_BIN}" ]]; then
+            echo "Node.js is required on the EC2 instance but was not found." >&2
+            exit 1
+          fi
+
+          mkdir -p "${APP_DIR}"
+          aws s3 cp "${ARTIFACT_URI}" /tmp/clinic-portal.tgz
+          aws s3 cp "${ENV_URI}" /tmp/ClinicPortal.env
+
+          systemctl stop "${SERVICE_NAME}" || true
+          rm -rf "${APP_DIR:?}"/*
+          tar -xzf /tmp/clinic-portal.tgz -C "${APP_DIR}"
+          install -m 600 -o root -g root /tmp/ClinicPortal.env /etc/ClinicPortal.env
+          chown -R root:root "${APP_DIR}"
+
+          cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<UNIT
+          [Unit]
+          Description=BellaDent Clinic Portal
+          After=network.target ClinicApi.service
+
+          [Service]
+          WorkingDirectory=${APP_DIR}
+          ExecStart=${NODE_BIN} ${APP_DIR}/server.js
+          Restart=always
+          RestartSec=5
+          User=root
+          EnvironmentFile=/etc/ClinicPortal.env
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          systemctl daemon-reload
+          systemctl enable "${SERVICE_NAME}"
+          systemctl start "${SERVICE_NAME}"
+          sleep 5
+          systemctl status "${SERVICE_NAME}" --no-pager
+          curl -fsS "http://127.0.0.1:${PORTAL_PORT}/" >/dev/null
+
+          if [[ "${CONFIGURE_NGINX}" == "true" && -n "${PORTAL_SERVER_NAME}" ]]; then
+            cat > "/etc/nginx/conf.d/${PORTAL_SERVER_NAME}.conf" <<NGINX
+          server {
+              listen 80;
+              server_name ${PORTAL_SERVER_NAME};
+
+              location / {
+                  proxy_pass http://127.0.0.1:${PORTAL_PORT};
+                  proxy_http_version 1.1;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection "upgrade";
+              }
+          }
+          NGINX
+            nginx -t
+            systemctl reload nginx
+          fi
+          SCRIPT
+          sed -i 's/^          //' deploy-clinic-portal.sh
+          chmod +x deploy-clinic-portal.sh
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload portal artifacts to S3
+        run: |
+          set -euo pipefail
+          aws s3 cp "${PORTAL_ARTIFACT}" "${PORTAL_ARTIFACT_URI}"
+          aws s3 cp "ClinicPortal_${GITHUB_SHA}.env" "${PORTAL_ENV_URI}"
+          aws s3 cp "deploy-clinic-portal.sh" "${PORTAL_DEPLOY_SCRIPT_URI}"
+
+      - name: Deploy on EC2 via SSM
+        run: |
+          set -euo pipefail
+          command_id="$(
+            aws ssm send-command \
+              --region "${AWS_REGION}" \
+              --instance-ids "${INSTANCE_ID}" \
+              --document-name "AWS-RunShellScript" \
+              --comment "Deploy ClinicPortal ${GITHUB_SHA}" \
+              --parameters commands="[
+                \"set -euo pipefail\",
+                \"aws s3 cp '${PORTAL_DEPLOY_SCRIPT_URI}' /tmp/deploy-clinic-portal.sh\",
+                \"chmod +x /tmp/deploy-clinic-portal.sh\",
+                \"sudo /tmp/deploy-clinic-portal.sh '${PORTAL_ARTIFACT_URI}' '${PORTAL_ENV_URI}' '${APP_DIR}' '${SERVICE_NAME}' '${PORTAL_PORT}' '${PORTAL_SERVER_NAME}' '${CONFIGURE_NGINX}'\"
+              ]" \
+              --query 'Command.CommandId' \
+              --output text
+          )"
+
+          aws ssm wait command-executed \
+            --region "${AWS_REGION}" \
+            --command-id "${command_id}" \
+            --instance-id "${INSTANCE_ID}"
+
+          aws ssm get-command-invocation \
+            --region "${AWS_REGION}" \
+            --command-id "${command_id}" \
+            --instance-id "${INSTANCE_ID}" \
+            --query '{Status:Status,ResponseCode:ResponseCode,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
+            --output json

@@ -354,7 +354,7 @@ function DinoTooth({
         {layers}
         {overlays}
         <SpriteDebugOverlay
-          enabled={debugMode || (process.env.NEXT_PUBLIC_QDENTO_DEBUG === 'true')}
+          enabled={debugMode}
           number={number}
           textureIdx={textureIdx}
           xOffset={xOffset}

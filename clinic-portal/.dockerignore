@@ -3,7 +3,6 @@ node_modules
 out
 .env.local
 .env*
-!.env.production
 .vscode
 npm-debug.log
 yarn-error.log
