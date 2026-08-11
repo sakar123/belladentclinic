@@ -1,5 +1,19 @@
+import { authFetch, http } from "./http";
+import { buildAdvancedOdontogramPayload } from "./odontogram/backend-to-advanced";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
-import { authFetch } from "./http";
+
+const EMPTY_ADVANCED_ODONTOGRAM_CHART = {
+  version: "2.19",
+  globals: {
+    wisdomVisible: true,
+    showBase: true,
+    occlusalVisible: true,
+    showHealthyPulp: true,
+    edentulous: false,
+  },
+  teeth: {},
+};
 
 async function fetcher(url, options = {}) {
   let finalUrl = `${API_BASE_URL}${url}`;
@@ -19,7 +33,9 @@ async function fetcher(url, options = {}) {
 
   const response = await authFetch(finalUrl, options);
   if (!response.ok) {
-    const error = new Error('An error occurred while fetching the data.');
+    const error = new Error(response.status === 401
+      ? 'Unauthorized API request. Sign in again or check Auth0 audience/roles.'
+      : 'An error occurred while fetching the data.');
     try {
       error.info = await response.json();
     } catch {
@@ -29,6 +45,15 @@ async function fetcher(url, options = {}) {
       } catch {}
     }
     error.status = response.status;
+    error.url = finalUrl;
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('API request failed', {
+        url: redactUrl(finalUrl),
+        status: response.status,
+        statusText: response.statusText,
+        info: error.info,
+      });
+    }
     throw error;
   }
   try {
@@ -36,6 +61,143 @@ async function fetcher(url, options = {}) {
   } catch {
     // No JSON body (e.g., 204), return null
     return null;
+  }
+}
+
+function redactUrl(url) {
+  try {
+    const parsed = new URL(url);
+    ['access_token', 'id_token', 'token', 'code'].forEach((key) => {
+      if (parsed.searchParams.has(key)) parsed.searchParams.set(key, '[redacted]');
+    });
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+function isNotFoundError(error) {
+  return Number(error?.status) === 404;
+}
+
+function isRecoverableOdontogramReadError(error) {
+  const status = Number(error?.status);
+  return status === 404 || status === 500;
+}
+
+function isAdvancedChart(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && value.version && value.teeth);
+}
+
+function stripSnapshotSidecars(chart) {
+  if (!chart || typeof chart !== "object" || Array.isArray(chart)) return EMPTY_ADVANCED_ODONTOGRAM_CHART;
+  const statusChart = { ...chart };
+  delete statusChart._planChart;
+  delete statusChart._plan_chart;
+  delete statusChart._clinic;
+  return statusChart;
+}
+
+function shouldUseLegacyPrimaryUniversal(teeth = []) {
+  const numbers = (teeth || [])
+    .map((tooth) => Number(tooth?.tooth_number ?? tooth?.toothNumber ?? tooth?.number))
+    .filter(Number.isFinite);
+  return numbers.length > 0 && numbers.every((number) => number >= 1 && number <= 20);
+}
+
+function chartsFromSnapshot(snapshot, teeth = []) {
+  const payload = snapshot?.payload || snapshot || null;
+  const primaryMode = shouldUseLegacyPrimaryUniversal(teeth);
+  const fallbackStatus = buildAdvancedOdontogramPayload({ teeth, snapshot, primaryMode });
+  const statusCandidate = payload?.statusChart || payload?.status_chart || payload?.chart || fallbackStatus;
+  const planCandidate = payload?.planChart || payload?.plan_chart || payload?._planChart || payload?._plan_chart;
+
+  return {
+    statusChart: stripSnapshotSidecars(isAdvancedChart(statusCandidate) ? statusCandidate : fallbackStatus),
+    planChart: isAdvancedChart(planCandidate) ? planCandidate : EMPTY_ADVANCED_ODONTOGRAM_CHART,
+  };
+}
+
+function compatibilityStateFromCharts(patientId, charts, sourceVersion, reason) {
+  return {
+    patient_id: patientId,
+    source_version: sourceVersion || "react-advanced-odontogram@2.2.0",
+    host_api_version: "clinic-advanced-odontogram-host@compat",
+    status_chart: charts.statusChart || EMPTY_ADVANCED_ODONTOGRAM_CHART,
+    plan_chart: charts.planChart || EMPTY_ADVANCED_ODONTOGRAM_CHART,
+    tooth_states: [],
+    plan_items: [],
+    row_version: null,
+    compatibility_mode: "snapshot",
+    compatibility_reason: reason,
+  };
+}
+
+async function getCompatibilityOdontogramState(patientId, reason) {
+  const [snapshot, teeth] = await Promise.all([
+    fetcher(`/patients/${patientId}/odontogram-snapshot`).catch((error) => {
+      if (isRecoverableOdontogramReadError(error)) return null;
+      throw error;
+    }),
+    fetcher('/teeth', { params: { patientId } }).catch((error) => {
+      if (isNotFoundError(error)) return [];
+      throw error;
+    }),
+  ]);
+
+  return compatibilityStateFromCharts(
+    patientId,
+    chartsFromSnapshot(snapshot, Array.isArray(teeth) ? teeth : []),
+    snapshot?.source_version,
+    reason
+  );
+}
+
+async function getOdontogramState(patientId) {
+  try {
+    return await fetcher(`/patients/${patientId}/odontogram-state`);
+  } catch (error) {
+    if (!isRecoverableOdontogramReadError(error)) throw error;
+    return getCompatibilityOdontogramState(patientId, `Full odontogram-state endpoint returned HTTP ${error.status}; using snapshot/teeth compatibility state.`);
+  }
+}
+
+async function saveOdontogramState(patientId, data, rowVersion) {
+  try {
+    return await fetcher(`/patients/${patientId}/odontogram-state`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(rowVersion ? { 'If-Match': rowVersion } : {}),
+      },
+      body: JSON.stringify(data),
+    });
+  } catch (error) {
+    if (!isRecoverableOdontogramReadError(error)) throw error;
+    const snapshot = await fetcher(`/patients/${patientId}/odontogram-snapshot`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source_version: data?.source_version || "react-advanced-odontogram@2.2.0",
+        payload: {
+          statusChart: data?.status_chart || EMPTY_ADVANCED_ODONTOGRAM_CHART,
+          planChart: data?.plan_chart || EMPTY_ADVANCED_ODONTOGRAM_CHART,
+          _clinic: {
+            provider: "react-advanced-odontogram",
+            sourceVersion: data?.source_version || "react-advanced-odontogram@2.2.0",
+            hostApiVersion: data?.host_api_version || "clinic-advanced-odontogram-host@1",
+            savedAt: data?.client_saved_at || new Date().toISOString(),
+            compatibilityMode: "snapshot",
+          },
+        },
+      }),
+    });
+    return compatibilityStateFromCharts(
+      patientId,
+      chartsFromSnapshot(snapshot, []),
+      snapshot?.source_version || data?.source_version,
+      `Full odontogram-state endpoint returned HTTP ${error.status}; saved through snapshot compatibility endpoint.`
+    );
   }
 }
 
@@ -270,6 +432,24 @@ export const api = {
     }),
     delete: (id) => fetcher(`/teeth/${id}`, {
       method: 'DELETE',
+    }),
+  },
+  odontogram: {
+    getSnapshot: (patientId) => fetcher(`/patients/${patientId}/odontogram-snapshot`),
+    saveSnapshot: (patientId, data) => fetcher(`/patients/${patientId}/odontogram-snapshot`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+    getState: getOdontogramState,
+    saveState: saveOdontogramState,
+    commitPlan: (patientId, data) => fetcher(`/patients/${patientId}/odontogram-plan/commit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+    dismissPlanItem: (patientId, planItemId) => fetcher(`/patients/${patientId}/odontogram-plan/${planItemId}/dismiss`, {
+      method: 'POST',
     }),
   },
   treatments: {

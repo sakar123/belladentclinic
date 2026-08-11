@@ -1,6 +1,8 @@
 import "./globals.css";
+import "../components/odontogram/react-advanced-odontogram-scoped.css";
 import Sidebar from "../components/layout/sidebar";
 import Header from "../components/layout/header";
+import ChunkReloadScript from "../components/system/chunk-reload-script";
 import { cn } from "../lib/utils";
 import Providers from "./providers";
 
@@ -12,6 +14,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <ChunkReloadScript />
+      </head>
       <body className={cn("antialiased bg-app-bg text-app-foreground")}>
         <Providers>
           <div className="min-h-dvh grid grid-cols-[auto_1fr] grid-rows-[auto_1fr] md:grid-rows-[auto_1fr] md:grid-cols-[280px_1fr]">

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { LayoutDashboard, Users, CalendarDays, CreditCard, FileText, Stethoscope, Settings, UserCog, LineChart, Megaphone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { isAdmin, hasAccess } from "@/lib/auth";
+import BellaDentLogo from "@/components/brand/belladent-logo";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -36,8 +37,8 @@ export default function Sidebar({ className }) {
       <div className="mb-4 flex items-center justify-between px-2">
         <Link href="/" className={cn("flex items-center gap-2 transition-all", collapsed && "opacity-0 w-0 overflow-hidden")}
           aria-label="BellaDent Portal">
-          <img src="/images/belladent_logo.jpg" alt="BellaDent" className="h-16 w-16 rounded-sm object-cover" />
-          <div className="text-lg font-semibold">BellaDent</div>
+          <BellaDentLogo variant="mark" className="h-20 w-20 shrink-0" />
+          <div className="text-xl font-semibold leading-tight">BellaDent</div>
         </Link>
         <button
           aria-label="Toggle sidebar"

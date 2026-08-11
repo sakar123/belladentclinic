@@ -1,7 +1,9 @@
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cn } from "../../lib/utils";
 
-const Button = React.forwardRef(function Button({ as: Comp = "button", className, variant = "default", size = "md", ...props }, ref) {
+const Button = React.forwardRef(function Button({ as: As = "button", asChild = false, className, variant = "default", size = "md", ...props }, ref) {
+  const Comp = asChild ? Slot : As;
   const variants = {
     /* primary now white with subtle border */
     default: "bg-primary text-primary-foreground border border-app-border hover:bg-teal-600",

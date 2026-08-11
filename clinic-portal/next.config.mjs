@@ -1,5 +1,9 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /** @type {import('next').NextConfig} */
 const API_PROXY_TARGET = process.env.API_PROXY_TARGET || 'http://localhost:8080';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig = {
   output: 'standalone',
@@ -16,6 +20,13 @@ const nextConfig = {
         destination: `${API_PROXY_TARGET}/:path*`,
       },
     ];
+  },
+  webpack(config) {
+    config.resolve.alias['react-advanced-odontogram$'] = path.resolve(
+      __dirname,
+      'node_modules/react-advanced-odontogram/dist/odontogram.js'
+    );
+    return config;
   },
 };
 

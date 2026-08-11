@@ -12,14 +12,14 @@ import Input from '@/components/ui/input';
 import { useMemo, useState, useEffect } from 'react';
 import Empty from '@/components/ui/empty';
 import { useToast } from '@/components/ui/toast';
-import DentalChart from '@/components/dental/dental-chart';
+import ClinicalOdontogram from '@/components/odontogram/clinical-odontogram';
 import { getAdultToothName, getPrimaryToothName } from '@/components/dental/tooth-data';
 import {
   getToothRawNumber,
   inferPermanentNumberingSystem,
-  normalizeChartTooth,
   normalizeToChartTooth,
 } from '@/components/dental/tooth-numbering';
+import { backendToAdvancedToothNumber } from '@/lib/odontogram/tooth-map';
 import AddTreatment from '@/components/treatments/add-treatment';
 
 export default function AppointmentDetailsPage() {
@@ -255,18 +255,33 @@ export default function AppointmentDetailsPage() {
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <div className="text-xs text-app-muted mb-1">Select tooth (inline)</div>
+            <div className="text-xs text-app-muted mb-1">Select tooth</div>
             <div className="rounded border border-app-border p-2">
-              <DentalChart
-                patientId={appointment.patient?.id || appointment.patient_id}
-                selectMode="single"
-                selectedTooth={selectedToothInline.tooth ? Number(selectedToothInline.tooth) : undefined}
-                onSelect={(n) => setSelectedToothInline(prev => ({ ...prev, tooth: n }))}
-                showLegend={false}
-              />
+              {!openAdd ? (
+                <ClinicalOdontogram
+                  patientId={appointment.patient?.id || appointment.patient_id}
+                  appointmentId={appointment.id}
+                  staffId={appointment.staff?.id || appointment.staff_id}
+                  mode="appointment"
+                  selectionMode="single"
+                  selectedTeeth={selectedToothInline.tooth ? [Number(selectedToothInline.tooth)] : []}
+                  onSelectionChange={(next) => setSelectedToothInline(prev => ({ ...prev, tooth: (next || [])[0] }))}
+                  compact
+                  title="Appointment odontogram"
+                  onSaved={() => {
+                    mutateApptTreatments();
+                    swrMutate('treatments');
+                    swrMutate('teeth');
+                  }}
+                />
+              ) : (
+                <div className="rounded border border-dashed border-app-border bg-app-bg p-4 text-sm text-app-muted">
+                  The treatment drawer is using the odontogram picker.
+                </div>
+              )}
             </div>
             {selectedToothInline.tooth && (
-              <div className="mt-2 text-xs">Selected: {formatChartToothName(selectedToothInline.tooth)}</div>
+              <div className="mt-2 text-xs">Selected: Tooth #{selectedToothInline.tooth}</div>
             )}
           </div>
           <ServicesForAppointment appointment={appointment} selectedTooth={selectedToothInline} allTeeth={allTeeth || []} toothStatuses={toothStatuses || []} appointmentsList={allAppointments || []} />
@@ -360,15 +375,7 @@ export default function AppointmentDetailsPage() {
 }
 
 function formatChartToothNumber(chartNumber) {
-  return normalizeChartTooth(chartNumber)?.displayNumber ?? Number(chartNumber);
-}
-
-function formatChartToothName(chartNumber) {
-  const normalized = normalizeChartTooth(chartNumber);
-  if (!normalized) return `Tooth ${chartNumber}`;
-  return normalized.kind === 'primary'
-    ? getPrimaryToothName(normalized.chartNumber)
-    : getAdultToothName(normalized.chartNumber);
+  return Number(chartNumber);
 }
 
 function formatRawToothNumber(rawNumber, numberingSystem) {
@@ -476,8 +483,24 @@ function VisitSummary({ appointment, allTeeth }) {
 }
 
 function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothStatuses, appointmentsList }) {
+  const router = useRouter();
+  const patientId = appointment.patient?.id || appointment.patient_id;
   const { data: services } = useSWR('services', () => api.service.getAll());
   const { data: treatments, mutate } = useSWR('treatments', () => api.treatments.getAll());
+  const { data: patientBills, mutate: mutatePatientBills } = useSWR(
+    patientId ? `patient-billing-details-${patientId}` : null,
+    async () => {
+      const summaries = await api.billing.getAll({ patientId });
+      return Promise.all((summaries || []).map(async (billing) => {
+        if (!billing?.id) return billing;
+        try {
+          return await api.billing.getById(billing.id);
+        } catch {
+          return billing;
+        }
+      }));
+    }
+  );
   const { notify } = useToast();
   const [selected, setSelected] = useState({});
   const [editing, setEditing] = useState(null);
@@ -488,18 +511,12 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
   // Teeth are defined by treatment_scope/tooth_numbers; we keep edit to service + notes here.
 
   if (!treatments) return <div>Loading…</div>;
-  const patientId = appointment.patient?.id || appointment.patient_id;
   const patientTeeth = (allTeeth || []).filter(t => t.patient_id === patientId);
   const numberingSystem = inferPermanentNumberingSystem(patientTeeth.map(getToothRawNumber));
-  const rawToChartNumber = (rawNumber) => normalizeToChartTooth(rawNumber, numberingSystem)?.chartNumber;
+  const advancedOptions = { primaryUniversal: false };
+  const rawToChartNumber = (rawNumber) => backendToAdvancedToothNumber(rawNumber, advancedOptions);
   const chartToBackendToothNumber = (chartNumber) => {
-    const selected = normalizeChartTooth(chartNumber);
-    if (!selected) return Number(chartNumber);
-    const existing = patientTeeth.find((tooth) => {
-      const normalized = normalizeToChartTooth(getToothRawNumber(tooth), numberingSystem);
-      return normalized?.kind === selected.kind &&
-        Number(normalized?.chartNumber) === Number(selected.chartNumber);
-    });
+    const existing = patientTeeth.find((tooth) => Number(backendToAdvancedToothNumber(getToothRawNumber(tooth), advancedOptions)) === Number(chartNumber));
     return Number(getToothRawNumber(existing) ?? chartNumber);
   };
   const baseList = (treatments || []).filter(t => t.appointment_id === appointment.id);
@@ -516,6 +533,108 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
   if (list.length === 0) return <Empty title="No treatments recorded" subtitle="Treatments linked to this appointment will appear here." />;
 
   const total = list.reduce((sum, t) => sum + Number((services || []).find(s => s.id === t.service_id)?.cost || 0), 0);
+  const billDetailsReady = Array.isArray(patientBills);
+  const baseTreatmentIds = new Set(baseList.map((treatment) => String(treatment.id)));
+  const treatmentBillMap = new Map();
+  const detailedBills = patientBills || [];
+  detailedBills.forEach((billing) => {
+    (billing?.line_items || []).forEach((item) => {
+      if (item?.treatment_id) {
+        treatmentBillMap.set(String(item.treatment_id), billing);
+      }
+    });
+  });
+  const existingAppointmentBills = detailedBills.filter((billing) => (
+    (billing?.line_items || []).some((item) => (
+      String(item?.appointment_id || '') === String(appointment.id) ||
+      (item?.treatment_id && baseTreatmentIds.has(String(item.treatment_id)))
+    ))
+  ));
+  const selectedIds = Object.keys(selected).filter(k => selected[k]);
+  const selectedTreatments = selectedIds.length > 0
+    ? list.filter((treatment) => selectedIds.includes(String(treatment.id)))
+    : [];
+  const selectedTreatmentBills = selectedTreatments
+    .map((treatment) => treatmentBillMap.get(String(treatment.id)))
+    .filter(Boolean);
+  const targetBill = existingAppointmentBills[0] || selectedTreatmentBills[0] || null;
+  const unbilledSelectedTreatments = selectedTreatments.filter((treatment) => !treatmentBillMap.has(String(treatment.id)));
+  const alreadyBilledSelectedCount = selectedTreatments.length - unbilledSelectedTreatments.length;
+  const selectedTotal = selectedTreatments.reduce((sum, treatment) => (
+    sum + Number((services || []).find(service => service.id === treatment.service_id)?.cost || 0)
+  ), 0);
+  const billActionLabel = !billDetailsReady
+    ? 'Loading bills...'
+    : targetBill
+      ? unbilledSelectedTreatments.length > 0
+        ? 'Add Selected to Bill'
+        : 'Open Bill'
+      : selectedIds.length > 0
+        ? 'Create Bill'
+        : 'Select Treatments to Bill';
+
+  const addTreatmentsToBilling = async (billingId, treatmentsToAdd) => {
+    for (const treatment of treatmentsToAdd) {
+      const svc = (services || []).find(service => service.id === treatment.service_id);
+      const unit = Number(svc?.cost || 0);
+      const surfaces = String(treatment.surfaces || '').toUpperCase();
+      const desc = `${svc?.name || 'Treatment'}${surfaces ? ` (${surfaces})` : ''}`;
+      await api.billing.addLineItem(billingId, {
+        billing_id: billingId,
+        treatment_id: treatment.id,
+        service_id: treatment.service_id,
+        line_item_type: 'Service',
+        description: desc,
+        quantity: 1,
+        unit_price: unit,
+        discount_percentage: 0,
+      });
+    }
+    await api.billing.recalculate(billingId);
+  };
+
+  const handleBillingAction = async () => {
+    if (!billDetailsReady) return;
+
+    if (selectedTreatments.length === 0) {
+      if (targetBill?.id) router.push(`/billing/${targetBill.id}`);
+      return;
+    }
+
+    if (targetBill?.id) {
+      if (unbilledSelectedTreatments.length > 0) {
+        await addTreatmentsToBilling(targetBill.id, unbilledSelectedTreatments);
+        notify({
+          title: 'Bill updated',
+          description: `${unbilledSelectedTreatments.length} treatment${unbilledSelectedTreatments.length === 1 ? '' : 's'} added. Previous payments were kept.`,
+        });
+        mutatePatientBills();
+      } else {
+        notify({ title: 'Already billed', description: 'Opening the existing bill for this treatment.' });
+      }
+      router.push(`/billing/${targetBill.id}`);
+      return;
+    }
+
+    const today = new Date();
+    const due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 30);
+    const created = await api.billing.create({
+      patient_id: patientId,
+      issue_date: today.toISOString(),
+      due_date: due.toISOString(),
+      total_amount: selectedTotal,
+      amount_paid: 0,
+      status: 'Open',
+      notes: `Appointment ${appointment.id}`,
+    });
+    if (created?.id) {
+      await addTreatmentsToBilling(created.id, selectedTreatments);
+      notify({ title: 'Bill created', description: `Rs ${selectedTotal.toLocaleString()}` });
+      mutatePatientBills();
+      router.push(`/billing/${created.id}`);
+    }
+  };
+
   const apptMap = new Map((appointmentsList||[]).map(a => [a.id, a]));
   const history = (selectedTooth?.tooth) ? (treatments||[])
     .filter(t => t.patient_id === (appointment.patient?.id || appointment.patient_id))
@@ -534,71 +653,45 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
   return (
     <div className="space-y-3">
       {currentTooth && (
-        <div className="flex items-center justify-between p-2 rounded border border-app-border">
-          <div className="text-sm">Current tooth status: <span className="font-medium">{(toothStatuses||[]).find(s => s.id === currentTooth.tooth_status_id)?.name || '—'}</span></div>
-          <div className="flex items-center gap-2">
-            <select className="h-9 rounded-md border border-app-border bg-app-surface px-2 text-sm" defaultValue={currentTooth.tooth_status_id} onChange={async (e) => { await api.teeth.update(currentTooth.id, { ...currentTooth, tooth_status_id: e.target.value }); notify({ title: 'Tooth status updated' }); }}>
-              {(toothStatuses||[]).map(s => (<option key={s.id} value={s.id}>{s.name || s.description || s.code}</option>))}
-            </select>
-          </div>
+        <div className="rounded border border-app-border bg-app-bg px-3 py-2 text-sm">
+          Tooth status: <span className="font-medium">{(toothStatuses||[]).find(s => s.id === currentTooth.tooth_status_id)?.name || '—'}</span>
         </div>
       )}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-app-muted">Total service cost: <span className="font-semibold">Rs {total.toLocaleString()}</span></div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={async () => {
-            const ids = Object.keys(selected).filter(k => selected[k]);
-            if (ids.length === 0) return;
-            const sum = list.filter(t => ids.includes(String(t.id))).reduce((s,t) => s + Number((services||[]).find(sv => sv.id === t.service_id)?.cost || 0), 0);
-            const today = new Date();
-            const due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 30);
-            const created = await api.billing.create({ patient_id: appointment.patient?.id || appointment.patient_id, issue_date: today.toISOString(), due_date: due.toISOString(), total_amount: sum, amount_paid: 0, status: 'Open' });
-            notify({ title: 'Billing created', description: `Rs ${sum.toLocaleString()}` });
-            if (created?.id) {
-              // Add selected treatments as line items
-              try {
-                const selTreatments = list.filter(t => ids.includes(String(t.id)));
-                for (const t of selTreatments) {
-                  const svc = (services || []).find(sv => sv.id === t.service_id);
-                  const unit = Number(svc?.cost || 0);
-                  const surfaces = String(t.surfaces || '').toUpperCase();
-                  const desc = `${svc?.name || 'Service'}${surfaces ? ` (${surfaces})` : ''}`;
-                  await api.billing.addLineItem(created.id, {
-                    billing_id: created.id,
-                    treatment_id: t.id,
-                    service_id: t.service_id,
-                    line_item_type: 'Service',
-                    description: desc,
-                    quantity: 1,
-                    unit_price: unit,
-                    discount_percentage: 0,
-                  });
-                }
-                // Recalculate to sync totals with line items
-                await api.billing.recalculate(created.id);
-              } catch (e) {
-                // eslint-disable-next-line no-console
-                console.error('Failed adding line items for billing', e);
-              }
-              const href = `/billing/${created.id}`;
-              // Use router if available; fallback to full navigation to avoid ReferenceError in edge cases
-              if (typeof router !== 'undefined' && router?.push) {
-                router.push(href);
-              } else {
-                window.location.href = href;
-              }
-            }
-          }}>Create Billing for Selected</Button>
+      <div className="rounded border border-app-border bg-white p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm">
+            <div className="font-medium">Visit total: Rs {total.toLocaleString()}</div>
+            <div className="text-xs text-app-muted">
+              {targetBill?.id
+                ? `Bill already exists${alreadyBilledSelectedCount ? ` · ${alreadyBilledSelectedCount} selected treatment${alreadyBilledSelectedCount === 1 ? '' : 's'} already included` : ''}`
+                : selectedIds.length > 0
+                  ? `Selected total: Rs ${selectedTotal.toLocaleString()}`
+                  : 'Select treatments below to create a bill.'}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {targetBill?.id && (
+              <Button size="sm" variant="outline" onClick={() => router.push(`/billing/${targetBill.id}`)}>
+                Open Bill
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant={targetBill ? 'secondary' : 'outline'}
+              disabled={!billDetailsReady || (selectedIds.length === 0 && !targetBill)}
+              onClick={handleBillingAction}
+            >
+              {billActionLabel}
+            </Button>
+          </div>
         </div>
-      </div>
-      <div className="mt-2">
-        <a href={`/billing?patient=${appointment.patient?.id || appointment.patient_id}`} className="text-sm text-sky-700 hover:underline">View Patient Bills →</a>
       </div>
       <div className="divide-y divide-app-border rounded border border-app-border">
         {list.map((t) => {
           const svc = (services || []).find(s => s.id === t.service_id);
           const cost = Number(svc?.cost || 0);
           const checked = !!selected[t.id];
+          const billed = treatmentBillMap.get(String(t.id));
           const nums = Array.isArray(t.tooth_numbers) ? t.tooth_numbers : (t.tooth_number ? [t.tooth_number] : []);
           const scope = (t.treatment_scope || '').toLowerCase();
           let coverage = '—';
@@ -609,8 +702,14 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
             <div key={t.id} className="p-3 grid grid-cols-[auto_1fr_auto] items-center gap-3">
               <input type="checkbox" checked={checked} onChange={(e) => setSelected(prev => ({ ...prev, [t.id]: e.target.checked }))} />
               <div className="min-w-0">
-                <div className="text-sm font-medium truncate">{svc?.name || `Service ${t.service_id}`} <span className="text-app-muted text-xs">· Rs {cost.toLocaleString()}</span></div>
-                <div className="text-xs text-app-muted truncate">Coverage: {coverage}{t.notes ? ` · ${t.notes}` : ''}</div>
+                <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  <span className="truncate">{svc?.name || `Service ${t.service_id}`}</span>
+                  <span className="text-xs text-app-muted">Rs {cost.toLocaleString()}</span>
+                  {billed?.id && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Billed</span>
+                  )}
+                </div>
+                <div className="text-xs text-app-muted truncate">{coverage}{t.notes ? ` · ${t.notes}` : ''}</div>
               </div>
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" onClick={() => {
@@ -666,17 +765,28 @@ function ServicesForAppointment({ appointment, selectedTooth, allTeeth, toothSta
             {(editScope === 'SingleTooth' || editScope === 'MultipleTeeth') && (
               <div>
                 <div className="text-xs text-app-muted mb-1">Select tooth{editScope==='MultipleTeeth'?' (multiple)':''}</div>
-                <div className="rounded border border-app-border p-2">
-                  <DentalChart
-                    patientId={appointment.patient?.id || appointment.patient_id}
-                    selectMode={editScope==='MultipleTeeth'?'multiple':'single'}
-                    selectedTeeth={editNumbers}
-                    onSelectionChange={(arr) => {
-                      const a = Array.isArray(arr) ? arr.map(Number) : [];
-                      setEditNumbers(editScope==='SingleTooth' && a.length>0 ? [a[0]] : a);
-                    }}
-                    showLegend={false}
-                  />
+                <div className="grid max-h-56 grid-cols-4 gap-2 overflow-auto rounded border border-app-border p-2 sm:grid-cols-6">
+                  {patientTeeth.map((tooth) => {
+                    const advancedNumber = rawToChartNumber(getToothRawNumber(tooth));
+                    if (!advancedNumber) return null;
+                    const active = editNumbers.includes(Number(advancedNumber));
+                    return (
+                      <button
+                        key={tooth.id}
+                        type="button"
+                        className={`rounded border px-2 py-1 text-xs ${active ? 'border-teal-600 bg-teal-600 text-white' : 'border-app-border bg-white hover:bg-app-bg'}`}
+                        onClick={() => {
+                          setEditNumbers((prev) => {
+                            const exists = prev.includes(Number(advancedNumber));
+                            if (editScope === 'SingleTooth') return exists ? [] : [Number(advancedNumber)];
+                            return exists ? prev.filter((n) => n !== Number(advancedNumber)) : [...prev, Number(advancedNumber)];
+                          });
+                        }}
+                      >
+                        #{advancedNumber}
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="text-xs text-app-muted mt-2">{editNumbers.length>0 ? `Selected: ${editNumbers.map(formatChartToothNumber).join(', ')}` : 'None selected'}</div>
               </div>

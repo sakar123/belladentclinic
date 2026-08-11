@@ -29,6 +29,43 @@ function toLocalInputValue(d) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+function getId(value) {
+  return value?.id || value?.Id;
+}
+
+function getPerson(entity) {
+  return entity?.person || entity?.Person || {};
+}
+
+function personName(person) {
+  return `${person.first_name || person.firstName || ''} ${person.last_name || person.lastName || ''}`.trim();
+}
+
+function readAppointmentStart(appointment) {
+  return appointment?.appointment_start_time || appointment?.appointmentStartTime;
+}
+
+function readPatientId(appointment) {
+  return appointment?.patient_id || appointment?.patientId || appointment?.patient?.id;
+}
+
+function readStatusId(appointment) {
+  return appointment?.status_id || appointment?.statusId || appointment?.status?.id;
+}
+
+function readStatusName(status) {
+  return status?.name || status?.status_name || status?.statusName || status?.label || '';
+}
+
+function readEmbeddedStatusName(appointment) {
+  return readStatusName(appointment?.status) || appointment?.status_name || appointment?.statusName || '';
+}
+
+function validDate(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
 export default function NotificationsPage() {
   const [tab, setTab] = useState('reminder');
   return (
@@ -55,13 +92,15 @@ export default function NotificationsPage() {
 
 function SendReminderTab() {
   const { notify } = useToast();
-  const { data: appointments } = useSWR('appointments-all', () => http.get('/Appointment'));
-  const { data: patients } = useSWR('patients-all', () => http.get('/Patient'));
+  const { data: appointments, error: appointmentsError } = useSWR('appointments-all', () => api.appointment.getAll());
+  const { data: patients, error: patientsError } = useSWR('patients-all', () => api.patient.getAll());
   const { data: statuses } = useSWR('appointment-status-all', () => api.lookup.appointmentStatus.getAll());
 
   // Use local-formatted defaults for datetime-local
   const [start, setStart] = useState(() => toLocalInputValue(new Date()));
   const [end, setEnd] = useState(() => { const d = new Date(); d.setDate(d.getDate()+3); return toLocalInputValue(d); });
+  const [rangeMode, setRangeMode] = useState('upcoming');
+  const [statusFilter, setStatusFilter] = useState('all');
   // Debounced effective range
   const [effStart, setEffStart] = useState(start);
   const [effEnd, setEffEnd] = useState(end);
@@ -73,58 +112,106 @@ function SendReminderTab() {
   }, [start, end]);
   const [selected, setSelected] = useState(new Set());
 
+  const statusOptions = useMemo(() => {
+    const map = new Map();
+    (statuses || []).forEach((status) => {
+      const id = String(getId(status) || '');
+      if (id) map.set(id, readStatusName(status) || 'Unknown');
+    });
+    (appointments || []).forEach((appointment) => {
+      const id = String(readStatusId(appointment) || '');
+      if (id && !map.has(id)) map.set(id, readEmbeddedStatusName(appointment) || 'Unknown');
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [appointments, statuses]);
+
   const rows = useMemo(() => {
     if (!appointments || !patients) return [];
-    const startDt = new Date(effStart);
-    const endDt = new Date(effEnd);
-    const pmap = new Map((patients || []).map(p => [p.id || p.patient_id || p.patientId, p]));
-    const allowed = new Set((statuses || [])
-      .filter(s => (s.name || '').toLowerCase().includes('scheduled') || (s.name || '').toLowerCase().includes('confirm'))
-      .map(s => s.id));
+    const now = new Date();
+    const startDt = rangeMode === 'upcoming' ? now : validDate(effStart);
+    const endDt = rangeMode === 'upcoming' ? null : validDate(effEnd);
+    const pmap = new Map((patients || []).map(p => [getId(p) || p.patient_id || p.patientId, p]));
+    const statusMap = new Map((statuses || []).map(s => [String(getId(s) || ''), readStatusName(s) || 'Unknown']));
+
     return (appointments || [])
       .filter(a => {
-        const when = new Date(a.appointment_start_time || a.appointmentStartTime);
-        const statusId = a.status_id || a.statusId;
-        const statusOk = statusId ? allowed.has(statusId) : ((a.status?.name || '').toLowerCase().includes('scheduled') || (a.status?.name || '').toLowerCase().includes('confirm'));
-        return statusOk && when >= startDt && when <= endDt;
+        const when = validDate(readAppointmentStart(a));
+        const statusId = String(readStatusId(a) || '');
+        if (statusFilter !== 'all' && statusId !== statusFilter) return false;
+        if (startDt && (!when || when < startDt)) return false;
+        if (endDt && (!when || when > endDt)) return false;
+        return true;
       })
       .map(a => {
-        const patientId = a.patient_id || a.patientId || a.patient?.id;
+        const patientId = readPatientId(a);
         const p = pmap.get(patientId) || {};
-        const person = p.person || {};
-        const name = `${person.first_name || person.firstName || ''} ${person.last_name || person.lastName || ''}`.trim();
+        const person = getPerson(p);
+        const name = personName(person);
         const email = person.email || '';
-        const when = new Date(a.appointment_start_time || a.appointmentStartTime);
+        const when = validDate(readAppointmentStart(a));
         const reason = a.reason_for_visit || a.reasonForVisit || 'Appointment';
+        const statusId = String(readStatusId(a) || '');
+        const statusName = statusMap.get(statusId) || readEmbeddedStatusName(a) || 'Unknown';
+        const dateCopy = when ? `${when.toLocaleDateString()} at ${when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'No appointment time';
+        const appointmentId = a.id || a.Id;
         return {
-          appointmentId: a.id,
+          id: appointmentId || `${patientId || 'patient'}-${readAppointmentStart(a) || reason}`,
+          appointmentId,
           personId: person.id,
           name,
           email,
-          context: `${reason} — ${when.toLocaleDateString()} at ${when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          context: `${reason} - ${dateCopy} - ${statusName}`,
           payload: {
-            appointmentDate: when.toISOString().slice(0,10),
-            appointmentTime: when.toTimeString().slice(0,5),
+            appointmentDate: when ? when.toISOString().slice(0,10) : '',
+            appointmentTime: when ? when.toTimeString().slice(0,5) : '',
           }
         };
       });
-  }, [appointments, patients, statuses, effStart, effEnd]);
+  }, [appointments, patients, statuses, effStart, effEnd, rangeMode, statusFilter]);
 
-  const onSelectAll = () => setSelected(new Set(rows.map(r => r.personId).filter(Boolean)));
+  const onSelectAll = () => setSelected(new Set(rows.filter(r => r.personId).map(r => r.id || r.personId)));
   const onClearAll = () => setSelected(new Set());
+
+  const applyRange = (mode) => {
+    setRangeMode(mode);
+    const now = new Date();
+    if (mode === 'upcoming') {
+      setStart(toLocalInputValue(now));
+      return;
+    }
+    if (mode === 'today') {
+      const from = now;
+      const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 0);
+      setStart(toLocalInputValue(from));
+      setEnd(toLocalInputValue(to));
+    }
+    if (mode === 'next7') {
+      const from = now;
+      const to = new Date(now);
+      to.setDate(to.getDate() + 7);
+      setStart(toLocalInputValue(from));
+      setEnd(toLocalInputValue(to));
+    }
+    if (mode === 'custom') {
+      setRangeMode('custom');
+    }
+  };
 
   const preview = async () => {
     try {
+      const filters = {
+        hasEmail: true,
+        hasUpcomingAppointment: true,
+      };
+      if (rangeMode !== 'upcoming') {
+        filters.appointmentBetweenStart = new Date(start).toISOString();
+        filters.appointmentBetweenEnd = new Date(end).toISOString();
+      }
       const res = await api.campaigns.preview({
         audienceType: 'Patient',
         channel: 'Email',
         topicCode: 'APPT_REMINDER',
-        filters: {
-          hasEmail: true,
-          hasUpcomingAppointment: true,
-          appointmentBetweenStart: new Date(start).toISOString(),
-          appointmentBetweenEnd: new Date(end).toISOString(),
-        },
+        filters,
       });
       notify({ title: `Preview: ${res.eligibleCount || 0} eligible`, description: res.exclusions ? JSON.stringify(res.exclusions) : undefined });
     } catch (e) {
@@ -134,11 +221,12 @@ function SendReminderTab() {
 
   const send = async () => {
     try {
-      const chosen = rows.filter(r => selected.has(r.personId));
+      const chosen = rows.filter(r => selected.has(r.id || r.personId));
+      const personIds = Array.from(new Set(chosen.map(r => r.personId).filter(Boolean)));
       const body = {
         topicCode: 'APPT_REMINDER',
         channel: 'Email',
-        personIds: chosen.map(r => r.personId),
+        personIds,
         // scheduledFor: undefined,
         initiatedBy: 'portal',
         // We send without appointment_id here; payload is generic per topic
@@ -151,23 +239,61 @@ function SendReminderTab() {
     }
   };
 
+  const totalUpcomingAppointments = useMemo(() => {
+    const now = new Date();
+    return (appointments || []).filter((appointment) => {
+      const when = validDate(readAppointmentStart(appointment));
+      return when && when >= now;
+    }).length;
+  }, [appointments]);
+  const loadError = appointmentsError || patientsError;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>Appointment Range</CardTitle>
+          <CardTitle>Appointments</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <div className="text-xs text-app-muted mb-1">Start</div>
-              <Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+          {loadError && (
+            <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              Failed to load appointments or patients.
             </div>
-            <div>
-              <div className="text-xs text-app-muted mb-1">End</div>
-              <Input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
-            </div>
+          )}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {[
+              ['upcoming', 'Upcoming'],
+              ['today', 'Today'],
+              ['next7', 'Next 7 days'],
+              ['custom', 'Custom'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => applyRange(value)}
+                className={`rounded-md border px-3 py-1.5 text-sm ${rangeMode === value ? 'border-sky-700 bg-sky-700 text-white' : 'border-app-border bg-white text-slate-700 hover:bg-app-bg'}`}
+              >
+                {label}
+              </button>
+            ))}
+            <select className="h-9 rounded-md border border-app-border bg-app-surface px-3 text-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">All statuses</option>
+              {statusOptions.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
+            </select>
+            <div className="ml-auto text-sm text-app-muted">{rows.length} shown of {totalUpcomingAppointments} upcoming</div>
           </div>
+          {rangeMode !== 'upcoming' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <div className="text-xs text-app-muted mb-1">Start</div>
+                <Input type="datetime-local" value={start} onChange={(e) => { setRangeMode('custom'); setStart(e.target.value); }} />
+              </div>
+              <div>
+                <div className="text-xs text-app-muted mb-1">End</div>
+                <Input type="datetime-local" value={end} onChange={(e) => { setRangeMode('custom'); setEnd(e.target.value); }} />
+              </div>
+            </div>
+          )}
           <RecipientSelector
             rows={rows}
             selectedIds={selected}
@@ -175,7 +301,7 @@ function SendReminderTab() {
             onSelectAll={onSelectAll}
             onClearAll={onClearAll}
             loading={!appointments || !patients || loadingRows}
-            emptyMessage="No appointments found in this date range with Scheduled or Confirmed status."
+            emptyMessage="No upcoming appointments match the current filters."
           />
           <div className="mt-4 flex items-center justify-end gap-2">
             <Button variant="outline" onClick={preview}>Preview</Button>
@@ -185,14 +311,27 @@ function SendReminderTab() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Tips</CardTitle>
+          <CardTitle>Reminder Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="list-disc list-inside text-sm text-app-muted space-y-1">
-            <li>Only Scheduled/Confirmed appointments are included.</li>
-            <li>Preview shows eligible recipients before sending.</li>
-            <li>Sends are queued and delivered automatically.</li>
-          </ul>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-md border border-app-border p-3">
+              <div className="text-xs text-app-muted">Appointments</div>
+              <div className="mt-1 text-xl font-semibold">{rows.length}</div>
+            </div>
+            <div className="rounded-md border border-app-border p-3">
+              <div className="text-xs text-app-muted">Selected</div>
+              <div className="mt-1 text-xl font-semibold">{selected.size}</div>
+            </div>
+            <div className="rounded-md border border-app-border p-3">
+              <div className="text-xs text-app-muted">With email</div>
+              <div className="mt-1 text-xl font-semibold">{rows.filter(r => r.email).length}</div>
+            </div>
+            <div className="rounded-md border border-app-border p-3">
+              <div className="text-xs text-app-muted">Missing contact</div>
+              <div className="mt-1 text-xl font-semibold">{rows.filter(r => !r.personId).length}</div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

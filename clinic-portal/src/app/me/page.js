@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import Button from "../../components/ui/button";
 import Skeleton from "../../components/ui/skeleton";
-import DentalChart from "../../components/dental/dental-chart";
+import ClinicalOdontogram from "../../components/odontogram/clinical-odontogram";
 import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { http } from "../../lib/http";
 import { normalizePatient } from "../../lib/normalizers";
@@ -12,9 +12,9 @@ import { CalendarDays, Clock, Pill } from "lucide-react";
 import {
   getToothRawNumber,
   inferPermanentNumberingSystem,
-  normalizeChartTooth,
   normalizeToChartTooth,
 } from "../../components/dental/tooth-numbering";
+import { backendToAdvancedToothNumber } from "../../lib/odontogram/tooth-map";
 
 function MePageContent() {
   const router = useRouter();
@@ -35,9 +35,20 @@ function MePageContent() {
     return search?.get('patientId') || search?.get('id') || undefined;
   }, [search]);
 
-  const patientNumberingSystem = useMemo(() => {
-    return inferPermanentNumberingSystem(teethList.map(getToothRawNumber));
-  }, [teethList]);
+  const advancedOptions = useMemo(() => {
+    const dobValue = patient?.person?.date_of_birth;
+    const dob = dobValue ? new Date(dobValue) : null;
+    const today = new Date();
+    const age = dob && !Number.isNaN(dob.getTime())
+      ? today.getFullYear() - dob.getFullYear() - (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0)
+      : null;
+    return {
+      primaryUniversal: age !== null && age < 14 && teethList.length > 0 && teethList.every((tooth) => {
+        const n = Number(getToothRawNumber(tooth));
+        return n >= 1 && n <= 20;
+      }),
+    };
+  }, [patient?.person?.date_of_birth, teethList]);
 
   useEffect(() => {
     if (!patientId) return;
@@ -50,7 +61,8 @@ function MePageContent() {
           http.get('/api/Treatments', { params: { patientId } }).catch(() => []),
         ]);
         if (!mounted) return;
-        setPatient(normalizePatient(p));
+        const normalizedPatient = normalizePatient(p);
+        setPatient(normalizedPatient);
         // upcoming appointment
         setTreatments(Array.isArray(tData) ? tData : []);
         let apps = await http.get('/api/Appointment', { params: { patientId } }).catch(() => []);
@@ -79,9 +91,21 @@ function MePageContent() {
         const idToCode = {};
         (statuses || []).forEach((s) => { idToCode[s.id] = s.code || s.name || s.value; });
         const numberingSystem = inferPermanentNumberingSystem((teeth || []).map(getToothRawNumber));
+        const dobValue = normalizedPatient?.person?.date_of_birth;
+        const dob = dobValue ? new Date(dobValue) : null;
+        const today = new Date();
+        const age = dob && !Number.isNaN(dob.getTime())
+          ? today.getFullYear() - dob.getFullYear() - (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0)
+          : null;
+        const loadAdvancedOptions = {
+          primaryUniversal: age !== null && age < 14 && (teeth || []).length > 0 && (teeth || []).every((tooth) => {
+            const n = Number(getToothRawNumber(tooth));
+            return n >= 1 && n <= 20;
+          }),
+        };
         const tmap = {};
         (teeth || []).forEach((t) => {
-          const num = normalizeToChartTooth(getToothRawNumber(t), numberingSystem)?.chartNumber;
+          const num = backendToAdvancedToothNumber(getToothRawNumber(t), loadAdvancedOptions) || normalizeToChartTooth(getToothRawNumber(t), numberingSystem)?.chartNumber;
           if (num) {
             tmap[num] = idToCode[t.toothStatusId || t.tooth_status_id] || t.statusCode || t.status;
           }
@@ -198,19 +222,23 @@ function MePageContent() {
           <CardTitle>Your Teeth</CardTitle>
         </CardHeader>
         <CardContent>
-          <DentalChart patientId={patientId} selectedTooth={selectedTooth} onSelect={setSelectedTooth} />
+          <ClinicalOdontogram
+            patientId={patientId}
+            mode="patient-self"
+            readOnly
+            selectionMode="single"
+            selectedTeeth={selectedTooth ? [selectedTooth] : []}
+            onSelectionChange={(next) => setSelectedTooth((next || [])[0])}
+            title="Your teeth"
+            compact
+          />
           <div className="mt-3">
             <Button
               variant="secondary"
               disabled={!selectedTooth}
               onClick={() => {
                 if (!selectedTooth) return;
-                const selected = normalizeChartTooth(selectedTooth);
-                const tooth = (teethList || []).find(t => {
-                  const normalized = normalizeToChartTooth(getToothRawNumber(t), patientNumberingSystem);
-                  return normalized?.kind === selected?.kind &&
-                    Number(normalized?.chartNumber) === Number(selected?.chartNumber);
-                });
+                const tooth = (teethList || []).find(t => Number(backendToAdvancedToothNumber(getToothRawNumber(t), advancedOptions)) === Number(selectedTooth));
                 const ids = tooth?.id ? [tooth.id] : [];
                 if (ids.length === 0) return;
                 const qs = new URLSearchParams({ patientId: patientId, teeth: ids.join(',') });
@@ -227,32 +255,32 @@ function MePageContent() {
             {selectedTooth && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">Tooth #{normalizeChartTooth(selectedTooth)?.displayNumber ?? selectedTooth}</div>
+                  <div className="text-sm font-medium">Tooth #{selectedTooth}</div>
                   <div className="text-xs text-app-muted">{statusLabel(toothStatuses[selectedTooth], statusMap)}</div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   <div>
                     <div className="text-xs text-app-muted mb-1">Treatments</div>
                     <div className="space-y-1">
-                      {filterByTooth(treatments, selectedTooth, patientNumberingSystem).slice(0,3).map((t) => (
+                      {filterByTooth(treatments, selectedTooth, advancedOptions).slice(0,3).map((t) => (
                         <div key={t.id} className="rounded border border-app-border px-2 py-1 text-xs">
                           <div className="font-medium truncate">{t.name || t.procedure || `Treatment ${t.id}`}</div>
                           <div className="text-app-muted">{new Date(t.date || t.createdAt || t.created_at || Date.now()).toLocaleDateString()}</div>
                         </div>
                       ))}
-                      {filterByTooth(treatments, selectedTooth, patientNumberingSystem).length === 0 && <div className="text-xs text-app-muted">None</div>}
+                      {filterByTooth(treatments, selectedTooth, advancedOptions).length === 0 && <div className="text-xs text-app-muted">None</div>}
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-app-muted mb-1">Prescriptions</div>
                     <div className="space-y-1">
-                      {filterByTooth(prescriptions, selectedTooth, patientNumberingSystem).slice(0,3).map((p) => (
+                      {filterByTooth(prescriptions, selectedTooth, advancedOptions).slice(0,3).map((p) => (
                         <div key={p.id} className="rounded border border-app-border px-2 py-1 text-xs">
                           <div className="font-medium truncate">{p.medication || p.name || `Prescription ${p.id}`}</div>
                           <div className="text-app-muted truncate">{p.dosage || p.instructions || ''}</div>
                         </div>
                       ))}
-                      {filterByTooth(prescriptions, selectedTooth, patientNumberingSystem).length === 0 && <div className="text-xs text-app-muted">None</div>}
+                      {filterByTooth(prescriptions, selectedTooth, advancedOptions).length === 0 && <div className="text-xs text-app-muted">None</div>}
                     </div>
                   </div>
                 </div>
@@ -329,17 +357,15 @@ function groupByWeek(apps) {
   }
   return Array.from(map.entries()).map(([week, items]) => ({ week, items }));
 }
-function filterByTooth(items, tooth, numberingSystem = "universal") {
-  const selected = normalizeChartTooth(tooth);
-  if (!selected) return [];
+function filterByTooth(items, tooth, advancedOptions = {}) {
+  const selected = Number(tooth);
+  if (!Number.isFinite(selected)) return [];
   return (items || []).filter((x) => {
     const rawNumbers = Array.isArray(x.tooth_numbers)
       ? x.tooth_numbers
       : (x.toothNumber || x.tooth_number || x.tooth ? [x.toothNumber || x.tooth_number || x.tooth] : []);
     return rawNumbers.some((raw) => {
-      const normalized = normalizeToChartTooth(raw, numberingSystem);
-      return normalized?.kind === selected.kind &&
-        Number(normalized?.chartNumber) === Number(selected.chartNumber);
+      return Number(backendToAdvancedToothNumber(raw, advancedOptions)) === selected;
     });
   });
 }

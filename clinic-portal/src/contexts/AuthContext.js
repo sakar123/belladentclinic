@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { setTokenGetter } from '@/lib/http';
@@ -19,15 +19,33 @@ export function AuthProvider({ children }) {
   } = useAuth0();
   const router = useRouter();
   const pathname = usePathname();
+  const [tokenReady, setTokenReady] = useState(false);
 
   // Wire up token getter for http.js so all API calls get Bearer token
   useEffect(() => {
-    if (isAuthenticated) {
-      setTokenGetter(() => getAccessTokenSilently());
+    if (!isAuthenticated) {
+      setTokenGetter(null);
+      setTokenReady(false);
       return;
     }
-    setTokenGetter(null);
+
+    setTokenGetter((options) => getAccessTokenSilently(options));
+    setTokenReady(true);
+
+    return () => {
+      setTokenGetter(null);
+    };
   }, [isAuthenticated, getAccessTokenSilently]);
+
+  useEffect(() => {
+    if (error && process.env.NODE_ENV === 'development') {
+      console.error('Auth0 error', {
+        name: error.name,
+        message: error.message,
+        error,
+      });
+    }
+  }, [error]);
 
   // Redirect to onboarding if profile completion is needed
   useEffect(() => {
@@ -37,7 +55,7 @@ export function AuthProvider({ children }) {
     }
   }, [user, pathname, router]);
 
-  const login = (returnTo = pathname || '/') => {
+  const login = useCallback((returnTo = pathname || '/') => {
     const authorizationParams = {};
     const connection = process.env.NEXT_PUBLIC_AUTH0_CONNECTION;
     if (connection) {
@@ -48,10 +66,11 @@ export function AuthProvider({ children }) {
       appState: { returnTo },
       authorizationParams,
     });
-  };
+  }, [loginWithRedirect, pathname]);
 
-  const logout = () =>
+  const logout = useCallback(() => {
     auth0Logout({ logoutParams: { returnTo: window.location.origin } });
+  }, [auth0Logout]);
 
   return (
     <AuthContext.Provider
@@ -60,6 +79,7 @@ export function AuthProvider({ children }) {
         isAuthenticated,
         isLoading,
         error,
+        tokenReady,
         login,
         logout,
         getAccessTokenSilently,

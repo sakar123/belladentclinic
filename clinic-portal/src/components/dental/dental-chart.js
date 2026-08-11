@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Activity, Eye, Filter, Layers3, RotateCcw, Search, X } from "lucide-react";
 import useSWR, { useSWRConfig } from "swr";
 import { http } from "../../lib/http";
@@ -47,6 +47,7 @@ export default function DentalChart({
   selectedSurfacesMap = undefined, // { [toothNumber]: ['M','O',...] }
   onSurfaceClick = undefined,      // (toothNumber, surface) => void
   showDetailsInMultiple = false,
+  refreshToken = 0,
 }) {
   const { mutate } = useSWRConfig();
   const [toothStatuses, setToothStatuses] = useState({});
@@ -100,52 +101,56 @@ export default function DentalChart({
 
   // ── Data fetching ──
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [teeth, statuses] = await Promise.all([
-          http.get(`/Teeth`, { params: { patientId } }).catch(() => []),
-          http.get(`/lookup/tooth-status`).catch(() => []),
-        ]);
-        const idToCode = {};
-        (statuses || []).forEach((s) => {
-          idToCode[s.id] = s.code || s.name || s.value;
-        });
-        const numberingSystem = inferPermanentNumberingSystem(
-          (teeth || []).map(getToothRawNumber)
-        );
-        const map = {};
-        (teeth || []).forEach((t) => {
-          const rawNum = getToothRawNumber(t);
-          const normalized = normalizeToChartTooth(rawNum, numberingSystem);
-          const num = normalized?.chartNumber;
-          const code =
-            idToCode[t.toothStatusId || t.tooth_status_id] ||
-            (t.toothStatus && (t.toothStatus.code || t.toothStatus.name)) ||
-            t.statusCode ||
-            t.status ||
-            "HEALTHY";
-          if (num) map[num] = code;
-        });
-        setTeethRaw(Array.isArray(teeth) ? teeth : []);
-        setToothStatuses(map);
-        const sm = {};
-        (statuses || []).forEach((s) => {
-          const key = String(s.code || s.name || s.value || "").toUpperCase();
-          if (!key) return;
-          sm[key] = {
-            label: s.name || s.description || key,
-            color: s.color || "#94a3b8",
-          };
-        });
-        setStatusMap(sm);
-      } catch {
-        setTeethRaw([]);
-        setToothStatuses({});
-        setStatusMap({});
-      }
-    })();
+  const loadChartData = useCallback(async () => {
+    try {
+      const [teeth, statuses] = await Promise.all([
+        http.get(`/Teeth`, { params: { patientId } }).catch(() => []),
+        http.get(`/lookup/tooth-status`).catch(() => []),
+      ]);
+      const idToCode = {};
+      (statuses || []).forEach((s) => {
+        idToCode[s.id] = s.code || s.name || s.value;
+      });
+      const numberingSystem = inferPermanentNumberingSystem(
+        (teeth || []).map(getToothRawNumber)
+      );
+      const map = {};
+      (teeth || []).forEach((t) => {
+        const rawNum = getToothRawNumber(t);
+        const normalized = normalizeToChartTooth(rawNum, numberingSystem);
+        const num = normalized?.chartNumber;
+        const code =
+          idToCode[t.toothStatusId || t.tooth_status_id] ||
+          (t.toothStatus && (t.toothStatus.code || t.toothStatus.name)) ||
+          t.statusCode ||
+          t.status ||
+          "HEALTHY";
+        if (num) map[num] = code;
+      });
+      setTeethRaw(Array.isArray(teeth) ? teeth : []);
+      setToothStatuses(map);
+      const sm = {};
+      (statuses || []).forEach((s) => {
+        const key = String(s.code || s.name || s.value || "").toUpperCase();
+        if (!key) return;
+        sm[key] = {
+          label: s.name || s.description || key,
+          color: s.color || "#94a3b8",
+        };
+      });
+      setStatusMap(sm);
+      return { teeth, statusMap: map, numberingSystem };
+    } catch {
+      setTeethRaw([]);
+      setToothStatuses({});
+      setStatusMap({});
+      return { teeth: [], statusMap: {}, numberingSystem: "universal" };
+    }
   }, [patientId]);
+
+  useEffect(() => {
+    loadChartData();
+  }, [loadChartData, refreshToken]);
 
   const { data: allTreatments } = useSWR(
     patientId ? `treatments-${patientId}` : null,
@@ -350,18 +355,26 @@ export default function DentalChart({
       if (name.includes('apical')) return 'APICAL_LESION';
       return undefined;
     };
+    const normalizeStatus = (value) => {
+      const compact = String(value || "Planned").replace(/\s+/g, "").toLowerCase();
+      if (compact === "completed") return "Completed";
+      if (compact === "cancelled" || compact === "canceled") return "Cancelled";
+      if (compact === "inprogress") return "InProgress";
+      return "Planned";
+    };
     const map = {};
     for (const tr of allTreatments) {
       // Filter by patientId
       if (String(tr.patient_id || tr.patientId) !== String(patientId)) continue;
-      
-      if (tr.status === "Cancelled") continue;
-      if (!showPlanned && tr.status !== "Completed") continue;
+
+      const status = normalizeStatus(tr.status);
+      if (status === "Cancelled") continue;
+      if (!showPlanned && status !== "Completed") continue;
       let cueCode = tr.visual_cue_code || tr.visualCueCode || inferCue(tr.service_name || tr.service?.name);
       if (!cueCode || !TREATMENT_CUES[cueCode]) continue;
-      const hasResultingStatus =
-        tr.resulting_tooth_status_code || tr.resultingToothStatusCode;
-      if (tr.status === "Completed" && hasResultingStatus) continue;
+      const resultingStatusCode = String(
+        tr.resulting_tooth_status_code || tr.resultingToothStatusCode || ""
+      ).toUpperCase();
       const toothNums = tr.tooth_numbers || tr.toothNumbers || [];
       const scope = tr.treatment_scope || tr.treatmentScope;
       let targetTeeth = [];
@@ -379,17 +392,21 @@ export default function DentalChart({
         targetTeeth = normalizedTooth ? [normalizedTooth] : [];
       }
       for (const tn of targetTeeth) {
+        const currentToothStatus = String(toothStatuses[tn] || "").toUpperCase();
+        if (status === "Completed" && resultingStatusCode && currentToothStatus === resultingStatusCode) {
+          continue;
+        }
         if (!map[tn]) map[tn] = [];
         map[tn].push({
           cueCode,
           surfaces: tr.surfaces || "",
-          status: tr.status,
+          status,
           treatmentId: tr.id,
         });
       }
     }
     return map;
-  }, [allTreatments, showPlanned, patientId, renderedToothNumbers, permanentNumberingSystem]);
+  }, [allTreatments, showPlanned, patientId, renderedToothNumbers, permanentNumberingSystem, toothStatuses]);
 
   const orthoGroups = useMemo(() => {
     if (!allTreatments) return [];
@@ -922,30 +939,7 @@ export default function DentalChart({
               try {
                 await api.treatments.complete(treatmentId);
                 mutate(patientId ? `treatments-${patientId}` : null);
-                const [teeth, statuses] = await Promise.all([
-                  http
-                    .get(`/Teeth`, { params: { patientId } })
-                    .catch(() => []),
-                  http.get(`/lookup/tooth-status`).catch(() => []),
-                ]);
-                setTeethRaw(Array.isArray(teeth) ? teeth : []);
-                const idToCode = {};
-                (statuses || []).forEach((s) => {
-                  idToCode[s.id] = s.code || s.name || s.value;
-                });
-                const refreshedNumberingSystem = inferPermanentNumberingSystem(
-                  (teeth || []).map(getToothRawNumber)
-                );
-                const map = {};
-                (teeth || []).forEach((t) => {
-                  const rawNum = getToothRawNumber(t);
-                  const num = normalizeToChartTooth(rawNum, refreshedNumberingSystem)?.chartNumber;
-                  const code =
-                    idToCode[t.toothStatusId || t.tooth_status_id] ||
-                    "HEALTHY";
-                  if (num) map[num] = code;
-                });
-                setToothStatuses(map);
+                const { teeth, statusMap: map, numberingSystem: refreshedNumberingSystem } = await loadChartData();
                 setSelectedDetail(
                   buildToothDetail(selectedDetail?.number, teeth, map, refreshedNumberingSystem)
                 );

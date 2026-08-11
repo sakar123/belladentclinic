@@ -17,7 +17,7 @@ import {
   CommandInput,
   CommandItem,
 } from "@/components/ui/command";
-import DentalChart from "@/components/dental/dental-chart";
+import ClinicalOdontogram from "@/components/odontogram/clinical-odontogram";
 import { SurfaceSelector } from "@/components/dental/surface-selector";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
@@ -27,9 +27,9 @@ import {
   inferPermanentNumberingSystem,
   isLowerTooth,
   isUpperTooth,
-  normalizeChartTooth,
   normalizeToChartTooth,
 } from "@/components/dental/tooth-numbering";
+import { backendToAdvancedToothNumber } from "@/lib/odontogram/tooth-map";
 import { cn } from "@/lib/utils";
 
 // TreatmentDrawer: Right-anchored slide-over with split panes
@@ -132,6 +132,8 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
     return inferPermanentNumberingSystem(patientTeeth.map(getToothRawNumber));
   }, [patientTeeth]);
 
+  const advancedOptions = useMemo(() => ({ primaryUniversal: false }), []);
+
   const chartTeeth = useMemo(() => {
     return patientTeeth
       .map((tooth) => {
@@ -143,38 +145,35 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
           sourceNumber: Number(rawNumber),
           chartKind: normalized.kind,
           chartNumber: normalized.chartNumber,
+          advancedNumber: backendToAdvancedToothNumber(rawNumber, advancedOptions),
           displayNumber: normalized.displayNumber,
         };
       })
       .filter(Boolean);
-  }, [patientTeeth, patientNumberingSystem]);
+  }, [advancedOptions, patientTeeth, patientNumberingSystem]);
 
   const archSelections = useMemo(() => {
     const upper = chartTeeth
       .filter((tooth) => isUpperTooth(tooth.chartKind, tooth.chartNumber))
-      .map((tooth) => tooth.chartNumber);
+      .map((tooth) => tooth.advancedNumber)
+      .filter(Boolean);
     const lower = chartTeeth
       .filter((tooth) => isLowerTooth(tooth.chartKind, tooth.chartNumber))
-      .map((tooth) => tooth.chartNumber);
+      .map((tooth) => tooth.advancedNumber)
+      .filter(Boolean);
     return {
-      upper: upper.length > 0 ? upper : Array.from({ length: 16 }, (_, i) => i + 1),
-      lower: lower.length > 0 ? lower : Array.from({ length: 16 }, (_, i) => i + 17),
+      upper: upper.length > 0 ? upper : [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28],
+      lower: lower.length > 0 ? lower : [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38],
     };
   }, [chartTeeth]);
 
   const resolveBackendToothNumber = (chartNumber) => {
-    const selected = normalizeChartTooth(chartNumber);
-    if (!selected) return Number(chartNumber);
-    const existing = chartTeeth.find((tooth) =>
-      tooth.chartKind === selected.kind &&
-      Number(tooth.chartNumber) === Number(selected.chartNumber)
-    );
+    const existing = chartTeeth.find((tooth) => Number(tooth.advancedNumber) === Number(chartNumber));
     return Number(existing?.sourceNumber ?? chartNumber);
   };
 
   const formatChartTooth = (chartNumber) => {
-    const selected = normalizeChartTooth(chartNumber);
-    return selected?.displayNumber ?? Number(chartNumber);
+    return Number(chartNumber);
   };
 
   // Try to auto-select teeth based on appointment notes if present
@@ -188,10 +187,10 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
     if (parsed.length > 0) {
       setScope('TEETH');
       setSelectedTeeth(parsed
-        .map((n) => normalizeToChartTooth(n, patientNumberingSystem)?.chartNumber)
+        .map((n) => backendToAdvancedToothNumber(n, advancedOptions))
         .filter(Boolean));
     }
-  }, [open, appointmentNotes, patientNumberingSystem, patientTeeth.length, selectedTeeth]);
+  }, [advancedOptions, open, appointmentNotes, patientTeeth.length, selectedTeeth]);
 
   function parseTeethFromText(text) {
     try {
@@ -200,7 +199,7 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
       const matches = Array.from(t.matchAll(/#?(\d{1,2})/g)).map(m => Number(m[1]));
       // Keep unique and valid ranges: universal 1-32, or FDI 11-48 / 51-85
       const uniq = Array.from(new Set(matches)).filter(n => Number.isFinite(n));
-      // Heuristic: prefer FDI if many 2-digit > 32 present, but we keep raw numbers as is; the DentalChart/selector accepts both primary (51-85) and permanent (1-32) and our TeethSelector shows both.
+      // Heuristic: prefer FDI if many 2-digit > 32 present, but keep raw numbers as is; the advanced adapter maps supported backend numbers into FDI slots.
       // Filter to plausible dental numbers
       const plausible = uniq.filter(n => (n >= 1 && n <= 32) || (n >= 11 && n <= 48) || (n >= 51 && n <= 85));
       return plausible.slice(0, 16); // cap for safety
@@ -384,7 +383,6 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
       onSaved?.(createdTreatments);
       onClose?.();
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error('Failed to save treatments', e);
       notify({ title: 'Failed to save treatments', description: e?.info?.message || e?.message || 'Please try again.' });
     } finally {
@@ -507,7 +505,7 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
                     />
                   ) : (
                     <div className="text-xs text-app-muted">
-                      Select a single tooth to use the quick surface picker, or click directly on teeth in the chart to set per‑tooth surfaces.
+                      Select a single tooth to assign surfaces for this draft treatment.
                     </div>
                   )}
                 </div>
@@ -586,7 +584,7 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
             </div>
           </div>
 
-          {/* Right Pane: Visual Chart (DentalChart) */}
+          {/* Right Pane: Visual Chart */}
           <div className="md:col-span-3 h-full relative">
             <div className={cn("absolute inset-0 p-4 overflow-y-auto", scope === 'MOUTH' && 'pointer-events-none opacity-40')}
                  aria-disabled={scope === 'MOUTH'}>
@@ -600,23 +598,18 @@ export default function AddTreatment({ open, onClose, appointmentId, patientId, 
                   </div>
                 )}
               </div>
-              <DentalChart
+              <ClinicalOdontogram
                 patientId={patientId}
+                appointmentId={appointmentId}
+                staffId={staffId}
+                mode="treatment-picker"
                 selectedTeeth={selectedTeeth}
                 onSelectionChange={setSelectedTeeth}
-                selectMode="multiple"
-                showLegend={false}
+                selectionMode="multiple"
                 className="w-full"
-                interactiveSurfaces={scope === 'TEETH'}
-                selectedSurfacesMap={Object.fromEntries(Object.entries(surfacesByTooth).map(([k,v]) => [Number(k), (v||'').toUpperCase().split('')]))}
-                onSurfaceClick={(tooth, s) => {
-                  setSurfacesByTooth(prev => {
-                    const cur = (prev?.[tooth] || '').toUpperCase();
-                    const has = cur.includes(s);
-                    const next = has ? cur.replace(s, '') : (cur + s);
-                    return { ...prev, [tooth]: next };
-                  });
-                }}
+                compact
+                title="Treatment picker"
+                showPlanPanel={false}
               />
               {scope === 'TEETH' && selectedTeeth.length > 0 && (
                 <div className="mt-3 text-xs text-app-muted">Selected: {selectedTeeth.map(formatChartTooth).join(', ')}

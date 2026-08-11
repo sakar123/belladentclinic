@@ -14,20 +14,61 @@ export function setTokenGetter(fn) {
   _getToken = fn;
 }
 
-async function getAuthHeaders() {
+function toPlainHeaders(headers) {
+  if (!headers) return {};
+  if (typeof Headers !== "undefined" && headers instanceof Headers) {
+    return Object.fromEntries(headers.entries());
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+  return headers;
+}
+
+function hasAuthorizationHeader(headers) {
+  return Object.keys(toPlainHeaders(headers)).some((key) => key.toLowerCase() === "authorization");
+}
+
+async function getAuthHeaders(options) {
   if (!_getToken) return {};
   try {
-    const token = await _getToken();
+    const token = await _getToken(options);
     return token ? { Authorization: `Bearer ${token}` } : {};
-  } catch {
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("Auth token lookup failed", {
+        name: error?.name,
+        message: error?.message,
+        error,
+      });
+    }
     return {};
   }
 }
 
-export async function authFetch(input, init = {}) {
+async function fetchWithAuth(input, init = {}) {
+  const callerHeaders = toPlainHeaders(init.headers);
   const authHeaders = await getAuthHeaders();
-  const mergedHeaders = { ...authHeaders, ...(init.headers || {}) };
-  return fetch(input, { ...init, headers: mergedHeaders });
+  const mergedHeaders = { ...authHeaders, ...callerHeaders };
+  const response = await fetch(input, { ...init, headers: mergedHeaders });
+
+  if (response.status !== 401 || !_getToken || hasAuthorizationHeader(callerHeaders)) {
+    return response;
+  }
+
+  const freshAuthHeaders = await getAuthHeaders({ cacheMode: "off" });
+  if (!freshAuthHeaders.Authorization || freshAuthHeaders.Authorization === authHeaders.Authorization) {
+    return response;
+  }
+
+  return fetch(input, {
+    ...init,
+    headers: { ...freshAuthHeaders, ...callerHeaders },
+  });
+}
+
+export async function authFetch(input, init = {}) {
+  return fetchWithAuth(input, init);
 }
 
 function isAbsoluteUrl(u) {
@@ -55,41 +96,37 @@ async function handleResponse(res) {
 }
 
 export async function get(path, { params, headers } = {}) {
-  const authHeaders = await getAuthHeaders();
-  const mergedHeaders = { ...DEFAULT_HEADERS, ...authHeaders, ...(headers || {}) };
+  const mergedHeaders = { ...DEFAULT_HEADERS, ...toPlainHeaders(headers) };
 
   if (isAbsoluteUrl(baseUrl)) {
     const url = new URL(baseUrl + path);
     if (params) Object.entries(keysToSnake(params)).forEach(([k, v]) => url.searchParams.set(k, v));
-    const res = await fetch(url.toString(), { method: "GET", headers: mergedHeaders, cache: "no-store" });
+    const res = await fetchWithAuth(url.toString(), { method: "GET", headers: mergedHeaders, cache: "no-store" });
     return handleResponse(res);
   }
   const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
   const url = new URL(origin);
   url.pathname = (baseUrl || "") + path;
   if (params) Object.entries(keysToSnake(params)).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.pathname + url.search, { method: "GET", headers: mergedHeaders, cache: "no-store" });
+  const res = await fetchWithAuth(url.pathname + url.search, { method: "GET", headers: mergedHeaders, cache: "no-store" });
   return handleResponse(res);
 }
 
 export async function post(path, body, { headers } = {}) {
-  const authHeaders = await getAuthHeaders();
   const target = isAbsoluteUrl(baseUrl) ? baseUrl + path : (baseUrl || "") + path;
-  const res = await fetch(target, { method: "POST", headers: { ...DEFAULT_HEADERS, ...authHeaders, ...(headers || {}) }, body: JSON.stringify(keysToSnake(body || {})) });
+  const res = await fetchWithAuth(target, { method: "POST", headers: { ...DEFAULT_HEADERS, ...toPlainHeaders(headers) }, body: JSON.stringify(keysToSnake(body || {})) });
   return handleResponse(res);
 }
 
 export async function put(path, body, { headers } = {}) {
-  const authHeaders = await getAuthHeaders();
   const target = isAbsoluteUrl(baseUrl) ? baseUrl + path : (baseUrl || "") + path;
-  const res = await fetch(target, { method: "PUT", headers: { ...DEFAULT_HEADERS, ...authHeaders, ...(headers || {}) }, body: JSON.stringify(keysToSnake(body || {})) });
+  const res = await fetchWithAuth(target, { method: "PUT", headers: { ...DEFAULT_HEADERS, ...toPlainHeaders(headers) }, body: JSON.stringify(keysToSnake(body || {})) });
   return handleResponse(res);
 }
 
 export async function del(path, { headers } = {}) {
-  const authHeaders = await getAuthHeaders();
   const target = isAbsoluteUrl(baseUrl) ? baseUrl + path : (baseUrl || "") + path;
-  const res = await fetch(target, { method: "DELETE", headers: { ...DEFAULT_HEADERS, ...authHeaders, ...(headers || {}) } });
+  const res = await fetchWithAuth(target, { method: "DELETE", headers: { ...DEFAULT_HEADERS, ...toPlainHeaders(headers) } });
   return handleResponse(res);
 }
 

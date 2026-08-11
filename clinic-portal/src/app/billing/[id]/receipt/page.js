@@ -3,6 +3,7 @@
 import useSWR from 'swr';
 import { api } from '@/lib/api';
 import Button from '@/components/ui/button';
+import BellaDentLogo from '@/components/brand/belladent-logo';
 
 export default function ReceiptPage({ params }) {
   const { id } = params;
@@ -24,8 +25,7 @@ export default function ReceiptPage({ params }) {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-3">
-            <img src="/images/belladent_logo_with_name.jpg" alt="BellaDent" className="h-10 w-auto" />
-            <div className="text-sm">BellaDent Dental Clinic</div>
+            <BellaDentLogo className="h-16 w-auto max-w-[260px]" />
           </div>
           <div className="text-right text-sm">
             <div className="font-semibold">Receipt</div>

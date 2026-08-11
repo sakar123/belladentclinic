@@ -3,8 +3,12 @@ import { useMemo } from "react";
 import { Table, Thead, Tbody, Tr, Th, Td } from "../ui/table";
 import Button from "../ui/button";
 
+function rowId(row) {
+  return row.id || row.selectionId || row.personId;
+}
+
 export default function RecipientSelector({ rows, selectedIds, setSelectedIds, onSelectAll, onClearAll, loading = false, emptyMessage = "No recipients" }) {
-  const allIds = useMemo(() => rows.map(r => r.personId).filter(Boolean), [rows]);
+  const allIds = useMemo(() => rows.filter(r => r.personId).map(rowId).filter(Boolean), [rows]);
   const allSelected = useMemo(() => allIds.length > 0 && allIds.every(id => selectedIds.has(id)), [allIds, selectedIds]);
 
   const toggle = (id) => {
@@ -50,12 +54,13 @@ export default function RecipientSelector({ rows, selectedIds, setSelectedIds, o
               </Tr>
             )}
             {!loading && rows.map((r) => (
-              <Tr key={`${r.personId}-${r.context || ''}`}>
+              <Tr key={rowId(r) || `${r.personId}-${r.context || ''}`}>
                 <Td className="w-10">
                   <input
                     type="checkbox"
-                    checked={selectedIds.has(r.personId)}
-                    onChange={() => toggle(r.personId)}
+                    disabled={!r.personId}
+                    checked={Boolean(r.personId) && selectedIds.has(rowId(r))}
+                    onChange={() => toggle(rowId(r))}
                   />
                 </Td>
                 <Td>{r.name || '—'}</Td>
