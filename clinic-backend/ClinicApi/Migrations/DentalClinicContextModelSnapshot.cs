@@ -231,10 +231,13 @@ namespace ClinicApi.Migrations
                 {
                     b.Property<Guid>("id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("uuid_generate_v4()");
 
                     b.Property<DateTime>("created_at")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("created_by")
                         .HasColumnType("text");
@@ -821,6 +824,47 @@ namespace ClinicApi.Migrations
                         .IsUnique();
 
                     b.ToTable("patient");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PatientOdontogramSnapshot", b =>
+                {
+                    b.Property<Guid>("id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("created_by")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("patient_id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("source_version")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("react-advanced-odontogram");
+
+                    b.Property<DateTime>("updated_at")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("updated_by")
+                        .HasColumnType("text");
+
+                    b.HasKey("id");
+
+                    b.HasIndex("patient_id")
+                        .IsUnique();
+
+                    b.ToTable("patient_odontogram_snapshot", (string)null);
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Payment", b =>
@@ -1855,6 +1899,17 @@ namespace ClinicApi.Migrations
                         .IsRequired();
 
                     b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("ClinicApi.Models.Entities.PatientOdontogramSnapshot", b =>
+                {
+                    b.HasOne("ClinicApi.Models.Entities.Patient", "patient")
+                        .WithOne()
+                        .HasForeignKey("ClinicApi.Models.Entities.PatientOdontogramSnapshot", "patient_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("patient");
                 });
 
             modelBuilder.Entity("ClinicApi.Models.Entities.Payment", b =>

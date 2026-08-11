@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Input from '@/components/ui/input';
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/toast';
 import { ChevronDown } from 'lucide-react';
 
@@ -37,15 +37,11 @@ export default function BillingDetailPage({ params }) {
 
   const [liOpen, setLiOpen] = useState(false);
   const [liData, setLiData] = useState({ description: '', line_item_type: 'Service', quantity: 1, unit_price: 0, discount_percentage: 0 });
+  const [editingLineItem, setEditingLineItem] = useState(null);
+  const [lineItemDraft, setLineItemDraft] = useState({ description: '', line_item_type: 'Service', quantity: 1, unit_price: 0, discount_percentage: 0 });
   const [payOpen, setPayOpen] = useState(false);
   const [pay, setPay] = useState({ amount: '', method: '', transaction_ref: '', notes: '' });
   const [notes, setNotes] = useState('');
-  const [editingDiscountId, setEditingDiscountId] = useState(null);
-  const [editingDiscountValue, setEditingDiscountValue] = useState(0);
-  const [openDiscountMenuFor, setOpenDiscountMenuFor] = useState(null);
-  const [editNoteFor, setEditNoteFor] = useState(null);
-  const [noteDraft, setNoteDraft] = useState('');
-  const discInputRef = useRef(null);
   const [liDiscountMenuOpen, setLiDiscountMenuOpen] = useState(false);
 
   const issue = bill?.issue_date ? new Date(bill.issue_date) : null;
@@ -65,6 +61,32 @@ export default function BillingDetailPage({ params }) {
       api.billing.update(bill.id, { ...bill, status: newStatus, amount_paid: paid }).then(() => mutate());
     }
   }, [balance, paid, bill, mutate]);
+
+  const openChargeEditor = (item) => {
+    setEditingLineItem(item);
+    setLineItemDraft({
+      description: item.description || '',
+      line_item_type: item.line_item_type || 'Service',
+      quantity: Number(item.quantity || 1),
+      unit_price: Number(item.unit_price || 0),
+      discount_percentage: Number(item.discount_percentage || 0),
+    });
+  };
+
+  const saveChargeEditor = async () => {
+    if (!editingLineItem) return;
+    await api.billing.updateLineItem(bill.id, editingLineItem.id, {
+      billing_id: bill.id,
+      description: lineItemDraft.description,
+      line_item_type: lineItemDraft.line_item_type,
+      quantity: Math.max(1, Number(lineItemDraft.quantity || 1)),
+      unit_price: Math.max(0, Number(lineItemDraft.unit_price || 0)),
+      discount_percentage: Math.max(0, Math.min(100, Number(lineItemDraft.discount_percentage || 0))),
+    });
+    setEditingLineItem(null);
+    notify({ title: 'Charge updated', description: 'The bill total was recalculated. Payments were kept.' });
+    mutate();
+  };
 
   if (!bill) return <div className="p-4">Loading…</div>;
 
@@ -100,181 +122,34 @@ export default function BillingDetailPage({ params }) {
       </Card>
 
       <Card>
-        <CardHeader className="p-4"><CardTitle>Line Items</CardTitle></CardHeader>
+        <CardHeader className="p-4"><CardTitle>Charges</CardTitle></CardHeader>
         <CardContent className="p-0">
-          <div className="grid grid-cols-[40px_1fr_100px_100px_100px_120px] text-sm bg-app-bg border-b border-app-border px-3 py-2">
-            <div>#</div><div>Description</div><div className="text-right">Qty</div><div className="text-right">Price</div><div className="text-right">Disc%</div><div className="text-right">Total</div>
+          <div className="grid grid-cols-[40px_1fr_80px_110px_90px_120px_90px] text-sm bg-app-bg border-b border-app-border px-3 py-2">
+            <div>#</div><div>Description</div><div className="text-right">Qty</div><div className="text-right">Price</div><div className="text-right">Discount</div><div className="text-right">Total</div><div className="text-right no-print">Edit</div>
           </div>
           {(items||[]).map((it, idx) => {
             const lineTotal = Number(it.quantity||0)*Number(it.unit_price||0)*(1 - Number(it.discount_percentage||0)/100);
             return (
-              <div key={it.id} className="grid grid-cols-[40px_1fr_100px_100px_100px_120px] items-center text-sm px-3 py-2 border-b border-app-border">
+              <div key={it.id} className="grid grid-cols-[40px_1fr_80px_110px_90px_120px_90px] items-center text-sm px-3 py-2 border-b border-app-border">
                 <div>{idx+1}</div>
                 <div className="min-w-0">
                   <div className="truncate font-medium">{it.description}</div>
                   <div className="text-xs text-app-muted">{it.service_name || it.line_item_type}</div>
-                  {/* Line item note */}
-                  {it.notes ? (
-                    <div className="text-xs text-app-muted mt-0.5 no-print">{it.notes}</div>
-                  ) : editNoteFor === it.id ? (
-                    <div className="mt-1 flex items-center gap-2 no-print">
-                      <Input
-                        value={noteDraft}
-                        onChange={e => setNoteDraft(e.target.value.slice(0,150))}
-                        placeholder="Add note (max 150 chars)"
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter') {
-                            const payload = {
-                              billing_id: bill.id,
-                              description: it.description,
-                              quantity: it.quantity,
-                              unit_price: it.unit_price,
-                              discount_percentage: it.discount_percentage || 0,
-                              line_item_type: it.line_item_type,
-                              notes: noteDraft,
-                            };
-                            await api.billing.updateLineItem(bill.id, it.id, payload);
-                            setEditNoteFor(null);
-                            setNoteDraft('');
-                            notify({ title: 'Note saved' });
-                            mutate();
-                          }
-                        }}
-                        onBlur={async () => {
-                          const payload = {
-                            billing_id: bill.id,
-                            description: it.description,
-                            quantity: it.quantity,
-                            unit_price: it.unit_price,
-                            discount_percentage: it.discount_percentage || 0,
-                            line_item_type: it.line_item_type,
-                            notes: noteDraft,
-                          };
-                          await api.billing.updateLineItem(bill.id, it.id, payload);
-                          setEditNoteFor(null);
-                          setNoteDraft('');
-                          notify({ title: 'Note saved' });
-                          mutate();
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      className="text-xs text-app-muted hover:underline no-print"
-                      onClick={() => { setEditNoteFor(it.id); setNoteDraft(it.notes || ''); }}
-                    >
-                      Add note
-                    </button>
-                  )}
                 </div>
                 <div className="text-right">{it.quantity}</div>
                 <div className="text-right">{money(it.unit_price)}</div>
-                <div className="text-right relative">
-                  {editingDiscountId === it.id ? (
-                    <div className="inline-flex items-center gap-1 justify-end">
-                      <Input
-                        ref={discInputRef}
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        className="h-8 w-20 text-right"
-                        value={editingDiscountValue}
-                        onChange={(e) => setEditingDiscountValue(e.target.value)}
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter') {
-                            const pct = Math.max(0, Math.min(100, Number(editingDiscountValue)));
-                            const payload = {
-                              billing_id: bill.id,
-                              description: it.description,
-                              quantity: it.quantity,
-                              unit_price: it.unit_price,
-                              discount_percentage: pct,
-                              line_item_type: it.line_item_type,
-                            };
-                            await api.billing.updateLineItem(bill.id, it.id, payload);
-                            setEditingDiscountId(null);
-                            notify({ title: 'Discount updated', description: `${pct}%` });
-                            mutate();
-                          }
-                        }}
-                        onBlur={async () => {
-                          const pct = Math.max(0, Math.min(100, Number(editingDiscountValue)));
-                          const payload = {
-                            billing_id: bill.id,
-                            description: it.description,
-                            quantity: it.quantity,
-                            unit_price: it.unit_price,
-                            discount_percentage: pct,
-                            line_item_type: it.line_item_type,
-                          };
-                          await api.billing.updateLineItem(bill.id, it.id, payload);
-                          setEditingDiscountId(null);
-                          notify({ title: 'Discount updated', description: `${pct}%` });
-                          mutate();
-                        }}
-                      />
-                      <button
-                        className="size-8 grid place-items-center rounded-md hover:bg-app-bg no-print"
-                        aria-label="Choose discount code"
-                        onMouseDown={(e)=> e.preventDefault()}
-                        onClick={() => setOpenDiscountMenuFor(v => v === it.id ? null : it.id)}
-                      >
-                        <ChevronDown size={16} />
-                      </button>
-                      {openDiscountMenuFor === it.id && (
-                        <div className="absolute right-0 mt-1 w-56 bg-app-surface border border-app-border rounded-md shadow-sm z-10">
-                          <div className="max-h-60 overflow-auto py-1">
-                            {(discountTypes||[]).map((d) => (
-                              <button
-                                key={d.id || d.discount_name}
-                                className="w-full text-left px-3 py-1.5 text-sm hover:bg-app-bg"
-                                onMouseDown={(e)=> e.preventDefault()}
-                                onClick={async () => {
-                                  const pct = Number(d.discount_percentage || 0);
-                                  setEditingDiscountValue(pct);
-                                  // Save immediately
-                                  const payload = {
-                                    billing_id: bill.id,
-                                    description: it.description,
-                                    quantity: it.quantity,
-                                    unit_price: it.unit_price,
-                                    discount_percentage: pct,
-                                    line_item_type: it.line_item_type,
-                                    discount_type_id: d.id, // optional; backend may ignore
-                                  };
-                                  await api.billing.updateLineItem(bill.id, it.id, payload);
-                                  setOpenDiscountMenuFor(null);
-                                  setEditingDiscountId(null);
-                                  notify({ title: 'Discount applied', description: `${d.discount_name || ''} (${pct}%)` });
-                                  mutate();
-                                }}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="truncate">{d.discount_name || 'Discount'}</span>
-                                  <span className="ml-2 text-app-muted">{Number(d.discount_percentage||0)}%</span>
-                                </div>
-                              </button>
-                            ))}
-                            {(!discountTypes || discountTypes.length === 0) && (
-                              <div className="px-3 py-2 text-sm text-app-muted">No discount codes</div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      className="hover:underline no-print"
-                      onClick={() => { setEditingDiscountId(it.id); setEditingDiscountValue(Number(it.discount_percentage||0)); setOpenDiscountMenuFor(null); setTimeout(()=>discInputRef.current?.focus(), 0); }}
-                    >{Number(it.discount_percentage||0)}%</button>
-                  )}
-                </div>
+                <div className="text-right">{Number(it.discount_percentage||0)}%</div>
                 <div className="text-right font-medium">{money(lineTotal)}</div>
+                <div className="text-right no-print">
+                  <Button size="sm" variant="outline" onClick={() => openChargeEditor(it)}>Edit</Button>
+                </div>
               </div>
             );
           })}
-          <div className="p-3"><Button size="sm" variant="outline" className="no-print" onClick={() => { setLiData({ description:'', line_item_type:'Other', quantity:1, unit_price:0, discount_percentage:0, notes:'' }); setLiOpen(true); }}>+ Add Line Item</Button></div>
+          {items.length === 0 && (
+            <div className="p-4 text-sm text-app-muted">No charges yet.</div>
+          )}
+          <div className="p-3"><Button size="sm" variant="outline" className="no-print" onClick={() => { setLiData({ description:'', line_item_type:'Other', quantity:1, unit_price:0, discount_percentage:0 }); setLiOpen(true); }}>Add Charge</Button></div>
         </CardContent>
       </Card>
 
@@ -355,13 +230,13 @@ export default function BillingDetailPage({ params }) {
         </CardContent>
       </Card>
 
-      {/* Add Line Item */}
+      {/* Add Charge */}
       <Dialog open={liOpen} onClose={() => setLiOpen(false)}>
-        <DialogHeader><DialogTitle>Add Line Item</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Add Charge</DialogTitle></DialogHeader>
         <DialogBody>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <div className="text-xs text-app-muted mb-1">Type</div>
+              <div className="text-xs text-app-muted mb-1">Category</div>
               <select className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm" value={liData.line_item_type} onChange={e => setLiData({ ...liData, line_item_type: e.target.value })}>
                 {['Service','Product','Lab','Adjustment','Other'].map(x => (<option key={x} value={x}>{x}</option>))}
               </select>
@@ -375,7 +250,7 @@ export default function BillingDetailPage({ params }) {
               <Input type="number" min="1" value={liData.quantity} onChange={e => setLiData({ ...liData, quantity: Number(e.target.value) })} />
             </div>
             <div>
-              <div className="text-xs text-app-muted mb-1">Unit Price (Rs)</div>
+              <div className="text-xs text-app-muted mb-1">Price (Rs)</div>
               <Input type="number" step="0.01" value={liData.unit_price} onChange={e => setLiData({ ...liData, unit_price: Number(e.target.value) })} />
             </div>
             <div className="relative">
@@ -414,18 +289,61 @@ export default function BillingDetailPage({ params }) {
                 </div>
               )}
             </div>
-            <div className="md:col-span-2">
-              <div className="text-xs text-app-muted mb-1">Line Item Note</div>
-              <Input value={liData.notes || ''} onChange={e => setLiData({ ...liData, notes: e.target.value.slice(0,150) })} placeholder="Optional note (max 150 chars)" />
-            </div>
           </div>
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" onClick={() => setLiOpen(false)}>Cancel</Button>
           <Button disabled={!liData.description} onClick={async ()=>{
-            await api.billing.addLineItem(bill.id, { billing_id: bill.id, description: liData.description, line_item_type: liData.line_item_type, quantity: Number(liData.quantity||1), unit_price: Number(liData.unit_price||0), discount_percentage: Number(liData.discount_percentage||0), notes: liData.notes || null });
-            setLiOpen(false); notify({ title: 'Line item added' }); mutate();
-          }}>Add</Button>
+            await api.billing.addLineItem(bill.id, { billing_id: bill.id, description: liData.description, line_item_type: liData.line_item_type, quantity: Number(liData.quantity||1), unit_price: Number(liData.unit_price||0), discount_percentage: Number(liData.discount_percentage||0) });
+            setLiOpen(false); notify({ title: 'Charge added' }); mutate();
+          }}>Add Charge</Button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* Edit Charge */}
+      <Dialog open={!!editingLineItem} onClose={() => setEditingLineItem(null)}>
+        <DialogHeader><DialogTitle>Edit Charge</DialogTitle></DialogHeader>
+        <DialogBody>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-app-muted mb-1">Category</div>
+              <select className="h-10 w-full rounded-md border border-app-border bg-app-surface px-3 text-sm" value={lineItemDraft.line_item_type} onChange={e => setLineItemDraft({ ...lineItemDraft, line_item_type: e.target.value })}>
+                {['Service','Product','Lab','Adjustment','Other'].map(x => (<option key={x} value={x}>{x}</option>))}
+              </select>
+            </div>
+            <div>
+              <div className="text-xs text-app-muted mb-1">Description</div>
+              <Input value={lineItemDraft.description} onChange={e => setLineItemDraft({ ...lineItemDraft, description: e.target.value })} />
+            </div>
+            <div>
+              <div className="text-xs text-app-muted mb-1">Quantity</div>
+              <Input type="number" min="1" value={lineItemDraft.quantity} onChange={e => setLineItemDraft({ ...lineItemDraft, quantity: Number(e.target.value) })} />
+            </div>
+            <div>
+              <div className="text-xs text-app-muted mb-1">Price (Rs)</div>
+              <Input type="number" min="0" step="0.01" value={lineItemDraft.unit_price} onChange={e => setLineItemDraft({ ...lineItemDraft, unit_price: Number(e.target.value) })} />
+            </div>
+            <div>
+              <div className="text-xs text-app-muted mb-1">Discount %</div>
+              <Input type="number" min="0" max="100" step="0.01" value={lineItemDraft.discount_percentage} onChange={e => setLineItemDraft({ ...lineItemDraft, discount_percentage: Number(e.target.value) })} />
+            </div>
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (!editingLineItem || !confirm('Remove this charge from the bill?')) return;
+              await api.billing.deleteLineItem(bill.id, editingLineItem.id);
+              setEditingLineItem(null);
+              notify({ title: 'Charge removed', description: 'The bill total was recalculated. Payments were kept.' });
+              mutate();
+            }}
+          >
+            Remove
+          </Button>
+          <Button variant="outline" onClick={() => setEditingLineItem(null)}>Cancel</Button>
+          <Button disabled={!lineItemDraft.description} onClick={saveChargeEditor}>Save</Button>
         </DialogFooter>
       </Dialog>
 

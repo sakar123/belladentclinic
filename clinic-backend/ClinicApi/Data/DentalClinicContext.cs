@@ -46,6 +46,10 @@ namespace ClinicApi.Data
         public DbSet<TreatmentToothSurface> TreatmentToothSurface { get; set; }
         public DbSet<PerioStatus> PerioStatus { get; set; }
         public DbSet<PerioMeasurement> PerioMeasurement { get; set; }
+        public DbSet<PatientOdontogramSnapshot> PatientOdontogramSnapshot { get; set; }
+        public DbSet<OdontogramToothState> OdontogramToothState { get; set; }
+        public DbSet<OdontogramPlanItem> OdontogramPlanItem { get; set; }
+        public DbSet<OdontogramAuditEvent> OdontogramAuditEvent { get; set; }
 
         // Notification-related DbSets
         public DbSet<PersonContactMethod> PersonContactMethod { get; set; }
@@ -132,6 +136,10 @@ namespace ClinicApi.Data
             modelBuilder.Entity<DocumentType>().ToTable("document_type");
             modelBuilder.Entity<DiscountType>().ToTable("discount_type");
             modelBuilder.Entity<SaleItem>().ToTable("sale_item");
+            modelBuilder.Entity<PatientOdontogramSnapshot>().ToTable("patient_odontogram_snapshot");
+            modelBuilder.Entity<OdontogramToothState>().ToTable("odontogram_tooth_state");
+            modelBuilder.Entity<OdontogramPlanItem>().ToTable("odontogram_plan_item");
+            modelBuilder.Entity<OdontogramAuditEvent>().ToTable("odontogram_audit_event");
 
             // Notification-related table name overrides
             modelBuilder.Entity<PersonContactMethod>().ToTable("person_contact_method");
@@ -166,6 +174,12 @@ namespace ClinicApi.Data
                 .WithOne()
                 .HasForeignKey<Patient>(p => p.person_id)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PatientOdontogramSnapshot>()
+                .HasOne(s => s.patient)
+                .WithOne()
+                .HasForeignKey<PatientOdontogramSnapshot>(s => s.patient_id)
+                .OnDelete(DeleteBehavior.Cascade);
             
             // === UNIQUE CONSTRAINTS ===
             // Ensure that certain combinations of fields are unique across the table
@@ -174,6 +188,128 @@ namespace ClinicApi.Data
             modelBuilder.Entity<Tooth>()
                 .HasIndex(t => new { t.patient_id, t.tooth_number })
                 .IsUnique();
+
+            modelBuilder.Entity<PatientOdontogramSnapshot>()
+                .HasIndex(s => s.patient_id)
+                .IsUnique();
+
+            modelBuilder.Entity<PatientOdontogramSnapshot>()
+                .Property(s => s.payload)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<PatientOdontogramSnapshot>()
+                .Property(s => s.id)
+                .HasDefaultValueSql("uuid_generate_v4()");
+
+            modelBuilder.Entity<PatientOdontogramSnapshot>()
+                .Property(s => s.source_version)
+                .HasDefaultValue("react-advanced-odontogram");
+
+            modelBuilder.Entity<PatientOdontogramSnapshot>()
+                .Property(s => s.created_at)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            modelBuilder.Entity<PatientOdontogramSnapshot>()
+                .Property(s => s.updated_at)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            modelBuilder.Entity<OdontogramToothState>()
+                .HasIndex(s => new { s.patient_id, s.chart_kind, s.backend_tooth_number })
+                .IsUnique();
+
+            modelBuilder.Entity<OdontogramToothState>()
+                .Property(s => s.id)
+                .HasDefaultValueSql("uuid_generate_v4()");
+
+            modelBuilder.Entity<OdontogramToothState>()
+                .Property(s => s.state_json)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<OdontogramToothState>()
+                .Property(s => s.created_at)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            modelBuilder.Entity<OdontogramToothState>()
+                .Property(s => s.updated_at)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            modelBuilder.Entity<OdontogramToothState>()
+                .HasOne(s => s.patient)
+                .WithMany()
+                .HasForeignKey(s => s.patient_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<OdontogramToothState>()
+                .HasOne(s => s.tooth)
+                .WithMany()
+                .HasForeignKey(s => s.tooth_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .Property(p => p.id)
+                .HasDefaultValueSql("uuid_generate_v4()");
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .Property(p => p.from_json)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .Property(p => p.to_json)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .Property(p => p.status)
+                .HasDefaultValue("Draft");
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .Property(p => p.created_at)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .Property(p => p.updated_at)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .HasOne(p => p.patient)
+                .WithMany()
+                .HasForeignKey(p => p.patient_id)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .HasOne(p => p.appointment)
+                .WithMany()
+                .HasForeignKey(p => p.appointment_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .HasOne(p => p.treatment)
+                .WithMany()
+                .HasForeignKey(p => p.treatment_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OdontogramPlanItem>()
+                .HasOne(p => p.proposed_service)
+                .WithMany()
+                .HasForeignKey(p => p.proposed_service_id)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OdontogramAuditEvent>()
+                .Property(e => e.id)
+                .HasDefaultValueSql("uuid_generate_v4()");
+
+            modelBuilder.Entity<OdontogramAuditEvent>()
+                .Property(e => e.payload)
+                .HasColumnType("jsonb");
+
+            modelBuilder.Entity<OdontogramAuditEvent>()
+                .Property(e => e.created_at)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            modelBuilder.Entity<OdontogramAuditEvent>()
+                .HasOne(e => e.patient)
+                .WithMany()
+                .HasForeignKey(e => e.patient_id)
+                .OnDelete(DeleteBehavior.Cascade);
             
             // === ONE-TO-MANY RELATIONSHIPS WITH RESTRICT DELETE ===
             // RESTRICT means you cannot delete the parent if child records exist

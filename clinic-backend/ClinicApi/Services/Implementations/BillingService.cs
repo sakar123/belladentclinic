@@ -218,6 +218,16 @@ namespace ClinicApi.Services.Implementations
             var billing = await _billingRepository.GetByIdAsync(billingId);
             if (billing == null) throw new KeyNotFoundException("Billing not found");
 
+            if (dto.treatment_id.HasValue)
+            {
+                var existingTreatmentLine = (await _lineItemRepository.FindAsync(li => li.treatment_id == dto.treatment_id.Value))
+                    .FirstOrDefault();
+                if (existingTreatmentLine != null)
+                {
+                    throw new InvalidOperationException($"Treatment is already billed on invoice {existingTreatmentLine.billing_id}.");
+                }
+            }
+
             dto.billing_id = billingId;
             var item = dto.ToEntity();
             await _lineItemRepository.AddAsync(item);

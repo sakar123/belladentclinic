@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import BellaDentLogo from "@/components/brand/belladent-logo";
 
 export default function Header({ className }) {
   const { user, logout, login } = useAuth();
@@ -23,10 +24,10 @@ export default function Header({ className }) {
             <Menu size={18} />
           </Button>
           <Link href="/" className="flex items-center gap-3 min-w-0">
-            <img
-              src="/images/belladent_logo_with_name.jpg"
+            <BellaDentLogo
               alt="BellaDent Clinic"
-              className="h-16 w-auto rounded-sm hidden sm:block"
+              priority
+              className="hidden h-20 w-auto max-w-[260px] sm:block lg:h-24 lg:max-w-[330px]"
             />
             <span className="font-semibold text-white truncate sm:hidden">BellaDent</span>
           </Link>

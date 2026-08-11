@@ -104,6 +104,20 @@ namespace ClinicApi.Tests.Unit.Teeth
         }
 
         [Fact]
+        public async Task CreateToothAsync_WithUnsupportedToothNumber_ShouldThrowInvalidOperationException()
+        {
+            // Arrange
+            var dto = new ToothDTO { patient_id = Guid.NewGuid(), tooth_status_id = Guid.NewGuid(), tooth_name = "T", tooth_number = 86 };
+
+            // Act
+            Func<Task> act = () => _sut.CreateToothAsync(dto);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Unsupported tooth_number 86*");
+            _mockPatientRepo.Verify(repo => repo.ExistsAsync(It.IsAny<Guid>()), Times.Never);
+        }
+
+        [Fact]
         public async Task UpdateToothAsync_WhenToothNotFound_ShouldThrowKeyNotFoundException()
         {
             // Arrange
@@ -135,7 +149,7 @@ namespace ClinicApi.Tests.Unit.Teeth
             // Assert
             result.Should().NotBeNull();
             result.tooth_name.Should().Be("Updated Tooth");
-            _mockToothRepo.Verify(r => r.Update(It.Is<Tooth>(t => t.id == toothId)), Times.Once);
+            _mockToothRepo.Verify(r => r.UpdateAsync(It.Is<Tooth>(t => t.id == toothId)), Times.Once);
             _mockToothRepo.Verify(r => r.SaveChangesAsync(), Times.Once);
         }
 
@@ -151,7 +165,7 @@ namespace ClinicApi.Tests.Unit.Teeth
 
             // Assert
             result.Should().BeTrue();
-            _mockToothRepo.Verify(r => r.Delete(tooth), Times.Once);
+            _mockToothRepo.Verify(r => r.DeleteAsync(tooth), Times.Once);
             _mockToothRepo.Verify(r => r.SaveChangesAsync(), Times.Once);
         }
         
@@ -169,4 +183,3 @@ namespace ClinicApi.Tests.Unit.Teeth
         }
     }
 }
-

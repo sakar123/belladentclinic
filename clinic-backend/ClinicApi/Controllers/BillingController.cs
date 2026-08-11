@@ -119,6 +119,7 @@ namespace ClinicApi.Controllers
                 return CreatedAtAction(nameof(GetBilling), new { id = billingId }, item);
             }
             catch (KeyNotFoundException ex) { return BadRequest(ex.Message); }
+            catch (InvalidOperationException ex) { return Conflict(new { message = ex.Message }); }
         }
 
         [Authorize(Policy = "BillingStaff")]

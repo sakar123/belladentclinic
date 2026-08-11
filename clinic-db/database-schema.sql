@@ -108,6 +108,44 @@ CREATE TABLE tooth (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE patient_odontogram_snapshot (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  patient_id UUID NOT NULL UNIQUE REFERENCES patient(id) ON DELETE CASCADE,
+  payload JSONB NOT NULL,
+  source_version VARCHAR(50) NOT NULL DEFAULT 'react-advanced-odontogram',
+
+  -- Auditing
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by VARCHAR(50),
+  updated_by VARCHAR(50)
+);
+
+CREATE TABLE odontogram_tooth_state (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  patient_id UUID NOT NULL REFERENCES patient(id) ON DELETE CASCADE,
+  tooth_id UUID NULL REFERENCES tooth(id) ON DELETE SET NULL,
+  backend_tooth_number INT NOT NULL,
+  advanced_tooth_number INT NOT NULL,
+  chart_kind VARCHAR(20) NOT NULL,
+  state_json JSONB NOT NULL,
+  state_hash VARCHAR(128) NOT NULL,
+  note TEXT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by VARCHAR(50),
+  UNIQUE(patient_id, chart_kind, backend_tooth_number)
+);
+
+CREATE TABLE odontogram_audit_event (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  patient_id UUID NOT NULL REFERENCES patient(id) ON DELETE CASCADE,
+  event_type VARCHAR(80) NOT NULL,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by VARCHAR(50)
+);
+
 -- ================================================================
 -- APPOINTMENT & CLINICAL TABLES
 -- ================================================================
@@ -191,6 +229,25 @@ CREATE TABLE treatment_tooth (
     treatment_id UUID NOT NULL REFERENCES treatment(id) ON DELETE CASCADE,
     tooth_id UUID NOT NULL REFERENCES tooth(id),
     PRIMARY KEY (treatment_id, tooth_id)
+);
+
+CREATE TABLE odontogram_plan_item (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  patient_id UUID NOT NULL REFERENCES patient(id) ON DELETE CASCADE,
+  appointment_id UUID NULL REFERENCES appointment(id) ON DELETE SET NULL,
+  treatment_id UUID NULL REFERENCES treatment(id) ON DELETE SET NULL,
+  backend_tooth_number INT NULL,
+  advanced_tooth_number INT NULL,
+  axis VARCHAR(80) NOT NULL,
+  from_json JSONB NULL,
+  to_json JSONB NOT NULL,
+  proposed_service_id UUID NULL REFERENCES service(id) ON DELETE SET NULL,
+  proposed_surfaces VARCHAR(20) NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'Draft',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by VARCHAR(50),
+  updated_by VARCHAR(50)
 );
 -- ================================================================
 -- SERVICE SCOPE SUPPORT

@@ -1,239 +1,212 @@
 "use client";
-import React, { useMemo, useState } from 'react';
-import { getAdultToothName } from './tooth-data';
-import { Input } from '@/components/ui/input';
 
-const UPPER_TEETH = Array.from({ length: 16 }, (_, i) => i + 1);
-const LOWER_TEETH = Array.from({ length: 16 }, (_, i) => 32 - i);
+import { useEffect, useMemo, useState } from 'react';
+import Button from '@/components/ui/button';
 
-// 6 sites per tooth: 0: DB, 1: B, 2: MB, 3: ML, 4: L, 5: DL
-const SITES = ['DB', 'B', 'MB', 'ML', 'L', 'DL'];
+const DEFAULT_UPPER = Array.from({ length: 16 }, (_, i) => ({ key: i + 1, display: i + 1, arch: 'upper' }));
+const DEFAULT_LOWER = Array.from({ length: 16 }, (_, i) => ({ key: 32 - i, display: 32 - i, arch: 'lower' }));
+const OUTSIDE_SITES = [0, 1, 2];
+const INSIDE_SITES = [3, 4, 5];
+const SITE_LABELS = ['Distal', 'Center', 'Mesial'];
 
-export default function PerioGrid({ patientId, initialData = {}, onSave }) {
-  // State shape: { pd: {}, gm: {}, cal: {}, bop: {}, mobility: {}, furcation: {} }
+function normalizeTeeth(teeth) {
+  if (!Array.isArray(teeth) || teeth.length === 0) {
+    return { upper: DEFAULT_UPPER, lower: DEFAULT_LOWER };
+  }
+
+  const normalized = teeth
+    .map((tooth) => {
+      const key = Number(tooth.key ?? tooth.chartNumber ?? tooth.selectionNumber ?? tooth.tooth_number ?? tooth);
+      if (!Number.isFinite(key)) return null;
+      return {
+        key,
+        display: tooth.display ?? tooth.displayNumber ?? tooth.label ?? key,
+        arch: tooth.arch || (key <= 16 ? 'upper' : 'lower'),
+      };
+    })
+    .filter(Boolean);
+
+  const upper = normalized
+    .filter((tooth) => tooth.arch === 'upper')
+    .sort((a, b) => a.key - b.key);
+  const lower = normalized
+    .filter((tooth) => tooth.arch === 'lower')
+    .sort((a, b) => b.key - a.key);
+
+  return {
+    upper: upper.length > 0 ? upper : DEFAULT_UPPER,
+    lower: lower.length > 0 ? lower : DEFAULT_LOWER,
+  };
+}
+
+function readSite(source, tooth, site) {
+  return source?.[tooth]?.[site] ?? '';
+}
+
+function parseInteger(value) {
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? '' : parsed;
+}
+
+function setNestedValue(setter, tooth, site, value) {
+  setter((previous) => ({
+    ...previous,
+    [tooth]: {
+      ...(previous[tooth] || {}),
+      [site]: parseInteger(value),
+    },
+  }));
+}
+
+function MetricInput({ label, value, alert, onChange }) {
+  return (
+    <input
+      aria-label={label}
+      inputMode="numeric"
+      pattern="-?[0-9]*"
+      maxLength={3}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className={`h-7 w-full rounded-none border-0 border-r border-slate-200 bg-white text-center text-xs outline-none last:border-r-0 focus:bg-teal-50 focus:ring-1 focus:ring-inset focus:ring-teal-500 ${alert ? 'bg-red-50 font-semibold text-red-700' : 'text-slate-700'}`}
+    />
+  );
+}
+
+function BleedingButton({ active, label, onClick }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={active}
+      onClick={onClick}
+      className={`h-7 w-full border-r border-slate-200 text-xs last:border-r-0 ${active ? 'bg-red-100 text-red-700' : 'bg-white text-slate-300 hover:bg-slate-50'}`}
+    >
+      ●
+    </button>
+  );
+}
+
+export default function PerioGrid({ initialData = {}, onSave, teeth = [] }) {
   const [pd, setPd] = useState(initialData.pd || {});
   const [gm, setGm] = useState(initialData.gm || {});
-  const [cal, setCal] = useState(initialData.cal || {}); // can be auto-computed from PD+recession
-  const [bop, setBop] = useState(initialData.bop || {}); // boolean per site
+  const [bop, setBop] = useState(initialData.bop || {});
   const [mobility, setMobility] = useState(initialData.mobility || {});
-  const [furcation, setFurcation] = useState(initialData.furcation || {});
 
-  const handlePdChange = (tooth, site, val) => {
-    const num = parseInt(val, 10);
-    setPd(prev => ({
-      ...prev,
+  useEffect(() => {
+    setPd(initialData.pd || {});
+    setGm(initialData.gm || {});
+    setBop(initialData.bop || {});
+    setMobility(initialData.mobility || {});
+  }, [initialData]);
+
+  const arches = useMemo(() => normalizeTeeth(teeth), [teeth]);
+
+  const toggleBleeding = (tooth, site) => {
+    setBop((previous) => ({
+      ...previous,
       [tooth]: {
-        ...(prev[tooth] || {}),
-        [site]: isNaN(num) ? '' : num
-      }
+        ...(previous[tooth] || {}),
+        [site]: !previous[tooth]?.[site],
+      },
     }));
   };
 
-  const handleGmChange = (tooth, site, val) => {
-    const num = parseInt(val, 10);
-    setGm(prev => ({
-      ...prev,
-      [tooth]: {
-        ...(prev[tooth] || {}),
-        [site]: isNaN(num) ? '' : num
-      }
+  const setMobilityValue = (tooth, value) => {
+    setMobility((previous) => ({
+      ...previous,
+      [tooth]: parseInteger(value),
     }));
   };
 
-  const handleCalChange = (tooth, site, val) => {
-    const num = parseInt(val, 10);
-    setCal(prev => ({
-      ...prev,
-      [tooth]: {
-        ...(prev[tooth] || {}),
-        [site]: isNaN(num) ? '' : num
-      }
-    }));
+  const save = () => {
+    onSave?.({ pd, gm, cal: {}, bop, mobility, furcation: {} });
   };
 
-  const toggleBop = (tooth, site) => {
-    setBop(prev => ({
-      ...prev,
-      [tooth]: {
-        ...(prev[tooth] || {}),
-        [site]: !(prev[tooth]?.[site])
-      }
-    }));
-  };
+  const renderBleedingSites = (tooth, sites, sideLabel) => (
+    <div className="flex border-b border-slate-200">
+      {sites.map((site, index) => (
+        <BleedingButton
+          key={site}
+          active={Boolean(bop[tooth.key]?.[site])}
+          label={`${sideLabel} bleeding ${SITE_LABELS[index]} for tooth ${tooth.display}`}
+          onClick={() => toggleBleeding(tooth.key, site)}
+        />
+      ))}
+    </div>
+  );
 
-  const handleMobilityChange = (tooth, val) => {
-    const num = parseInt(val, 10);
-    setMobility(prev => ({ ...prev, [tooth]: isNaN(num) ? '' : num }));
-  };
-
-  const handleFurcationChange = (tooth, site, val) => {
-    const num = parseInt(val, 10);
-    setFurcation(prev => ({
-      ...prev,
-      [tooth]: {
-        ...(prev[tooth] || {}),
-        [site]: isNaN(num) ? '' : num
-      }
-    }));
-  };
-
-  const renderCell = (val, isAlert) => {
-    return (
-      <span className={`font-semibold ${isAlert ? 'text-red-600' : 'text-slate-700'}`}>
-        {val !== '' && val !== undefined ? val : '-'}
-      </span>
-    );
-  };
-
-  const renderToothColumn = (t, isUpper) => {
-    const mVal = mobility[t] ?? '';
-    return (
-      <div key={t} className="flex flex-col items-center border-r border-slate-200 min-w-[40px] flex-1">
-        {/* Tooth number header */}
-        <div className="w-full text-center py-1 bg-slate-100 font-bold text-xs border-b border-slate-200">
-          {t}
-        </div>
-        
-        {/* Mobility */}
-        <div className="w-full p-1 border-b border-slate-200 flex justify-center">
-          <input
-            type="text"
-            maxLength={1}
-            value={mVal}
-            onChange={(e) => handleMobilityChange(t, e.target.value)}
-            className="w-6 h-6 text-center text-xs border rounded hover:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-            title="Mobility (0, 1, 2, 3)"
+  const renderMetricSites = (tooth, sites, sideLabel, source, setter, alertAt) => (
+    <div className="flex border-b border-slate-200">
+      {sites.map((site, index) => {
+        const value = readSite(source, tooth.key, site);
+        return (
+          <MetricInput
+            key={site}
+            label={`${sideLabel} ${SITE_LABELS[index]} for tooth ${tooth.display}`}
+            value={value}
+            alert={alertAt ? Number(value) >= alertAt : false}
+            onChange={(next) => setNestedValue(setter, tooth.key, site, next)}
           />
-        </div>
+        );
+      })}
+    </div>
+  );
 
-        {/* BOP Buccal (sites 0,1,2) */}
-        <div className="w-full flex border-b border-slate-200">
-          {[0,1,2].map(site => (
-            <button key={site} onClick={() => toggleBop(t, site)}
-              className={`w-1/3 h-6 text-center text-[10px] border-r last:border-r-0 ${bop[t]?.[site] ? 'bg-red-100 text-red-600' : 'bg-white text-slate-400'}`}
-              title={`BOP ${SITES[site]}`}
-            >•</button>
-          ))}
-        </div>
-        {/* PD Buccal (0,1,2) */}
-        <div className="w-full flex border-b border-slate-200">
-          {[0, 1, 2].map(site => {
-            const val = pd[t]?.[site] ?? '';
-            const isAlert = val >= 4;
-            return (
-              <input key={site} type="text" maxLength={2} value={val}
-                onChange={(e) => handlePdChange(t, site, e.target.value)}
-                className={`w-1/3 h-6 text-center text-xs border-r last:border-r-0 hover:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 ${isAlert ? 'text-red-600 font-bold bg-red-50' : ''}`}
-                title={`PD ${SITES[site]}`} />
-            );
-          })}
-        </div>
-        {/* GM Buccal (0,1,2) */}
-        <div className="w-full flex border-b border-slate-200">
-          {[0,1,2].map(site => (
-            <input key={site} type="text" maxLength={3} value={gm[t]?.[site] ?? ''}
-              onChange={(e) => handleGmChange(t, site, e.target.value)}
-              className="w-1/3 h-6 text-center text-xs border-r last:border-r-0 hover:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              title={`GM ${SITES[site]}`} />
-          ))}
-        </div>
-        {/* CAL Buccal (0,1,2) */}
-        <div className="w-full flex border-b border-slate-200 bg-slate-50/60">
-          {[0,1,2].map(site => (
-            <input key={site} type="text" maxLength={3} value={cal[t]?.[site] ?? ''}
-              onChange={(e) => handleCalChange(t, site, e.target.value)}
-              className="w-1/3 h-6 text-center text-xs border-r last:border-r-0 hover:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              title={`CAL ${SITES[site]}`} />
-          ))}
-        </div>
+  const renderToothColumn = (tooth) => (
+    <div key={tooth.key} className="min-w-[44px] border-r border-slate-200 last:border-r-0">
+      <div className="border-b border-slate-200 bg-slate-100 py-1 text-center text-xs font-semibold text-slate-700">
+        {tooth.display}
+      </div>
+      <div className="border-b border-slate-200">
+        <MetricInput
+          label={`Mobility for tooth ${tooth.display}`}
+          value={mobility[tooth.key] ?? ''}
+          onChange={(next) => setMobilityValue(tooth.key, next)}
+        />
+      </div>
+      {renderBleedingSites(tooth, OUTSIDE_SITES, 'Outside')}
+      {renderMetricSites(tooth, OUTSIDE_SITES, 'Outside pocket depth', pd, setPd, 4)}
+      {renderMetricSites(tooth, OUTSIDE_SITES, 'Outside gum margin', gm, setGm)}
+      {renderBleedingSites(tooth, INSIDE_SITES, 'Inside')}
+      {renderMetricSites(tooth, INSIDE_SITES, 'Inside pocket depth', pd, setPd, 4)}
+      {renderMetricSites(tooth, INSIDE_SITES, 'Inside gum margin', gm, setGm)}
+    </div>
+  );
 
-        {/* BOP Lingual (3,4,5) */}
-        <div className="w-full flex border-b border-slate-200">
-          {[3,4,5].map(site => (
-            <button key={site} onClick={() => toggleBop(t, site)}
-              className={`w-1/3 h-6 text-center text-[10px] border-r last:border-r-0 ${bop[t]?.[site] ? 'bg-red-100 text-red-600' : 'bg-white text-slate-400'}`}
-              title={`BOP ${SITES[site]}`}
-            >•</button>
-          ))}
-        </div>
-        {/* PD Lingual (3,4,5) */}
-        <div className="w-full flex border-b border-slate-200">
-          {[3, 4, 5].map(site => {
-            const val = pd[t]?.[site] ?? '';
-            const isAlert = val >= 4;
-            return (
-              <input key={site} type="text" maxLength={2} value={val}
-                onChange={(e) => handlePdChange(t, site, e.target.value)}
-                className={`w-1/3 h-6 text-center text-xs border-r last:border-r-0 hover:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 ${isAlert ? 'text-red-600 font-bold bg-red-50' : ''}`}
-                title={`PD ${SITES[site]}`} />
-            );
-          })}
-        </div>
-        {/* GM Lingual (3,4,5) */}
-        <div className="w-full flex border-b border-slate-200">
-          {[3,4,5].map(site => (
-            <input key={site} type="text" maxLength={3} value={gm[t]?.[site] ?? ''}
-              onChange={(e) => handleGmChange(t, site, e.target.value)}
-              className="w-1/3 h-6 text-center text-xs border-r last:border-r-0 hover:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              title={`GM ${SITES[site]}`} />
-          ))}
-        </div>
-        {/* CAL Lingual (3,4,5) */}
-        <div className="w-full flex bg-slate-50/60">
-          {[3,4,5].map(site => (
-            <input key={site} type="text" maxLength={3} value={cal[t]?.[site] ?? ''}
-              onChange={(e) => handleCalChange(t, site, e.target.value)}
-              className="w-1/3 h-6 text-center text-xs border-r last:border-r-0 hover:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              title={`CAL ${SITES[site]}`} />
-          ))}
+  const renderArch = (title, archTeeth) => (
+    <div>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</div>
+      <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+        <div
+          className="grid min-w-[900px]"
+          style={{ gridTemplateColumns: `130px repeat(${archTeeth.length}, minmax(44px, 1fr))` }}
+        >
+          <div className="border-r border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+            {['Tooth', 'Mobility', 'Bleeding outside', 'Pockets outside', 'Gum line outside', 'Bleeding inside', 'Pockets inside', 'Gum line inside'].map((label) => (
+              <div key={label} className="flex h-7 items-center border-b border-slate-200 px-2 last:border-b-0">
+                {label}
+              </div>
+            ))}
+          </div>
+          <div className="contents">
+            {archTeeth.map(renderToothColumn)}
+          </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-4 overflow-x-auto">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-semibold text-slate-800">Periodontal Chart</h3>
-        <button
-          onClick={() => onSave?.({ pd, gm, cal, bop, mobility, furcation })}
-          className="px-3 py-1 bg-teal-600 text-white text-sm rounded hover:bg-teal-700"
-        >
-          Save Perio Data
-        </button>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm text-app-muted">
+          Enter whole millimeters. Pocket values of 4 or more are highlighted.
+        </div>
+        <Button size="sm" onClick={save}>Save Chart</Button>
       </div>
 
-      <div className="min-w-[800px]">
-        {/* Upper Arch */}
-        <div className="flex border-l border-t border-slate-200 mb-8 shadow-sm">
-          <div className="w-24 shrink-0 bg-slate-50 border-r border-b border-slate-200 flex flex-col font-medium text-xs text-slate-500">
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200">Tooth</div>
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200">Mobility</div>
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200">BOP (Buc)</div>
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200" title="Buccal Pocket Depth">PD (Buccal)</div>
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200">GM (Buccal)</div>
-            <div className="flex-1 flex items-center px-2" title="Buccal CAL">CAL (Buccal)</div>
-          </div>
-          <div className="flex flex-1 border-b border-slate-200">
-            {UPPER_TEETH.map(t => renderToothColumn(t, true))}
-          </div>
-        </div>
-
-        {/* Lower Arch */}
-        <div className="flex border-l border-t border-slate-200 shadow-sm">
-          <div className="w-24 shrink-0 bg-slate-50 border-r border-b border-slate-200 flex flex-col font-medium text-xs text-slate-500">
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200">Tooth</div>
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200">Mobility</div>
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200">BOP (Ling)</div>
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200" title="Buccal Pocket Depth">PD (Buccal)</div>
-            <div className="flex-1 flex items-center px-2 border-b border-slate-200">GM (Lingual)</div>
-            <div className="flex-1 flex items-center px-2" title="Lingual CAL">CAL (Lingual)</div>
-          </div>
-          <div className="flex flex-1 border-b border-slate-200">
-            {LOWER_TEETH.map(t => renderToothColumn(t, false))}
-          </div>
-        </div>
-      </div>
+      {renderArch('Upper Teeth', arches.upper)}
+      {renderArch('Lower Teeth', arches.lower)}
     </div>
   );
 }

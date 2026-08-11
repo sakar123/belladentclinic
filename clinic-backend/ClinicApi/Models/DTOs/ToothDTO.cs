@@ -11,7 +11,7 @@ namespace ClinicApi.Models.DTOs
         public Guid patient_id { get; set; }
         
         [Required]
-        [Range(1, 32)]
+        [Range(1, 99)]
         public int tooth_number { get; set; }
         
         [Required]

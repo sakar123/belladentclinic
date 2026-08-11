@@ -194,16 +194,20 @@ function XMark({ color }) {
  * Crown area is roughly the middle band of the tooth.
  */
 function CrownOutline({ color, isUpper, status }) {
-  if (status === 'Completed') return null;
   // Crown region: upper ~52-82%, lower ~18-48%
   const top = isUpper ? 52 : 18;
   const bot = isUpper ? 82 : 48;
+  const isCompleted = status === 'Completed';
 
   return (
     <rect
       x="12" y={top} width="76" height={bot - top}
-      fill="none" stroke={color} strokeWidth="2.5"
-      strokeDasharray="4 2" rx="4"
+      fill={isCompleted ? color : "none"}
+      fillOpacity={isCompleted ? "0.22" : undefined}
+      stroke={color}
+      strokeWidth={isCompleted ? "3" : "2.5"}
+      strokeDasharray={isCompleted ? undefined : "4 2"}
+      rx="4"
     />
   );
 }
