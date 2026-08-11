@@ -57,7 +57,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Assert ignored local artifacts are not tracked
         run: |
@@ -94,9 +94,9 @@ jobs:
           fi
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: clinic-portal/package-lock.json
 
@@ -118,7 +118,8 @@ jobs:
           artifact="ClinicPortal_${GITHUB_SHA}.tgz"
           test -f clinic-portal/.next/standalone/server.js
           tar -C clinic-portal/.next/standalone -czf "${artifact}" .
-          tar -tzf "${artifact}" | grep -q '^server\.js$'
+          tar -tzf "${artifact}" > portal-artifact-files.txt
+          grep -Eq '(^|/|^\./)server\.js$' portal-artifact-files.txt
           echo "PORTAL_ARTIFACT=${artifact}" >> "${GITHUB_ENV}"
           echo "PORTAL_ARTIFACT_URI=s3://${ARTIFACT_BUCKET}/clinic-portal/${artifact}" >> "${GITHUB_ENV}"
           echo "PORTAL_ENV_URI=s3://${ARTIFACT_BUCKET}/clinic-portal/ClinicPortal_${GITHUB_SHA}.env" >> "${GITHUB_ENV}"
@@ -247,7 +248,7 @@ jobs:
           chmod +x deploy-clinic-portal.sh
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ env.ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
