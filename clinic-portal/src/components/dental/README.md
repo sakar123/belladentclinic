@@ -1,9 +1,9 @@
-BellaDent Dental Chart — QDento Parity Notes
+BellaDent Dental Chart Notes
 
 Overview
 - Sprite atlases under `public/images/dental` follow a 26-column layout (6 molars @ 180px, 20 others @ 120px).
 - `atlas.json` documents column widths, offsets, shared regions in `tooth_common.png`, and extended overlays.
-- Renderer (`dino-tooth.js`) composes layers to match QDento’s ToothPainter.cpp ordering.
+- Renderer (`dino-tooth.js`) composes layers in a stable clinical order.
 
 Atlas Manifest (atlas.json)
 - `permanentIndices`: 32-length mapping for universal teeth (1–32) to texture columns.
@@ -41,9 +41,7 @@ Bridge Terminal Logic
 
 Perio Model
 - `PerioGrid` tracks PD/GM/CAL with BOP mobility and molar furcations.
-- Gingival/CAL lines render as arch polylines (flagged via V2 feature).
+- Gingival/CAL lines render as arch polylines.
 
 Notes
-- Feature flag `NEXT_PUBLIC_QDENTO_CHART_V2` gates new renderer options.
-- `sprite-preloader.js` preloads atlases before first render when V2 is enabled.
-
+- `sprite-preloader.js` preloads atlases before first render.

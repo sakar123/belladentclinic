@@ -16,6 +16,15 @@
 
 #block_inspiration
 apexo-flutter/
+qdento/
+
+# Agent/Codex local planning and scratch artifacts
+AGENTS.md
+**/AGENTS.md
+docs/
+.agents/
+.codex/
+*.agent.md
 
 #no-temps
 temps/
@@ -40,6 +49,7 @@ yarn-error.log*
 
 # Environment variables
 .env
+.env*
 .env.local
 .env.development.local
 .env.test.local

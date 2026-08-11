@@ -64,9 +64,6 @@ export default function DentalChart({
   const [spriteDebug, setSpriteDebug] = useState(false);
   const [inspector, setInspector] = useState({ open: false, x: 0, y: 0, data: null });
 
-  // Feature flag for new renderer/options
-  const useV2 = process.env.NEXT_PUBLIC_QDENTO_CHART_V2 === 'true';
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -92,7 +89,7 @@ export default function DentalChart({
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const spritesLoading = useV2 && !spritesReady;
+  const spritesLoading = !spritesReady;
   const permanentNumberingSystem = useMemo(() => {
     return inferPermanentNumberingSystem(
       teethRaw.map(getToothRawNumber)
@@ -749,7 +746,7 @@ export default function DentalChart({
 
                 <OcclusalPlaneLabel isCompact={isCompact} />
 
-                {useV2 && latestPerio && (
+                {latestPerio && (
                   <div className="w-full max-w-5xl">
                     {(() => {
                       const widths = PERMANENT_UPPER_TEETH.map(t => getToothDisplayWidth(t, toothScale));
@@ -793,7 +790,7 @@ export default function DentalChart({
                   debugMode={spriteDebug}
                   onDebugContext={(payload) => setInspector({ open: true, x: payload.clientX, y: payload.clientY, data: payload })}
                 />
-                {useV2 && latestPerio && (
+                {latestPerio && (
                   <div className="w-full max-w-5xl">
                     {(() => {
                       const widths = PERMANENT_LOWER_TEETH.map(t => getToothDisplayWidth(t, toothScale));
