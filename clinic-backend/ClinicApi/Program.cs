@@ -156,6 +156,9 @@ try
     builder.Services.AddScoped<ITreatmentService, TreatmentService>();
     builder.Services.AddScoped<IEmailService, EmailService>();
     builder.Services.AddScoped<IGoogleReviewsService, GoogleReviewsService>();
+    builder.Services.AddScoped<IOdontogramSnapshotService, OdontogramSnapshotService>();
+    builder.Services.AddScoped<IAdvancedOdontogramMapper, AdvancedOdontogramMapper>();
+    builder.Services.AddScoped<IAdvancedOdontogramService, AdvancedOdontogramService>();
 
     // Notification system services
     builder.Services.AddScoped<IAudienceResolver, AudienceResolver>();

@@ -100,6 +100,12 @@ Environment variables and endpoints:
 - Resolve/confirm mapper TODOs for related objects (only if API needs to return expanded graphs).
 - Finalize Auth0 roles/claims and expand middleware protection to more routes as needed.
 - Add CI to build API, run tests, and lint portal; optionally compose-based integration job.
+- QA the adopted `ClinicalOdontogram` against adult, pediatric, and mixed dentition patients; verify save/reload, plan commit, drawer selection, appointment page, `/me`, and the full-screen route with the real API.
+- Decide whether to fork/vendor `react-advanced-odontogram` for stable host APIs for selected teeth, surfaces, and perio import/export; current integration bridges those gaps outside the package.
+- Keep `NEXT_PUBLIC_ODONTOGRAM_PROVIDER=legacy` rollback until advanced-chart QA passes on real seeded and production-like data.
+- Repair existing backend test-project compile drift so `dotnet test Clinic-Api.sln` can run again.
+- QA crown fitting on James Jackson or another seeded adult patient: planned crown should show a blue dashed crown cue; completed crown should show the CROWNED tooth status after refresh.
+- QA Auth0 session persistence across protected pages after refresh/direct navigation; confirm the Auth0 app allows refresh tokens for the local SPA client.
  - Optional: Add docker-compose.dev.yml for hot-reload (dotnet watch, next dev) to avoid rebuilds during active development.
  - Optional: Switch compose DB to custom image on 5433 or keep simple 5433 image; align API connection string accordingly.
 
@@ -304,3 +310,141 @@ How to use this log: Append a new entry on each work session with date, what cha
   - Portal: Primary teeth now get chart anchors so search/focus works for mixed dentition as well as permanent teeth.
   - Portal: Improved the tooth detail panel with status color, open-treatment/record counts, clearer surface-history empty states, and richer treatment rows with dates/surfaces.
   - Verification: `npm run lint` passes with existing warnings; `npm run build` passes.
+
+- 2026-08-09: Odontogram replacement research.
+  - Reviewed `react-advanced-odontogram` / `React-Odontogram-Modul` as a candidate replacement for the current Dino/QDento dental chart UI.
+  - Verified published npm package `react-advanced-odontogram@2.2.0` is MIT, ESM-only, React 18/19 compatible, and exports `OdontogramShell`, `importStatus`, `getStatusChart`, `getPlanChart`, and `setPlanChart`.
+  - Key risks: module-level singleton (one chart per page), FDI/primary tooth mapping mismatch, limited published perio setter exports, and need for backend JSON snapshot/adapter rather than replacing normalized teeth/treatment/perio tables.
+
+- 2026-08-09: Odontogram replacement implementation guide.
+  - Added `docs/odontogram-replacement-implementation.md` with a phased backend/frontend runbook for replacing the current dental chart with `react-advanced-odontogram`.
+  - Guide covers tooth-number validation, snapshot JSONB API, derivation mapping, portal wrapper, feature flag rollout, fork criteria, plan-to-treatment flow, perio risks, testing, and rollback.
+
+- 2026-08-09: Odontogram replacement implementation phase 1.
+  - Backend: added `PatientOdontogramSnapshot` JSONB persistence, `GET/PUT /api/patients/{patientId}/odontogram-snapshot`, EF mapping/migration/snapshot, and widened tooth-number validation to support FDI primary/permanent numbers.
+  - Portal: installed `react-advanced-odontogram@2.2.0`, imported package CSS, added Next webpack alias for the package export-map quirk, and added adapter/wrapper files under `src/lib/odontogram` and `src/components/odontogram`.
+  - UI: added `/patients/[id]/odontogram` replacement route and linked it from the patient Teeth tab for side-by-side QA before deleting legacy QDento/Dino components.
+  - Verification: `dotnet build ClinicApi/ClinicApi.csproj --no-restore` succeeds with existing warnings; full solution build still exits after five minutes with 0 errors after API compile; `npm run lint` and `npm run build` pass.
+
+- 2026-08-09: Odontogram replacement implementation phase 2.
+  - Backend: added `ToothNumberValidator`; ToothService now rejects impossible Universal/FDI values with 422 responses, and snapshot saves require a JSON object payload.
+  - Backend: aligned snapshot EF defaults/migration/model snapshot with SQL schema defaults; added focused tooth-number validator coverage.
+  - Portal: Patient Teeth tab now renders `react-advanced-odontogram` by default with `NEXT_PUBLIC_ODONTOGRAM_PROVIDER=legacy` as rollback; standalone route passes pediatric context into the adapter.
+  - Portal: adapter now maps legacy child teeth seeded as `1-20` to primary slots only for primary-dentition charts; wrapper reload/theming behavior matches upstream APIs.
+  - Verification: API project builds; portal lint/build pass. Full backend tests are still blocked by older test compile drift unrelated to this odontogram pass.
+
+- 2026-08-09: Odontogram replacement frontend fix.
+  - Portal: snapshot reads now fall back to normalized backend teeth for all snapshot errors, not just 404, removing the blocking "Failed to load odontogram snapshot" state when the endpoint/migration/auth is unavailable.
+  - Verification: `npm run lint` and `npm run build` pass; a dev server had been started on `http://localhost:3001` for QA.
+
+- 2026-08-09: Odontogram replacement frontend containment.
+  - Stopped the local portal server on port 3001 per request and did not restart it.
+  - Portal: restored the patient Teeth tab to the existing stable `DentalChart` and removed snapshot/advanced package loading from that page.
+  - Portal: removed the upstream odontogram CSS import from root `globals.css`; generated a scoped local copy so package globals only apply inside `.advanced-odontogram-scope` on the preview chart.
+  - Portal: widened the advanced preview wrapper and changed clipping to horizontal scroll so the replacement route does not render as a half-screen chart.
+  - Portal: snapshot reads now fall back to normalized backend teeth for all snapshot errors, not just 404, removing the blocking "Failed to load odontogram snapshot" state when the endpoint/migration/auth is unavailable.
+  - Verification: `npm run lint` and `npm run build` pass.
+
+- 2026-08-09: Crown fitting odontogram visibility fix.
+  - Backend: TreatmentService now rejects tooth-scoped treatments when selected teeth cannot be resolved, preventing silent treatments with no `treatment_tooth` link; completion also fails if a tooth-status-changing service has no linked teeth.
+  - Backend: new treatment status input normalizes `In Progress` to `InProgress` instead of always saving `Planned`.
+  - Portal: patient Add Treatment now requires a tooth for crown/filling/root/extraction-style services and refreshes chart treatment/teeth data after save/complete.
+  - Portal: DentalChart reloads data via a refresh token, keeps completed crown cues visible until the tooth status reflects the resulting status, and renders a visible completed crown overlay fallback.
+  - Verification: `npm run lint`, `npm run build`, and `dotnet build ClinicApi/ClinicApi.csproj --no-restore` pass. Targeted `dotnet test ... --filter TreatmentServiceSurfaceTests` is still blocked by existing unrelated test-project compile drift.
+
+- 2026-08-09: Auth persistence and odontogram library usage check.
+  - Portal: Auth0Provider now uses `cacheLocation="localstorage"`, refresh tokens, and iframe fallback to reduce unexpected protected-page logouts after reloads or silent-token failures.
+  - Portal: protected-page guards now initiate Auth0 login with the current path as `returnTo`; `/login` sanitizes `returnTo` and redirects already-authenticated users away from the sign-in page.
+  - Portal: advanced odontogram preview now hydrates saved `_planChart` data via `setPlanChart`; main patient Teeth tab remains on stable `DentalChart` while the upstream `react-advanced-odontogram` route is isolated at `/patients/{id}/odontogram`.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes.
+
+- 2026-08-09: Portal chunk-load recovery fix.
+  - Portal: added an inline root `ChunkReloadScript` to recover once from stale Next.js chunk references after rebuilds, avoiding blank screens from `ChunkLoadError` even when `app/layout` or `/patients/{id}/odontogram` chunks are the missing files.
+  - Portal: added `scripts/prepare-standalone.mjs` and `postbuild` so local standalone runs include `.next/static` and `public`, matching Docker's runtime artifact copy.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes and prepares standalone runtime assets.
+
+- 2026-08-09: React advanced odontogram full adoption plan.
+  - Added `docs/react-advanced-odontogram-full-adoption-plan.md` after deciding the preview UI should become the primary odontogram throughout the portal.
+  - Plan keeps the upstream chart as the UI while preserving backend clinical authority through snapshot JSONB, parsed per-tooth state, normalized treatment/surface/perio projections, plan-to-treatment commit, audit, security, QA, and rollback.
+  - Identified replacement call sites: patient Teeth tab, appointment detail charts, treatment drawer, `/me`, preview route, and perio UI.
+
+- 2026-08-09: React advanced odontogram full adoption implementation.
+  - Backend: added full `odontogram-state` and `odontogram-plan/commit` APIs, parsed tooth-state/plan/audit tables, JSONB snapshot compatibility, EF migration/schema updates, normalized tooth projection, and treatment creation through existing clinical services.
+  - Portal: added `ClinicalOdontogram` as the primary wrapper and adopted it on patient Teeth, full-screen odontogram, appointment detail, treatment drawer, and `/me`, while preserving `NEXT_PUBLIC_ODONTOGRAM_PROVIDER=legacy` rollback.
+  - Integration: root-scoped upstream CSS, explicit save/reload, row-version conflict handling, plan-item commit/dismiss UI, singleton-safe appointment/drawer mounting, and FDI primary/permanent tooth mapping.
+  - Notes: installed upstream package does not expose reliable host selected-tooth/surface/perio APIs, so surface entry and perio persistence remain bridged with existing UI until a fork/vendor decision.
+  - Verification: API project build passes; portal lint/build pass with existing warnings; full backend tests remain blocked by existing test-project compile drift.
+
+- 2026-08-09: Advanced odontogram host API layer.
+  - Portal: added `src/lib/odontogram/advanced-host-api.js` as the app-owned adapter contract over `react-advanced-odontogram` for chart hydration, save payloads, plan diffs, DOM-backed tooth selection, capabilities, and source/host API versioning.
+  - Portal: `ClinicalOdontogram` now exposes an imperative API (`save`, `reload`, `commitPlan`, `dismissPlanItem`, `getSnapshot`, `getSelection`, `setSelection`, `clearSelection`) so page-level workflows can depend on clinic-owned behavior instead of upstream internals.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes.
+
+- 2026-08-09: Frontend loading diagnostics.
+  - Portal: added a dev-only frontend log bridge (`/api/dev/frontend-log` + `FrontendLogBridge`) so browser console errors, warnings, unhandled rejections, and failed fetch diagnostics print in the Next dev terminal.
+  - Portal: auth token lookup failures and failed API responses now log sanitized diagnostics in development; protected pages show Auth0 errors instead of an indefinite spinner.
+  - Portal: odontogram load failure UI now shows HTTP status and message, and `Button` now supports Radix-style `asChild` via `@radix-ui/react-slot` to remove the leaked DOM prop warning.
+  - Debug note: local backend on `https://localhost:5112/api` is reachable but returns `401 Bearer` without a valid Auth0 access token; reload with the log bridge active to confirm whether the failing load is missing token, Auth0 audience/role, or another API error.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes; frontend log endpoint smoke test prints in the dev server.
+
+- 2026-08-09: Odontogram state 404 fallback.
+  - Portal: `api.odontogram.getState` now falls back to the older snapshot/teeth compatibility path when `/patients/{id}/odontogram-state` returns 404, preventing the blocking red load failure while API deployments catch up.
+  - Portal: `api.odontogram.saveState` falls back to `odontogram-snapshot` persistence on the same 404 path; `ClinicalOdontogram` labels this as snapshot compatibility mode and keeps plan commit disabled there.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes; API project build passes.
+
+- 2026-08-09: Odontogram 500 and stale chunk recovery.
+  - Backend: `GET /api/patients/{id}/odontogram-state` now detects missing odontogram persistence tables (`patient_odontogram_snapshot`, parsed state, plan, audit) and returns a teeth-derived compatibility state instead of a 500.
+  - Backend: snapshot reads return no snapshot when the snapshot table is absent; snapshot/full-state saves and plan commit return explicit migration-required errors instead of unhandled database exceptions.
+  - Portal: odontogram state loading now also falls back on HTTP 500, and the chunk reload guard catches failed `_next/static/chunks` fetch/script loads during stale post-build navigation.
+  - Verification: API project build passes with existing warnings; `npm run lint` and `npm run build` pass with existing warnings.
+
+- 2026-08-09: Applied advanced odontogram migrations locally.
+  - Added EF migration metadata attributes to the two new migration classes so `dotnet ef migrations list` discovers them.
+  - Applied `20260809190000_AddPatientOdontogramSnapshot` and `20260809203000_AddAdvancedOdontogramState` to the local Development database at `localhost:5432/clinic_db`.
+  - Verification: `__EFMigrationsHistory` contains both new migration IDs; tables `patient_odontogram_snapshot`, `odontogram_tooth_state`, `odontogram_plan_item`, and `odontogram_audit_event` exist; API project build passes.
+
+- 2026-08-09: Portal auth gate and chunk retry hardening.
+  - Portal: moved protected-route authentication gating into `Providers` so page/SWR API calls wait until Auth0 finishes loading and the HTTP token getter is installed.
+  - Portal: shared HTTP helper now retries once with a fresh Auth0 access token after a 401, covering stale cached tokens after local Auth0/API configuration changes.
+  - Portal: chunk reload guard now allows a small number of fast stale-chunk refreshes instead of suppressing follow-up missing chunk errors for 30 seconds.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes.
+
+- 2026-08-09: Appointment billing and patient clinical page cleanup.
+  - Portal: appointment treatment billing now opens/updates the existing bill for billed treatments instead of creating duplicate bills; unbilled selected treatments are added to the existing bill and previous payments are preserved.
+  - Portal: billing detail page renamed line-item UI to charges and added edit/remove controls for description, category, quantity, price, and discount with automatic total recalculation.
+  - Portal: patient Teeth tab was simplified with one scheduling action, reduced selection controls, clearer Dental Chart/History labels, and a cleaner periodontal measurement grid using displayed tooth numbers.
+  - Backend: billing line-item creation rejects attempts to bill the same treatment twice and returns 409 Conflict with a structured message.
+  - Verification: portal lint/build pass; API project build passes with existing warnings; local API and portal were restarted.
+
+- 2026-08-10: Reports builder redesign.
+  - Portal: replaced the fixed Reports page with a configurable report builder over appointments, billing, treatments, patients, documents, and services.
+  - Added smart query tokens, date presets/custom date range, addable field filters, dynamic grouping/metrics, KPI cards, chart-type switching, top groups, result drill-through links, and CSV export.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes; `/reports` returns 200 from the restarted local portal.
+
+- 2026-08-10: Billing center redesign.
+  - Portal: replaced the Billing card grid with a compact accounts-receivable workbench: KPI strip, invoice queue filters, searchable/sortable ledger table, selected-invoice inspector, and aging breakdown.
+  - Moved repeated per-invoice actions into the inspector, preserving create invoice, record payment, mark paid, send reminder, receipt, detail navigation, and CSV export workflows.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes; `/billing` returns 200 from the restarted local portal.
+
+- 2026-08-10: Notifications appointment list fix.
+  - Portal: Send Reminder now loads appointments/patients through the same API helpers as the rest of the app instead of mixed `http.get('/Appointment')` calls.
+  - Replaced hidden Scheduled/Confirmed-only plus next-3-days filtering with visible All/Today/Next 7/Custom date controls and an All Statuses selector, so all appointments can be listed.
+  - Recipient selection now keys by appointment row id, keeps rows visible even when contact data is missing, and only selects sendable patient-contact rows.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes; `/notifications` returns 200 from the restarted local portal.
+
+- 2026-08-10: Notifications upcoming appointment default.
+  - Portal: Send Reminder now defaults to Upcoming appointments instead of all historical appointments.
+  - Removed the All appointments range button; kept Today, Next 7 days, Custom, and All Statuses as visible narrowing controls.
+  - Preview always requests an upcoming-appointment audience, adding explicit date bounds only for narrower ranges.
+  - Verification: `npm run lint` passes with existing warnings; `npm run build` passes; `/notifications` returns 200 from the restarted local portal.
+
+- 2026-08-10: BellaDent logo display pass.
+  - Portal: added a shared `BellaDentLogo` component using Next Image with object-contain sizing for the wordmark and mark assets.
+  - Enlarged logo presentation in the header, sidebar, login redirect, auth gate, and billing receipt; removed cropped/raw logo image tags.
+  - Verification: `npm run lint` passes with only existing non-logo warnings; `npm run build` passes; `/` and `/login` return 200 from the restarted local portal.
+
+- 2026-08-11: Production EC2 database migration.
+  - Connected to EC2 with `temps/belladent-prod-ec2-ssh-kp.pem`; fixed API boot by linking `/opt/appsettings.Production.json` into `/opt/ClinicApi/appsettings.Production.json`.
+  - Backed up production Postgres to `/opt/db-backups/clinic_db_20260811T034226Z.dump`, added a `uuid_generate_v4()` compatibility wrapper over `gen_random_uuid()`, dry-ran the migration with rollback, then applied schema migrations through `20260809203000_AddAdvancedOdontogramState`.
+  - Production `clinic_db` now has notification, perio/QDento, and advanced odontogram tables; `ClinicApi` is active and `/api/appointment` returns 200 locally on the instance.
+  - Deployment note: the EC2 API binary is still the older GitHub Actions artifact and does not contain the new Advanced/Odontogram controllers or August migration classes; deploy backend code through the pipeline before relying on `/api/patients/{id}/odontogram-state` in production.

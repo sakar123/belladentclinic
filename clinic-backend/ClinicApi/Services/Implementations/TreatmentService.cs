@@ -109,6 +109,7 @@ namespace ClinicApi.Services.Implementations
             }
 
             // Build entity; resolve teeth based on scope and provided tooth ids/numbers
+            var initialStatus = NormalizeInitialTreatmentStatus(treatmentDto.status);
             var treatment = new Treatment
             {
                 id = treatmentDto.id ?? Guid.NewGuid(),
@@ -117,7 +118,7 @@ namespace ClinicApi.Services.Implementations
                 staff_id = treatmentDto.staff_id,
                 service_id = treatmentDto.service_id,
                 treatment_scope = requestedScope,
-                status = "Planned",
+                status = initialStatus,
                 completed_at = null,
                 notes = treatmentDto.notes,
                 surfaces = treatmentDto.surfaces,
@@ -132,6 +133,7 @@ namespace ClinicApi.Services.Implementations
             };
 
             var targetToothIds = await ResolveToothIdsAsync(treatmentDto);
+            EnsureResolvedToothTargets(requestedScope, treatmentDto, targetToothIds);
             if (treatment.treatment_scope == "NonTooth")
             {
                 // No teeth linked
@@ -312,6 +314,9 @@ namespace ClinicApi.Services.Implementations
             // Auto-update tooth status if the service has a resulting status
             if (treatment.service?.resulting_tooth_status_id != null)
             {
+                if (!treatment.teeth.Any())
+                    throw new InvalidOperationException("Cannot complete a tooth-based treatment because no teeth are linked.");
+
                 var newStatusId = treatment.service.resulting_tooth_status_id.Value;
 
                 foreach (var tooth in treatment.teeth)
@@ -468,6 +473,7 @@ namespace ClinicApi.Services.Implementations
 
             // Update teeth links
             var newToothIds = await ResolveToothIdsAsync(treatmentDto);
+            EnsureResolvedToothTargets(existingTreatment.treatment_scope, treatmentDto, newToothIds);
             existingTreatment.teeth.Clear();
             if (existingTreatment.treatment_scope == "FullMouth")
             {
@@ -550,6 +556,48 @@ namespace ClinicApi.Services.Implementations
             }
 
             return ids.ToList();
+        }
+
+        private static void EnsureResolvedToothTargets(string scope, TreatmentDTO dto, List<Guid> resolvedToothIds)
+        {
+            var normalizedScope = string.IsNullOrWhiteSpace(scope) ? "NonTooth" : scope.Trim();
+            if (normalizedScope == "NonTooth" || normalizedScope == "FullMouth")
+                return;
+
+            var resolvedCount = resolvedToothIds.Distinct().Count();
+            if (normalizedScope == "SingleTooth" && resolvedCount != 1)
+                throw new InvalidOperationException("Select one existing tooth for this treatment.");
+
+            if (normalizedScope == "MultipleTeeth" && resolvedCount < 2)
+                throw new InvalidOperationException("Select at least two existing teeth for this treatment.");
+
+            var requestedRefs = CountRequestedToothRefs(dto);
+            if (requestedRefs > 0 && resolvedCount < requestedRefs)
+                throw new InvalidOperationException("One or more selected teeth do not exist for this patient.");
+        }
+
+        private static int CountRequestedToothRefs(TreatmentDTO dto)
+        {
+            var idCount = 0;
+            if (dto.tooth_id.HasValue && dto.tooth_id.Value != Guid.Empty) idCount++;
+            if (dto.tooth_ids != null) idCount += dto.tooth_ids.Where(id => id != Guid.Empty).Distinct().Count();
+
+            var numberCount = 0;
+            if (dto.tooth_number.HasValue) numberCount++;
+            if (dto.tooth_numbers != null) numberCount += dto.tooth_numbers.Distinct().Count();
+
+            return Math.Max(idCount, numberCount);
+        }
+
+        private static string NormalizeInitialTreatmentStatus(string? status)
+        {
+            var compact = (status ?? "Planned").Replace(" ", "", StringComparison.OrdinalIgnoreCase).Trim();
+            return compact.ToLowerInvariant() switch
+            {
+                "inprogress" => "InProgress",
+                "planned" => "Planned",
+                _ => "Planned"
+            };
         }
     }
 }

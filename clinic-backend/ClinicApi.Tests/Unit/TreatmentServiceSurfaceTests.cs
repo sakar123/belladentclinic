@@ -41,15 +41,33 @@ namespace ClinicApi.Tests.Unit
             var ttsRepo = new Repository<TreatmentToothSurface>(ctx);
 
             // Seed core entities
-            var patient = new Patient { id = Guid.NewGuid(), person_id = Guid.NewGuid(), created_at = DateTime.UtcNow, updated_at = DateTime.UtcNow };
-            var staff = new Staff { id = Guid.NewGuid(), person_id = Guid.NewGuid(), created_at = DateTime.UtcNow, updated_at = DateTime.UtcNow };
-            var appt = new Appointment { id = Guid.NewGuid(), patient_id = patient.id, staff_id = staff.id, start_time = DateTime.UtcNow, end_time = DateTime.UtcNow.AddMinutes(30), status_id = Guid.NewGuid() };
+            var patientPerson = new Person { id = Guid.NewGuid(), first_name = "Test", last_name = "Patient" };
+            var staffPerson = new Person { id = Guid.NewGuid(), first_name = "Test", last_name = "Provider" };
+            var role = new Role { id = Guid.NewGuid(), name = "Dentist" };
+            var appointmentStatus = new AppointmentStatus { id = Guid.NewGuid(), name = "Scheduled" };
+            var patient = new Patient { id = Guid.NewGuid(), person_id = patientPerson.id, Person = patientPerson, created_at = DateTime.UtcNow, updated_at = DateTime.UtcNow };
+            var staff = new Staff { id = Guid.NewGuid(), person_id = staffPerson.id, person = staffPerson, role_id = role.id, role = role, created_at = DateTime.UtcNow, updated_at = DateTime.UtcNow };
+            var appt = new Appointment
+            {
+                id = Guid.NewGuid(),
+                patient_id = patient.id,
+                patient = patient,
+                staff_id = staff.id,
+                staff = staff,
+                status_id = appointmentStatus.id,
+                status = appointmentStatus,
+                appointment_start_time = DateTime.UtcNow,
+                duration_minutes = 30
+            };
             var service = new Service { id = Guid.NewGuid(), name = "Filling", cost = 100m };
             var toothStatus = new ToothStatus { id = Guid.NewGuid(), code = "HEALTHY" };
-            var tooth = new Tooth { id = Guid.NewGuid(), patient_id = patient.id, tooth_number = 16, tooth_name = "Tooth 16", tooth_status_id = toothStatus.id, tooth_status = toothStatus, created_at = DateTime.UtcNow, updated_at = DateTime.UtcNow };
+            var tooth = new Tooth { id = Guid.NewGuid(), patient_id = patient.id, patient = patient, tooth_number = 16, tooth_name = "Tooth 16", tooth_status_id = toothStatus.id, tooth_status = toothStatus, created_at = DateTime.UtcNow, updated_at = DateTime.UtcNow };
 
+            ctx.Person.AddRange(patientPerson, staffPerson);
+            ctx.Role.Add(role);
             ctx.Patient.Add(patient);
             ctx.Staff.Add(staff);
+            ctx.AppointmentStatus.Add(appointmentStatus);
             ctx.Appointment.Add(appt);
             ctx.Service.Add(service);
             ctx.ToothStatus.Add(toothStatus);
@@ -70,6 +88,9 @@ namespace ClinicApi.Tests.Unit
                 updated_at = DateTime.UtcNow,
                 surfaces = "MOD",
                 teeth = new List<Tooth> { tooth },
+                appointment = appt,
+                patient = patient,
+                staff = staff,
                 service = service,
             };
             ctx.Treatment.Add(tr);
@@ -95,6 +116,68 @@ namespace ClinicApi.Tests.Unit
             bli.Should().NotBeNull();
             bli!.unit_price.Should().Be(150m);
         }
+
+        [Fact]
+        public async Task CreateTreatment_WithUnresolvedSingleTooth_ShouldThrow()
+        {
+            using var ctx = CreateContext();
+            var tRepo = new Repository<Treatment>(ctx);
+            var apptRepo = new Repository<Appointment>(ctx);
+            var patRepo = new Repository<Patient>(ctx);
+            var staffRepo = new Repository<Staff>(ctx);
+            var svcRepo = new Repository<Service>(ctx);
+            var toothRepo = new Repository<Tooth>(ctx);
+            var tsRepo = new Repository<ToothStatus>(ctx);
+            var billRepo = new Repository<Billing>(ctx);
+            var bliRepo = new Repository<BillingLineItem>(ctx);
+            var tierRepo = new Repository<SurfacePricingTier>(ctx);
+            var ttsRepo = new Repository<TreatmentToothSurface>(ctx);
+
+            var patientPerson = new Person { id = Guid.NewGuid(), first_name = "Test", last_name = "Patient" };
+            var staffPerson = new Person { id = Guid.NewGuid(), first_name = "Test", last_name = "Provider" };
+            var role = new Role { id = Guid.NewGuid(), name = "Dentist" };
+            var appointmentStatus = new AppointmentStatus { id = Guid.NewGuid(), name = "Scheduled" };
+            var patient = new Patient { id = Guid.NewGuid(), person_id = patientPerson.id, Person = patientPerson, created_at = DateTime.UtcNow, updated_at = DateTime.UtcNow };
+            var staff = new Staff { id = Guid.NewGuid(), person_id = staffPerson.id, person = staffPerson, role_id = role.id, role = role, created_at = DateTime.UtcNow, updated_at = DateTime.UtcNow };
+            var appt = new Appointment
+            {
+                id = Guid.NewGuid(),
+                patient_id = patient.id,
+                patient = patient,
+                staff_id = staff.id,
+                staff = staff,
+                status_id = appointmentStatus.id,
+                status = appointmentStatus,
+                appointment_start_time = DateTime.UtcNow,
+                duration_minutes = 30
+            };
+            var service = new Service { id = Guid.NewGuid(), name = "Crown Fitting", cost = 1200m, visual_cue_code = "CROWN" };
+
+            ctx.Person.AddRange(patientPerson, staffPerson);
+            ctx.Role.Add(role);
+            ctx.Patient.Add(patient);
+            ctx.Staff.Add(staff);
+            ctx.AppointmentStatus.Add(appointmentStatus);
+            ctx.Appointment.Add(appt);
+            ctx.Service.Add(service);
+            await ctx.SaveChangesAsync();
+
+            var svc = new TreatmentService(tRepo, apptRepo, patRepo, staffRepo, svcRepo, toothRepo, tsRepo, billRepo, bliRepo, tierRepo, ttsRepo);
+
+            var dto = new TreatmentDTO
+            {
+                appointment_id = appt.id,
+                patient_id = patient.id,
+                staff_id = staff.id,
+                service_id = service.id,
+                tooth_number = 99,
+                notes = "Crown fitting"
+            };
+
+            Func<Task> act = () => svc.CreateTreatmentAsync(dto);
+
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("Select one existing tooth for this treatment.");
+        }
     }
 }
-

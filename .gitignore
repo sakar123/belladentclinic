@@ -17,6 +17,9 @@
 #block_inspiration
 apexo-flutter/
 
+#no-temps
+temps/
+
 # Node.js
 node_modules/
 # Next.js specific build/cache directories

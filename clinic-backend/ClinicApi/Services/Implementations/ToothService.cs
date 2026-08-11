@@ -47,6 +47,8 @@ namespace ClinicApi.Services.Implementations
 
         public async Task<ToothDTO> CreateToothAsync(ToothDTO toothDto)
         {
+            ValidateToothNumber(toothDto.tooth_number);
+
             if (!await _patientRepository.ExistsAsync(toothDto.patient_id))
                 throw new KeyNotFoundException("Patient not found");
 
@@ -69,6 +71,8 @@ namespace ClinicApi.Services.Implementations
 
         public async Task<ToothDTO> UpdateToothAsync(Guid id, ToothDTO toothDto)
         {
+            ValidateToothNumber(toothDto.tooth_number);
+
             var existingTooth = await _toothRepository.GetByIdAsync(id);
             if (existingTooth == null)
                 throw new KeyNotFoundException("Tooth not found");
@@ -110,6 +114,14 @@ namespace ClinicApi.Services.Implementations
             await _toothRepository.DeleteAsync(tooth);
             await _toothRepository.SaveChangesAsync();
             return true;
+        }
+
+        private static void ValidateToothNumber(int toothNumber)
+        {
+            if (!ToothNumberValidator.IsValid(toothNumber))
+            {
+                throw new InvalidOperationException(ToothNumberValidator.ValidationMessage(toothNumber));
+            }
         }
     }
 }

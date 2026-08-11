@@ -49,6 +49,10 @@ namespace ClinicApi.Controllers
             {
                 return BadRequest(ex.Message);
             }
+            catch (InvalidOperationException ex)
+            {
+                return UnprocessableEntity(new { message = ex.Message });
+            }
         }
 
         [HttpPut("{id}")]
@@ -62,6 +66,10 @@ namespace ClinicApi.Controllers
             catch (ClinicApi.Models.Exceptions.IncompatibleToothStatusException ex)
             {
                 return UnprocessableEntity(new { message = ex.Message, current_status = ex.CurrentStatus, new_status = ex.NewStatus });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return UnprocessableEntity(new { message = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {
